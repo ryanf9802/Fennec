@@ -17,9 +17,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -47,7 +47,7 @@ jobs:
           } | ConvertTo-Json | Set-Content artifacts/dev/build-info.json
 
       - name: Upload developer build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fennec-dev-win-x64-${{ github.sha }}
           path: artifacts/dev
@@ -64,13 +64,13 @@ jobs:
             -p:SourceRevisionId="${{ github.sha }}" `
             -p:PublishDir="$publishDir"
           Compress-Archive -Path artifacts/release/* -DestinationPath artifacts/Fennec-win-x64.zip -Force
-          $msi = Get-ChildItem installer/bin/Release -Recurse -Filter FennecSetup.msi | Select-Object -First 1
+          $msi = Get-ChildItem installer/bin -Recurse -Filter FennecSetup.msi | Select-Object -First 1
           if ($null -eq $msi) { throw "FennecSetup.msi was not produced." }
           Copy-Item $msi.FullName artifacts/FennecSetup-win-x64.msi
 
       - name: Upload release ZIP
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fennec-release-win-x64-${{ github.run_number }}
           path: artifacts/Fennec-win-x64.zip
@@ -79,7 +79,7 @@ jobs:
 
       - name: Upload MSI
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fennec-msi-win-x64-${{ github.run_number }}
           path: artifacts/FennecSetup-win-x64.msi
