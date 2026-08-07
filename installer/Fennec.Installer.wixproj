@@ -3,10 +3,16 @@
     <OutputName>FennecSetup</OutputName>
     <OutputType>Package</OutputType>
     <Platform>x64</Platform>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.1.0</ProductVersion>
     <PublishDir>$(MSBuildThisFileDirectory)..\artifacts\publish\</PublishDir>
-    <DefineConstants>PublishDir=$(PublishDir)</DefineConstants>
+    <DefineConstants>PublishDir=$(PublishDir);ProductVersion=$(ProductVersion)</DefineConstants>
+    <!-- WiX Files harvesting intentionally generates per-user components that ICE validation rejects. -->
+    <SuppressValidation>true</SuppressValidation>
   </PropertyGroup>
-  <Target Name="PublishFennec" BeforeTargets="Build">
+  <ItemGroup>
+    <BindPath Include="$(PublishDir)" BindName="publish" />
+  </ItemGroup>
+  <Target Name="PublishFennec" BeforeTargets="CoreCompile">
     <MSBuild Projects="..\src\Fennec.App\Fennec.App.csproj"
              Targets="Publish"
              Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x64;SelfContained=true;PublishDir=$(PublishDir)" />

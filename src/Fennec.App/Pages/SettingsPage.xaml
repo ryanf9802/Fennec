@@ -5,6 +5,23 @@
         <StackPanel Spacing="12"><TextBlock Text="Sessions and behavior" Style="{StaticResource SectionTitle}"/><NumberBox x:Name="SessionGap" Header="New session after this many idle minutes" Minimum="1" Maximum="240" SpinButtonPlacementMode="Inline"/><ToggleSwitch x:Name="AutoOpen" Header="Automatically open the live monitor"/><ToggleSwitch x:Name="StartWithWindows" Header="Start Fennec with Windows"/><ComboBox x:Name="ThemePicker" Header="Appearance" Width="220" HorizontalAlignment="Left"><x:String>Dark</x:String><x:String>System</x:String><x:String>Light</x:String></ComboBox></StackPanel>
         <StackPanel Spacing="12"><TextBlock Text="Timeline" Style="{StaticResource SectionTitle}"/><TextBlock Text="Curated is a calm baseline. Everything displays every stored discrete event and attribute. Custom lets you choose both." TextWrapping="Wrap" Opacity="0.65"/><ComboBox x:Name="TimelinePresetPicker" Header="Default preset" Width="220" HorizontalAlignment="Left" SelectionChanged="TimelinePreset_Changed"><x:String>Curated</x:String><x:String>Everything</x:String><x:String>Custom</x:String></ComboBox><StackPanel x:Name="TimelineEventOptions" Spacing="6"/></StackPanel>
         <StackPanel Spacing="12"><TextBlock Text="Local data" Style="{StaticResource SectionTitle}"/><TextBlock Text="History stays on this PC until you delete it." Opacity="0.65"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Export JSON + CSV" Click="Export_Click"/><Button Content="Delete match history" Click="Delete_Click"/></StackPanel></StackPanel>
+        <StackPanel x:Name="DiagnosticsPanel" Spacing="12" Visibility="Collapsed">
+            <TextBlock Text="Developer diagnostics" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Developer mode records connection and lifecycle details without raw Stats API payloads or player names." TextWrapping="Wrap" Opacity="0.65"/>
+            <Border Background="{StaticResource FennecSurfaceBrush}" CornerRadius="10" Padding="16">
+                <StackPanel Spacing="7">
+                    <TextBlock x:Name="DiagnosticVersion" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="DiagnosticConnection"/>
+                    <TextBlock x:Name="DiagnosticEndpoint" FontFamily="Cascadia Mono"/>
+                    <TextBlock x:Name="DiagnosticLastEntry" TextWrapping="Wrap" Opacity="0.65"/>
+                </StackPanel>
+            </Border>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Copy diagnostics" Click="CopyDiagnostics_Click"/>
+                <Button Content="Open logs" Click="OpenLogs_Click"/>
+                <Button Content="Open data folder" Click="OpenData_Click"/>
+            </StackPanel>
+        </StackPanel>
         <Button Content="Save settings" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right" Click="Save_Click"/>
     </StackPanel></ScrollViewer>
 </UserControl>

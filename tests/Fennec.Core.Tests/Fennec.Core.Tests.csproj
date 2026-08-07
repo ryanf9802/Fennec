@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fennec.Core\Fennec.Core.csproj" />
+    <ProjectReference Include="..\..\src\Fennec.Infrastructure\Fennec.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

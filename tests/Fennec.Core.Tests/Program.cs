@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Fennec.Core;
+using Fennec.Infrastructure;
 
 var tests = new (string Name, Action Run)[]
 {
@@ -8,6 +9,8 @@ var tests = new (string Name, Action Run)[]
     ("Reducer retains discrete event payloads", ReducerDiscreteEvent),
     ("Reducer starts a new live match when the GUID changes", ReducerNewGuid),
     ("Reducer resumes event sequence after restart", ReducerResume),
+    ("Developer launch options accept flags and environment", DeveloperLaunchOptions),
+    ("Diagnostic logs are single-line and expire old files", DiagnosticLogBehavior),
     ("Session threshold is inclusive", SessionThreshold),
     ("Encounter roles and records are separated", EncounterRoles),
     ("Timeline discovers nested and unknown fields", TimelineDiscovery),
@@ -64,6 +67,29 @@ static void ReducerResume()
     reducer.Resume(existing);
     var updated = reducer.Apply(StatsEnvelope.Parse("{\"Event\":\"PlayerJoined\",\"Data\":{\"MatchGuid\":\"match-1\"}}"));
     Equal(13L, updated.Events[^1].Sequence);
+}
+
+static void DeveloperLaunchOptions()
+{
+    var flags = AppLaunchOptions.Parse("--background --dev", null);
+    True(flags.StartHidden); True(flags.DeveloperMode);
+    var environment = AppLaunchOptions.Parse(string.Empty, "true");
+    True(!environment.StartHidden); True(environment.DeveloperMode);
+    True(!AppLaunchOptions.Parse(null, "0").DeveloperMode);
+}
+
+static void DiagnosticLogBehavior()
+{
+    var directory = Path.Combine(Path.GetTempPath(), $"fennec-log-test-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    var expired = Path.Combine(directory, "fennec-20000101.log");
+    File.WriteAllText(expired, "expired"); File.SetLastWriteTimeUtc(expired, DateTime.UtcNow.AddDays(-8));
+    var log = new FileDiagnosticLog(directory, verbose: true);
+    log.Write(DiagnosticSeverity.Information, "Test\nArea", "safe\r\nmessage", new InvalidOperationException("failure\nmessage"));
+    var lines = File.ReadAllLines(log.CurrentFilePath);
+    Equal(1, lines.Length); True(lines[0].Contains("safe  message", StringComparison.Ordinal));
+    True(lines[0].Contains("InvalidOperationException", StringComparison.Ordinal)); True(!File.Exists(expired));
+    Directory.Delete(directory, recursive: true);
 }
 
 static void SessionThreshold()

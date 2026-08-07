@@ -1,5 +1,6 @@
 using Fennec.Core;
 using Fennec.Infrastructure;
+using System.Reflection;
 
 namespace Fennec.App;
 
@@ -10,12 +11,15 @@ public sealed class AppRuntime : IAsyncDisposable
     private readonly MatchReducer _reducer = new();
     private readonly SqliteFennecStore _store;
     private readonly AppSettingsStore _settingsStore;
+    private readonly FileDiagnosticLog _diagnostics;
     private StatsFeedClient? _feed;
     private Task? _feedTask;
 
-    public AppRuntime()
+    public AppRuntime(bool developerMode = false)
     {
         DataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Fennec");
+        IsDeveloperMode = developerMode;
+        _diagnostics = new FileDiagnosticLog(Path.Combine(DataDirectory, "logs"), developerMode);
         _store = new SqliteFennecStore(Path.Combine(DataDirectory, "fennec.db"));
         SettingsPath = Path.Combine(DataDirectory, "settings.json");
         IsFirstRun = !File.Exists(SettingsPath);
@@ -24,6 +28,10 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public string DataDirectory { get; }
     public string SettingsPath { get; }
+    public bool IsDeveloperMode { get; }
+    public string LogDirectory => _diagnostics.DirectoryPath;
+    public string LogFilePath => _diagnostics.CurrentFilePath;
+    public string? LastDiagnostic => _diagnostics.LastEntry;
     public bool IsFirstRun { get; private set; }
     public FennecSettings Settings { get; private set; } = new();
     public FeedConnectionState ConnectionState { get; private set; } = FeedConnectionState.Stopped;
@@ -38,6 +46,7 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public async Task InitializeAsync()
     {
+        _diagnostics.Write(DiagnosticSeverity.Information, "Runtime", $"Starting Fennec; developerMode={IsDeveloperMode}");
         await _store.InitializeAsync().ConfigureAwait(false);
         Settings = await _settingsStore.LoadAsync().ConfigureAwait(false);
         var loadedMatches = await _store.LoadMatchesAsync().ConfigureAwait(false);
@@ -59,6 +68,7 @@ public sealed class AppRuntime : IAsyncDisposable
         StartFeed();
         WindowsStartupService.SetEnabled(Settings.StartWithWindows, Environment.ProcessPath!);
         Changed?.Invoke();
+        _diagnostics.Write(DiagnosticSeverity.Information, "Runtime", $"Loaded {loadedMatches.Count} matches");
     }
 
     public async Task SelectProfileAsync(ParticipantState participant)
@@ -76,6 +86,7 @@ public sealed class AppRuntime : IAsyncDisposable
         var reconnect = settings.WebSocketPort != Settings.WebSocketPort;
         Settings = settings;
         await _settingsStore.SaveAsync(settings).ConfigureAwait(false);
+        _diagnostics.Write(DiagnosticSeverity.Information, "Settings", "Settings saved");
         IsFirstRun = false;
         if (reconnect)
         {
@@ -109,6 +120,22 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public void MarkMatchOpened(string id) => LastOpenedMatchId = id;
 
+    public string GetDiagnosticSummary()
+    {
+        var version = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+        return string.Join(Environment.NewLine,
+            $"Fennec: {version}",
+            $"Developer mode: {IsDeveloperMode}",
+            $"Runtime: {Environment.Version}",
+            $"OS: {Environment.OSVersion}",
+            $"Endpoint: ws://127.0.0.1:{Settings.WebSocketPort}",
+            $"Connection: {ConnectionState}",
+            $"Matches: {GetMatchesSnapshot().Count}",
+            $"Data: {DataDirectory}",
+            $"Log: {LogFilePath}",
+            $"Last diagnostic: {LastDiagnostic ?? "none"}");
+    }
+
     public IReadOnlyList<EncounterSummary> GetEncounters(string? excludeMatchId = null) =>
         string.IsNullOrWhiteSpace(ProfilePrimaryId)
             ? []
@@ -116,7 +143,7 @@ public sealed class AppRuntime : IAsyncDisposable
 
     private void StartFeed()
     {
-        _feed = new StatsFeedClient(new Uri($"ws://127.0.0.1:{Settings.WebSocketPort}"));
+        _feed = new StatsFeedClient(new Uri($"ws://127.0.0.1:{Settings.WebSocketPort}"), _diagnostics);
         _feed.StateChanged += state =>
         {
             ConnectionState = ActiveMatch is null ? state : FeedConnectionState.Live;
@@ -129,6 +156,8 @@ public sealed class AppRuntime : IAsyncDisposable
     private async Task HandleMessageAsync(StatsEnvelope envelope)
     {
         if (envelope.Event == "ReplayCreated") return;
+        if (envelope.Event is not "UpdateState" and not "ClockUpdatedSeconds")
+            _diagnostics.Write(DiagnosticSeverity.Information, "StatsEvent", envelope.Event);
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -149,6 +178,8 @@ public sealed class AppRuntime : IAsyncDisposable
                 await _store.SaveProfileAsync(ProfilePrimaryId, profile.Name).ConfigureAwait(false);
             }
             await _store.SaveMatchAsync(match).ConfigureAwait(false);
+            if (envelope.Event is "MatchEnded" or "MatchDestroyed")
+                _diagnostics.Write(DiagnosticSeverity.Information, "Match", $"{match.Id} transitioned to {match.Lifecycle}");
             ConnectionState = match.Lifecycle == MatchLifecycle.Live ? FeedConnectionState.Live : FeedConnectionState.Waiting;
         }
         finally
@@ -162,6 +193,7 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _diagnostics.Write(DiagnosticSeverity.Information, "Runtime", "Stopping Fennec");
         if (_feed is not null) await _feed.DisposeAsync().ConfigureAwait(false);
         if (_feedTask is not null)
         {

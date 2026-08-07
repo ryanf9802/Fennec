@@ -14,6 +14,7 @@
     <ApplicationIcon>Assets\Fennec.ico</ApplicationIcon>
     <AssemblyName>Fennec</AssemblyName>
     <RootNamespace>Fennec.App</RootNamespace>
+    <VersionPrefix>0.1.0</VersionPrefix>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Fennec.Core\Fennec.Core.csproj" />
@@ -27,5 +28,6 @@
     <Content Include="Assets\fennec-*.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\scripts\Run-Fennec-Dev.cmd" Link="Run-Fennec-Dev.cmd" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

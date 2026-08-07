@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Fennec.Core;
 
 namespace Fennec.App;
 
@@ -10,9 +11,8 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        var startHidden = args.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Contains("--background", StringComparer.OrdinalIgnoreCase);
-        MainWindow = new MainWindow(startHidden);
+        var options = AppLaunchOptions.Parse(args.Arguments, Environment.GetEnvironmentVariable("FENNEC_DEV_MODE"));
+        MainWindow = new MainWindow(options.StartHidden, options.DeveloperMode);
         MainWindow.Activate();
     }
 }

@@ -7,9 +7,10 @@ namespace Fennec.Infrastructure;
 
 public enum FeedConnectionState { Stopped, Connecting, Waiting, Live, Unavailable }
 
-public sealed class StatsFeedClient(Uri endpoint) : IAsyncDisposable
+public sealed class StatsFeedClient(Uri endpoint, IDiagnosticLog? diagnostics = null) : IAsyncDisposable
 {
     private readonly Uri _endpoint = endpoint;
+    private readonly IDiagnosticLog? _diagnostics = diagnostics;
     private readonly CancellationTokenSource _lifetime = new();
     private ClientWebSocket? _socket;
 
@@ -30,10 +31,12 @@ public sealed class StatsFeedClient(Uri endpoint) : IAsyncDisposable
             try
             {
                 StateChanged?.Invoke(FeedConnectionState.Connecting);
+                _diagnostics?.Write(DiagnosticSeverity.Information, "StatsFeed", $"Connecting to {_endpoint}");
                 _socket?.Dispose();
                 _socket = new ClientWebSocket();
                 await _socket.ConnectAsync(_endpoint, cancellationToken).ConfigureAwait(false);
                 StateChanged?.Invoke(FeedConnectionState.Waiting);
+                _diagnostics?.Write(DiagnosticSeverity.Information, "StatsFeed", "WebSocket connected");
                 delay = TimeSpan.FromSeconds(1);
                 await ReceiveMessagesAsync(_socket, cancellationToken).ConfigureAwait(false);
             }
@@ -41,9 +44,15 @@ public sealed class StatsFeedClient(Uri endpoint) : IAsyncDisposable
             {
                 break;
             }
-            catch (WebSocketException)
+            catch (WebSocketException exception)
             {
                 StateChanged?.Invoke(FeedConnectionState.Unavailable);
+                _diagnostics?.Write(DiagnosticSeverity.Warning, "StatsFeed", "WebSocket unavailable", exception);
+            }
+            catch (Exception exception)
+            {
+                StateChanged?.Invoke(FeedConnectionState.Unavailable);
+                _diagnostics?.Write(DiagnosticSeverity.Error, "StatsFeed", "Monitoring loop failed and will retry", exception);
             }
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             delay = TimeSpan.FromSeconds(Math.Min(delay.TotalSeconds * 2, 15));
@@ -76,9 +85,10 @@ public sealed class StatsFeedClient(Uri endpoint) : IAsyncDisposable
                 var envelope = StatsEnvelope.Parse(Encoding.UTF8.GetString(message.GetBuffer(), 0, checked((int)message.Length)));
                 if (MessageReceived is { } handler) await handler(envelope).ConfigureAwait(false);
             }
-            catch (JsonException)
+            catch (JsonException exception)
             {
                 // A malformed packet must not terminate monitoring.
+                _diagnostics?.Write(DiagnosticSeverity.Warning, "StatsFeed", "Ignored a malformed Stats API packet", exception);
             }
         }
     }

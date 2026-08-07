@@ -3,6 +3,7 @@ using Fennec.Core;
 using Fennec.Infrastructure;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 
 namespace Fennec.App.Pages;
@@ -24,6 +25,22 @@ public sealed partial class SettingsPage : UserControl
         _enabledEvents = new HashSet<string>(runtime.Settings.EnabledTimelineEvents ?? TimelineConfiguration.Curated.Rules.Select(item => item.EventName), StringComparer.Ordinal);
         _attributes = runtime.Settings.TimelineAttributes is null ? new(StringComparer.Ordinal) : runtime.Settings.TimelineAttributes.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
         BuildTimelineOptions();
+        DiagnosticsPanel.Visibility = runtime.IsDeveloperMode ? Visibility.Visible : Visibility.Collapsed;
+        RefreshDiagnostics();
+        _runtime.Changed += Runtime_Changed;
+        Unloaded += (_, _) => _runtime.Changed -= Runtime_Changed;
+    }
+
+    private void Runtime_Changed() => DispatcherQueue.TryEnqueue(RefreshDiagnostics);
+
+    private void RefreshDiagnostics()
+    {
+        if (!_runtime.IsDeveloperMode) return;
+        var lines = _runtime.GetDiagnosticSummary().Split(Environment.NewLine);
+        DiagnosticVersion.Text = lines.ElementAtOrDefault(0) ?? "Fennec";
+        DiagnosticConnection.Text = $"Connection: {_runtime.ConnectionState}";
+        DiagnosticEndpoint.Text = $"ws://127.0.0.1:{_runtime.Settings.WebSocketPort}";
+        DiagnosticLastEntry.Text = _runtime.LastDiagnostic ?? "No diagnostic entries yet.";
     }
 
     private void BuildTimelineOptions()
@@ -98,5 +115,14 @@ public sealed partial class SettingsPage : UserControl
         var dialog = new ContentDialog { Title = "Delete all match history?", Content = "This permanently deletes recorded matches, participants, and timelines. Your profile and settings remain.", PrimaryButtonText = "Delete", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close, XamlRoot = XamlRoot };
         if (await dialog.ShowAsync() == ContentDialogResult.Primary) { await _runtime.ClearHistoryAsync(); Show(InfoBarSeverity.Success, "History deleted", "Fennec is ready to record the next match."); }
     }
+    private void CopyDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        var package = new DataPackage(); package.SetText(_runtime.GetDiagnosticSummary());
+        Clipboard.SetContent(package); Clipboard.Flush();
+        Show(InfoBarSeverity.Success, "Diagnostics copied", "The diagnostic summary is ready to paste.");
+    }
+    private void OpenLogs_Click(object sender, RoutedEventArgs e) => OpenFolder(_runtime.LogDirectory);
+    private void OpenData_Click(object sender, RoutedEventArgs e) => OpenFolder(_runtime.DataDirectory);
+    private static void OpenFolder(string path) => Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true, ArgumentList = { path } });
     private void Show(InfoBarSeverity severity, string title, string message) { SettingsStatus.Severity = severity; SettingsStatus.Title = title; SettingsStatus.Message = message; SettingsStatus.IsOpen = true; }
 }

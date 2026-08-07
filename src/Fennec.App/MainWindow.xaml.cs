@@ -12,14 +12,15 @@ namespace Fennec.App;
 
 public sealed partial class MainWindow : Window
 {
-    private readonly AppRuntime _runtime = new();
+    private readonly AppRuntime _runtime;
     private readonly AppWindow _appWindow;
     private TrayIconService? _tray;
     private string? _lastActiveMatchId;
     private readonly bool _startHidden;
 
-    public MainWindow(bool startHidden = false)
+    public MainWindow(bool startHidden = false, bool developerMode = false)
     {
+        _runtime = new AppRuntime(developerMode);
         _startHidden = startHidden;
         InitializeComponent();
         var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
