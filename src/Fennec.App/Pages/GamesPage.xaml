@@ -1,0 +1,118 @@
+<UserControl
+    x:Class="Fennec.App.Pages.GamesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer>
+        <StackPanel Padding="36,30,36,48" Spacing="24" MaxWidth="1180" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Games" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Every match, organized automatically." Opacity="0.65" />
+            </StackPanel>
+
+            <Border x:Name="CurrentSessionPanel" BorderBrush="{StaticResource FennecCyanBrush}"
+                    BorderThickness="1" CornerRadius="12" Background="{StaticResource FennecSurfaceBrush}" Padding="22">
+                <StackPanel Spacing="18">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" Spacing="9">
+                            <Ellipse Width="9" Height="9" Fill="{StaticResource FennecCyanBrush}" />
+                            <TextBlock Text="CURRENT SESSION" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" />
+                        </StackPanel>
+                        <TextBlock x:Name="SessionRange" Grid.Column="1" Opacity="0.55" />
+                    </Grid>
+                    <Grid ColumnSpacing="18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel><TextBlock Text="RECORD" Opacity="0.55" FontSize="11"/><TextBlock x:Name="RecordMetric" Style="{StaticResource MetricValue}"/></StackPanel>
+                        <StackPanel Grid.Column="1"><TextBlock Text="WIN RATE" Opacity="0.55" FontSize="11"/><TextBlock x:Name="WinRateMetric" Style="{StaticResource MetricValue}"/></StackPanel>
+                        <StackPanel Grid.Column="2"><TextBlock Text="STREAK" Opacity="0.55" FontSize="11"/><TextBlock x:Name="StreakMetric" Style="{StaticResource MetricValue}"/></StackPanel>
+                        <StackPanel Grid.Column="3"><TextBlock Text="GOALS F–A" Opacity="0.55" FontSize="11"/><TextBlock x:Name="GoalsForAgainstMetric" Style="{StaticResource MetricValue}"/></StackPanel>
+                        <StackPanel Grid.Column="4"><TextBlock Text="GOAL DIFF" Opacity="0.55" FontSize="11"/><TextBlock x:Name="GoalDiffMetric" Style="{StaticResource MetricValue}"/></StackPanel>
+                        <StackPanel Grid.Column="5"><TextBlock Text="SHOOTING" Opacity="0.55" FontSize="11"/><TextBlock x:Name="ShootingMetric" Style="{StaticResource MetricValue}"/></StackPanel>
+                    </Grid>
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                            <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel><TextBlock Text="Goals" Opacity="0.55"/><TextBlock x:Name="GoalsMetric" FontWeight="SemiBold"/></StackPanel>
+                        <StackPanel Grid.Column="1"><TextBlock Text="Assists" Opacity="0.55"/><TextBlock x:Name="AssistsMetric" FontWeight="SemiBold"/></StackPanel>
+                        <StackPanel Grid.Column="2"><TextBlock Text="Saves" Opacity="0.55"/><TextBlock x:Name="SavesMetric" FontWeight="SemiBold"/></StackPanel>
+                        <StackPanel Grid.Column="3"><TextBlock Text="Shots" Opacity="0.55"/><TextBlock x:Name="ShotsMetric" FontWeight="SemiBold"/></StackPanel>
+                        <StackPanel Grid.Column="4"><TextBlock Text="Avg score" Opacity="0.55"/><TextBlock x:Name="ScoreMetric" FontWeight="SemiBold"/></StackPanel>
+                        <StackPanel Grid.Column="5"><TextBlock Text="Demos" Opacity="0.55"/><TextBlock x:Name="DemosMetric" FontWeight="SemiBold"/></StackPanel>
+                        <StackPanel Grid.Column="6"><TextBlock Text="Touches" Opacity="0.55"/><TextBlock x:Name="TouchesMetric" FontWeight="SemiBold"/></StackPanel>
+                        <StackPanel Grid.Column="7"><TextBlock Text="Games" Opacity="0.55"/><TextBlock x:Name="GamesMetric" FontWeight="SemiBold"/></StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Button x:Name="LiveButton" Click="LiveButton_Click" Visibility="Collapsed"
+                    HorizontalContentAlignment="Stretch" Padding="0" Background="Transparent" BorderThickness="0">
+                <Border x:Name="LiveCard" BorderBrush="{StaticResource FennecOrangeBrush}" BorderThickness="2" CornerRadius="12"
+                        Background="{StaticResource FennecSurfaceBrush}" Padding="20">
+                    <Grid ColumnSpacing="18">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource FennecOrangeBrush}" CornerRadius="5" Padding="9,4" VerticalAlignment="Center">
+                            <TextBlock Text="LIVE" Foreground="#111111" FontWeight="Bold" FontSize="11"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock x:Name="LivePlaylist" FontWeight="SemiBold" FontSize="17"/>
+                            <TextBlock x:Name="LivePersonal" Opacity="0.65"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Right">
+                            <TextBlock x:Name="LiveScore" FontSize="25" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                            <TextBlock x:Name="LiveClock" Opacity="0.65" HorizontalAlignment="Right"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Button>
+
+            <StackPanel Spacing="12">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="180"/><ColumnDefinition Width="130"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+                    <TextBox x:Name="HistorySearch" PlaceholderText="Search games or players" TextChanged="HistorySearch_TextChanged"/>
+                    <ComboBox x:Name="PlaylistFilter" Grid.Column="1" PlaceholderText="All playlists" SelectionChanged="HistoryFilter_Changed"/>
+                    <ComboBox x:Name="ResultFilter" Grid.Column="2" SelectedIndex="0" SelectionChanged="HistoryFilter_Changed"><x:String>All results</x:String><x:String>Wins</x:String><x:String>Losses</x:String><x:String>Incomplete</x:String></ComboBox>
+                    <ComboBox x:Name="DateFilter" Grid.Column="3" SelectedIndex="0" SelectionChanged="HistoryFilter_Changed"><x:String>All time</x:String><x:String>Last 7 days</x:String><x:String>Last 30 days</x:String><x:String>Last 90 days</x:String></ComboBox>
+                </Grid>
+                <TextBlock Text="GAME TIMELINE" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Opacity="0.7" />
+                <ItemsControl x:Name="SessionList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Spacing="8" Margin="0,4,0,20">
+                                <Button Tag="{Binding Id}" Click="SessionButton_Click" HorizontalContentAlignment="Stretch"
+                                        Padding="0" Background="Transparent" BorderThickness="0">
+                                    <Grid Padding="4,10" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock Text="{Binding Header}" FontWeight="SemiBold" FontSize="17"/><TextBlock Text="{Binding Range}" Opacity="0.55"/></StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding Summary}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                    </Grid>
+                                </Button>
+                                <ItemsControl ItemsSource="{Binding Matches}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Tag="{Binding Id}" Click="MatchButton_Click" HorizontalContentAlignment="Stretch"
+                                                    Background="{StaticResource FennecSurfaceBrush}" BorderThickness="0" Padding="16,13" Margin="0,2">
+                                                <Grid ColumnSpacing="14">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="90"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Result}" Foreground="{StaticResource FennecCyanBrush}" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Score}" FontWeight="SemiBold" FontSize="18" VerticalAlignment="Center"/>
+                                                    <StackPanel Grid.Column="2"><TextBlock Text="{Binding Playlist}" FontWeight="SemiBold"/><TextBlock Text="{Binding FamiliarPlayers}" Opacity="0.55"/></StackPanel>
+                                                    <StackPanel Grid.Column="3"><TextBlock Text="{Binding PersonalLine}" HorizontalAlignment="Right"/><TextBlock Text="{Binding When}" Opacity="0.55" HorizontalAlignment="Right"/></StackPanel>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="EmptyHistory" Text="Your games will appear here as soon as Fennec receives a match."
+                           Opacity="0.55" HorizontalAlignment="Center" Margin="0,32" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

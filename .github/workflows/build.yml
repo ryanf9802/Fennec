@@ -1,0 +1,20 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore Fennec.sln
+      - name: Core behavior tests
+        run: dotnet run --project tests/Fennec.Core.Tests -c Release
+      - name: Build native app
+        run: dotnet build src/Fennec.App/Fennec.App.csproj -c Release --no-restore

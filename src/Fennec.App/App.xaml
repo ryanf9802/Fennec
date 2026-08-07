@@ -1,0 +1,33 @@
+<Application
+    x:Class="Fennec.App.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    RequestedTheme="Dark">
+    <Application.Resources>
+        <ResourceDictionary>
+            <Color x:Key="FennecNavy">#0B111D</Color>
+            <Color x:Key="FennecSurface">#131C2A</Color>
+            <Color x:Key="FennecCyan">#65D9EE</Color>
+            <Color x:Key="FennecOrange">#FF8A3D</Color>
+            <SolidColorBrush x:Key="FennecNavyBrush" Color="{StaticResource FennecNavy}" />
+            <SolidColorBrush x:Key="FennecSurfaceBrush" Color="{StaticResource FennecSurface}" />
+            <SolidColorBrush x:Key="FennecCyanBrush" Color="{StaticResource FennecCyan}" />
+            <SolidColorBrush x:Key="FennecOrangeBrush" Color="{StaticResource FennecOrange}" />
+            <Style x:Key="PageTitle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
+                <Setter Property="FontSize" Value="32" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+            <Style x:Key="SectionTitle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
+                <Setter Property="FontSize" Value="18" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+            <Style x:Key="MetricValue" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
+                <Setter Property="FontSize" Value="24" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
