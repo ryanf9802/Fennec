@@ -43,12 +43,7 @@ public sealed partial class GamesPage : UserControl
                 (_runtime.ActiveMatch is not null || DateTimeOffset.UtcNow - latest.EndedAt < threshold);
             var currentMatches = isCurrent ? latest!.Matches : [];
             var metrics = UiProjection.Metrics(currentMatches, _runtime.ProfilePrimaryId);
-            RecordMetric.Text = metrics.Record; WinRateMetric.Text = metrics.WinRate; StreakMetric.Text = metrics.Streak;
-            GoalsForAgainstMetric.Text = metrics.GoalsForAgainst;
-            GoalDiffMetric.Text = metrics.GoalDifference; ShootingMetric.Text = metrics.Shooting;
-            GoalsMetric.Text = metrics.Goals; AssistsMetric.Text = metrics.Assists; SavesMetric.Text = metrics.Saves;
-            ShotsMetric.Text = metrics.Shots; ScoreMetric.Text = metrics.Score; DemosMetric.Text = metrics.Demos;
-            TouchesMetric.Text = metrics.Touches; GamesMetric.Text = metrics.Games;
+            CurrentMetrics.SetMetrics(metrics);
             SessionRange.Text = isCurrent ? $"Started {latest!.StartedAt.ToLocalTime():h:mm tt}" : "Waiting for a match";
 
             var encounters = _runtime.GetEncounters(_runtime.ActiveMatch?.Id).ToDictionary(item => item.PrimaryId, StringComparer.Ordinal);
@@ -59,7 +54,9 @@ public sealed partial class GamesPage : UserControl
                 LivePersonal.Text = row.PersonalLine; LiveScore.Text = row.Score;
                 LiveClock.Text = active.IsOvertime ? "OVERTIME" : $"{active.TimeSeconds / 60}:{active.TimeSeconds % 60:00}";
                 var unopened = active.Id != _runtime.LastOpenedMatchId;
-                LiveCard.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[unopened ? "FennecOrangeBrush" : "FennecCyanBrush"];
+                var themeKey = LiveCard.ActualTheme == ElementTheme.Light ? "Light" : "Default";
+                var themeResources = (ResourceDictionary)Application.Current.Resources.ThemeDictionaries[themeKey];
+                LiveCard.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)themeResources[unopened ? "FennecOrangeBrush" : "FennecCyanBrush"];
                 LiveCard.BorderThickness = new Thickness(unopened ? 2 : 1);
             }
             else LiveButton.Visibility = Visibility.Collapsed;

@@ -12,10 +12,7 @@ public sealed partial class SessionPage : UserControl
         TitleText.Text = session.StartedAt.ToLocalTime().ToString("dddd, MMMM d");
         RangeText.Text = $"{session.StartedAt.ToLocalTime():h:mm tt} – {session.EndedAt.ToLocalTime():h:mm tt} · {session.Matches.Count} games";
         var metrics = UiProjection.Metrics(session.Matches, runtime.ProfilePrimaryId);
-        RecordText.Text = metrics.Record; WinRateText.Text = metrics.WinRate; StreakText.Text = metrics.Streak;
-        GoalsForAgainstText.Text = metrics.GoalsForAgainst; GoalDiffText.Text = metrics.GoalDifference; ShootingText.Text = metrics.Shooting;
-        GoalsText.Text = metrics.Goals; AssistsText.Text = metrics.Assists; SavesText.Text = metrics.Saves; ShotsText.Text = metrics.Shots;
-        ScoreText.Text = metrics.Score; DemosText.Text = metrics.Demos; TouchesText.Text = metrics.Touches; GamesText.Text = metrics.Games;
+        SessionMetrics.SetMetrics(metrics);
         var encounters = runtime.GetEncounters().ToDictionary(item => item.PrimaryId, StringComparer.Ordinal);
         var familiar = session.Matches.SelectMany(item => item.Participants).Where(item => item.PrimaryId != runtime.ProfilePrimaryId && item.PrimaryId is not null)
             .GroupBy(item => item.PrimaryId!).Select(group => encounters.GetValueOrDefault(group.Key)).Where(item => item is not null && item.GamesTogether + item.GamesOpposed > 1)
