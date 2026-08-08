@@ -26,9 +26,12 @@ describe('Fennec site infrastructure', () => {
     template.hasResourceProperties('AWS::CloudFront::Distribution', {
       DistributionConfig: Match.objectLike({
         Aliases: ['app.fennec.gg', 'fennec.gg'],
+        PriceClass: Match.absent(),
         DefaultCacheBehavior: Match.objectLike({
+          CachePolicyId: '83da9c7e-98b4-4e11-a168-04f0df8e2c65',
           FunctionAssociations: [
             Match.objectLike({ EventType: 'viewer-request' }),
+            Match.objectLike({ EventType: 'viewer-response' }),
           ],
         }),
       }),
@@ -41,6 +44,13 @@ describe('Fennec site infrastructure', () => {
         "'https://app.fennec.gg' \\+ request.uri \\+ querySuffix",
       ),
     });
+    template.hasResourceProperties('AWS::CloudFront::Function', {
+      FunctionCode: Match.stringLikeRegexp(
+        'content-security-policy[\\s\\S]*strict-transport-security',
+      ),
+    });
+    template.resourceCountIs('AWS::CloudFront::CachePolicy', 0);
+    template.resourceCountIs('AWS::CloudFront::ResponseHeadersPolicy', 0);
     template.resourceCountIs('AWS::Route53::RecordSet', 4);
     template.hasOutput('SiteUrl', { Value: 'https://app.fennec.gg' });
   });

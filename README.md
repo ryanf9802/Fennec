@@ -105,6 +105,8 @@ account `309418039962`. `FennecSite` creates a private S3 origin, CloudFront
 Origin Access Control, SPA routing, security headers, ACM/Route 53 records, and
 a permanent `fennec.gg` to `app.fennec.gg` redirect. `FennecCiAccess` creates a
 GitHub OIDC role whose trust is restricted to this repository's `main` branch.
+The distribution uses AWS-managed caching and dedicated CloudFront Functions so
+it remains compatible with CloudFront's flat-rate Free plan.
 
 The deployment intentionally fails before assuming AWS credentials unless
 `AWS_ACCOUNT_ID` is exactly `309418039962`. CDK also rejects every other

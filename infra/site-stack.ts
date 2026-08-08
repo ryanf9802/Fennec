@@ -103,45 +103,29 @@ function handler(event) {
           })
         : undefined;
 
-    const cachePolicy = new cloudfront.CachePolicy(this, 'AssetCachePolicy', {
-      defaultTtl: cdk.Duration.seconds(0),
-      minTtl: cdk.Duration.seconds(0),
-      maxTtl: cdk.Duration.days(365),
-      cookieBehavior: cloudfront.CacheCookieBehavior.none(),
-      headerBehavior: cloudfront.CacheHeaderBehavior.none(),
-      queryStringBehavior: cloudfront.CacheQueryStringBehavior.none(),
-      enableAcceptEncodingBrotli: true,
-      enableAcceptEncodingGzip: true,
-    });
-
-    const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(
+    const securityHeadersFunction = new cloudfront.Function(
       this,
       'SecurityHeaders',
       {
-        securityHeadersBehavior: {
-          contentSecurityPolicy: {
-            override: true,
-            contentSecurityPolicy:
-              "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*",
-          },
-          contentTypeOptions: { override: true },
-          frameOptions: {
-            frameOption: cloudfront.HeadersFrameOption.DENY,
-            override: true,
-          },
-          referrerPolicy: {
-            referrerPolicy:
-              cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
-            override: true,
-          },
-          strictTransportSecurity: {
-            accessControlMaxAge: cdk.Duration.days(365),
-            includeSubdomains: true,
-            preload: true,
-            override: true,
-          },
-          xssProtection: { protection: true, modeBlock: true, override: true },
-        },
+        comment: 'Apply Fennec browser security headers',
+        runtime: cloudfront.FunctionRuntime.JS_2_0,
+        code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var response = event.response;
+  var headers = response.headers;
+  headers['content-security-policy'] = {
+    value: ${JSON.stringify("default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*")}
+  };
+  headers['x-content-type-options'] = { value: 'nosniff' };
+  headers['x-frame-options'] = { value: 'DENY' };
+  headers['referrer-policy'] = { value: 'strict-origin-when-cross-origin' };
+  headers['strict-transport-security'] = {
+    value: 'max-age=31536000; includeSubDomains; preload'
+  };
+  headers['x-xss-protection'] = { value: '1; mode=block' };
+  return response;
+}
+`),
       },
     );
 
@@ -157,23 +141,27 @@ function handler(event) {
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       enableIpv6: true,
-      priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(bucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
         compress: true,
-        cachePolicy,
-        responseHeadersPolicy,
-        functionAssociations: redirectFunction
-          ? [
-              {
-                eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-                function: redirectFunction,
-              },
-            ]
-          : undefined,
+        cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
+        functionAssociations: [
+          ...(redirectFunction
+            ? [
+                {
+                  eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+                  function: redirectFunction,
+                },
+              ]
+            : []),
+          {
+            eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
+            function: securityHeadersFunction,
+          },
+        ],
       },
       errorResponses: [403, 404].map((httpStatus) => ({
         httpStatus,
