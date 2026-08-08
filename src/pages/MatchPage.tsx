@@ -1,4 +1,4 @@
-import { ArrowLeft, History, Radio, Trophy } from 'lucide-react';
+import { ArrowLeft, History, Trophy } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { PlayerName } from '../components/PlayerName';
@@ -46,7 +46,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
   return <div className="space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-6 xl:space-y-0">
     <Link to="/" className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"><ArrowLeft className="size-4" />Game timeline</Link>
     <header className="flex flex-wrap items-start justify-between gap-5">
-      <div><div className="eyebrow flex items-center gap-2">{match.lifecycle === 'live' && <Radio className="size-3 text-fennec-cyan" />}{match.lifecycle} match</div><h1 className="mt-1 text-3xl font-black sm:text-4xl">{match.playlistName}</h1><p className="text-muted mt-2">{match.arena || 'Arena unavailable'} · {new Date(match.startedAt).toLocaleString()}</p></div>
+      <div><h1 className="text-3xl font-black sm:text-4xl">{match.playlistName}</h1><p className="text-muted mt-2">{match.arena || 'Arena unavailable'} · {new Date(match.startedAt).toLocaleString()}</p></div>
       <div className="text-right"><div className="text-4xl font-black">{teams.length > 1 ? `${teams[0]!.score} – ${teams.at(-1)!.score}` : '—'}</div><div className="text-fennec-orange mt-1 font-bold">{match.isOvertime ? 'OVERTIME · ' : ''}{Math.floor(match.timeSeconds / 60)}:{String(match.timeSeconds % 60).padStart(2, '0')}</div></div>
     </header>
     <div className="grid min-w-0 gap-6 xl:min-h-0 xl:grid-cols-[minmax(0,3fr)_minmax(22rem,2fr)]">

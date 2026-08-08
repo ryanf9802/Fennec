@@ -12,7 +12,7 @@ export function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const trackingSince = overviewQuery.data?.firstMatchStartedAt ? new Date(overviewQuery.data.firstMatchStartedAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : '—';
   return <div className="space-y-7">
-    <header><div className="eyebrow">Identity</div><h1 className="mt-1 text-3xl font-black sm:text-4xl">Profile</h1><p className="text-muted mt-2">Choose your stable platform ID once; Fennec follows display-name changes automatically.</p></header>
+    <header><h1 className="text-3xl font-black sm:text-4xl">Profile</h1><p className="text-muted mt-2">Choose your stable platform ID once; Fennec follows display-name changes automatically.</p></header>
     <section className="surface rounded-3xl p-5 sm:p-7">
       <div className="flex items-start gap-4"><div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-400/10 text-fennec-cyan"><UserRound className="size-6" /></div><div className="min-w-0"><div className="eyebrow">Display name</div><div className="mt-1 truncate text-3xl font-black">{profile?.displayName ?? 'Not selected'}</div><div className="text-muted mt-2 break-all font-mono text-sm">{profile?.primaryId ?? 'No platform identifier selected'}</div></div></div>
       <div className="mt-7 grid grid-cols-2 gap-5 border-t border-ui pt-6 sm:grid-cols-4">{[['Platform', profile?.primaryId.split('|')[0] ?? '—'], ['Games tracked', overviewQuery.data?.matches ?? '—'], ['Sessions', overviewQuery.data?.sessions ?? '—'], ['Tracking since', trackingSince]].map(([label, value]) => <div key={label}><div className="eyebrow">{label}</div><div className="mt-1 font-extrabold">{value}</div></div>)}</div>

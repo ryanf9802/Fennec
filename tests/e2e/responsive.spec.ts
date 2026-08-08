@@ -19,6 +19,7 @@ test('demo feed opens a live match and settings remain usable', async ({ page })
   await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
   await page.getByText('Live now').click();
   await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
+  await expect(page.locator('main .eyebrow').filter({ hasText: /^live match$/i })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Event timeline' })).toBeVisible();
   await expect(page.getByText('Select another player for history')).toBeVisible();
   await expect(page.getByRole('button', { name: 'View history with Luna' })).toBeVisible();
@@ -60,9 +61,10 @@ test('primary pages use the same full content width', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Game timeline' })).toBeVisible();
   await expect(page.getByText('Second-monitor dashboard')).toHaveCount(0);
   const gamesWidth = (await page.locator('main > div').first().boundingBox())!.width;
-  for (const [path, heading] of [['/settings?demo=1', 'Settings'], ['/profile?demo=1', 'Profile'], ['/onboarding?demo=1', 'Connect Rocket League']] as const) {
+  for (const [path, heading, removedEyebrow] of [['/settings?demo=1', 'Settings', 'Preferences and storage'], ['/profile?demo=1', 'Profile', 'Identity'], ['/onboarding?demo=1', 'Connect Rocket League', undefined]] as const) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    if (removedEyebrow) await expect(page.getByText(removedEyebrow, { exact: true })).toHaveCount(0);
     expect((await page.locator('main > div').first().boundingBox())!.width).toBeCloseTo(gamesWidth, 0);
   }
 });

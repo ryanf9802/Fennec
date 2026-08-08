@@ -72,7 +72,7 @@ export function SettingsPage() {
   };
 
   return <div className="space-y-7">
-    <header><div className="eyebrow">Preferences and storage</div><h1 className="mt-1 text-3xl font-black sm:text-4xl">Settings</h1><p className="text-muted mt-2">Monitoring, automatic sessions, event detail, and browser-local data.</p></header>
+    <header><h1 className="text-3xl font-black sm:text-4xl">Settings</h1><p className="text-muted mt-2">Monitoring, automatic sessions, event detail, and browser-local data.</p></header>
 
     <section className="surface rounded-3xl p-5 sm:p-7"><h2 className="text-xl font-extrabold">Monitoring</h2><div className="mt-5 grid gap-5 lg:grid-cols-2"><label className="block"><span className="eyebrow">WebSocket port</span><input className="control mt-2" type="number" min="1024" max="65535" value={draft.webSocketPort} onChange={(event) => patchDraft({ webSocketPort: Number(event.target.value) })} /></label><div><div className="eyebrow">Connection</div><ConnectionStatus connection={connection} className="surface-strong mt-2 min-h-11 rounded-xl px-4" /></div></div>
       <div className="mt-6"><div className="eyebrow">Rocket League configuration</div><p className="text-muted mt-1 text-sm">Update one Stats API setting from the game's installation directory.</p><StatsApiSetup /></div>
