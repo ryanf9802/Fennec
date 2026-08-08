@@ -154,6 +154,21 @@ test('3D touch map controls and preference persist across matches', async ({
   const box = (await viewport.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 80);
   await expect(viewport).toHaveCSS('cursor', 'grab');
+
+  const matchColumn = page.locator('.scoreboard-container');
+  const initialScrollTop = await matchColumn.evaluate(
+    (element) => element.scrollTop,
+  );
+  const initialDistance = await viewport.getAttribute('data-camera-distance');
+  await page.mouse.wheel(0, 100);
+  await expect(viewport).not.toHaveAttribute(
+    'data-camera-distance',
+    initialDistance!,
+  );
+  await expect
+    .poll(() => matchColumn.evaluate((element) => element.scrollTop))
+    .toBe(initialScrollTop);
+
   await page.mouse.down();
   await expect(viewport).toHaveCSS('cursor', 'grabbing');
   await page.mouse.move(box.x + box.width / 2, box.y + 180);

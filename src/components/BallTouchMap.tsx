@@ -1,11 +1,11 @@
 import {
   Component,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-  type WheelEvent,
 } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { arenaProfile } from '../domain/arenaProfiles';
@@ -94,6 +94,7 @@ export function BallTouchMap({
   const [camera, setCamera] = useState<TouchMapCameraState>(() =>
     defaultCameraState(arena),
   );
+  const viewport = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number } | undefined>(undefined);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; x: number; y: number } | undefined>(
@@ -128,6 +129,22 @@ export function BallTouchMap({
   const updateCamera = (
     update: (current: TouchMapCameraState) => TouchMapCameraState,
   ) => setCamera((current) => constrainCameraState(arena, update(current)));
+
+  useEffect(() => {
+    const element = viewport.current;
+    if (!element) return;
+    const zoom = (event: globalThis.WheelEvent) => {
+      event.preventDefault();
+      setCamera((current) =>
+        constrainCameraState(arena, {
+          ...current,
+          distance: current.distance * (event.deltaY > 0 ? 1.1 : 0.9),
+        }),
+      );
+    };
+    element.addEventListener('wheel', zoom, { passive: false });
+    return () => element.removeEventListener('wheel', zoom);
+  }, [arena]);
 
   const startPan = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -195,14 +212,6 @@ export function BallTouchMap({
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
   };
-  const zoom = (event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    updateCamera((current) => ({
-      ...current,
-      distance: current.distance * (event.deltaY > 0 ? 1.1 : 0.9),
-    }));
-  };
-
   const activePoint = visible.find((point) => point.id === active);
   return (
     <div className="relative space-y-3">
@@ -239,14 +248,15 @@ export function BallTouchMap({
       </div>
 
       <div
+        ref={viewport}
         data-testid="ball-touch-map-viewport"
         data-camera-target={`${Math.round(camera.targetX)},${Math.round(camera.targetZ)}`}
+        data-camera-distance={Math.round(camera.distance)}
         className="surface-flat relative h-[clamp(22rem,56vw,38rem)] cursor-grab touch-none overflow-hidden rounded-2xl active:cursor-grabbing"
         onPointerDown={startPan}
         onPointerMove={pan}
         onPointerUp={stopPan}
         onPointerCancel={stopPan}
-        onWheel={zoom}
       >
         <SceneErrorBoundary>
           <BallTouchScene
