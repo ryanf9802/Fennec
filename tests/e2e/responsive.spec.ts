@@ -66,6 +66,28 @@ test('primary pages use the same full content width', async ({ page }) => {
   }
 });
 
+test('primary pages reserve a stable root scrollbar gutter', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto('/?demo=1');
+  await expect(page.getByRole('heading', { name: 'Game timeline' })).toBeVisible();
+  const games = await page.evaluate(() => ({
+    mainWidth: document.querySelector('main')!.getBoundingClientRect().width,
+    rootScrolls: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+    gutter: getComputedStyle(document.documentElement).scrollbarGutter,
+  }));
+  expect(games).toMatchObject({ rootScrolls: false, gutter: 'stable' });
+
+  await page.goto('/settings?demo=1');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  const settings = await page.evaluate(() => ({
+    mainWidth: document.querySelector('main')!.getBoundingClientRect().width,
+    rootScrolls: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+    gutter: getComputedStyle(document.documentElement).scrollbarGutter,
+  }));
+  expect(settings.rootScrolls).toBe(true);
+  expect(settings.mainWidth).toBe(games.mainWidth);
+});
+
 test('desktop sidebar connection status fits without clipping', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 620 });
   await page.goto('/?demo=1');
