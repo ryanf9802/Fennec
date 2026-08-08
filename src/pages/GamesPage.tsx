@@ -6,6 +6,7 @@ import { ConnectionStatus } from '../components/ConnectionStatus';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
 import { sessionMetrics } from '../domain/metrics';
+import { formatTeamScore, profileTeamNumber } from '../domain/teamPresentation';
 import { useSessions } from '../data/historyQueries';
 
 function sessionTitle(startedAt: string, current: boolean): string {
@@ -40,7 +41,7 @@ export function GamesPage() {
           <div><div className="eyebrow text-fennec-cyan">Live now</div><h2 className="mt-0.5 text-xl font-extrabold sm:text-2xl">{activeMatch.playlistName}</h2><p className="text-muted mt-1 text-sm">{activeMatch.arena || 'Waiting for match state'}</p></div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-right"><div className="text-3xl font-black">{activeMatch.teams.length > 1 ? `${activeMatch.teams[0]!.score} – ${activeMatch.teams.at(-1)!.score}` : '—'}</div><div className="text-fennec-orange text-sm font-bold">{Math.floor(activeMatch.timeSeconds / 60)}:{String(activeMatch.timeSeconds % 60).padStart(2, '0')}</div></div>
+          <div className="text-right"><div className="text-3xl font-black">{formatTeamScore(activeMatch.teams, profileTeamNumber(activeMatch, profile?.primaryId))}</div><div className="text-fennec-orange text-sm font-bold">{Math.floor(activeMatch.timeSeconds / 60)}:{String(activeMatch.timeSeconds % 60).padStart(2, '0')}</div></div>
           <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </div>
       </div>

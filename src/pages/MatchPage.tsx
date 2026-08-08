@@ -7,6 +7,7 @@ import { PlayerProfileDialog } from '../components/PlayerProfileDialog';
 import { Timeline } from '../components/Timeline';
 import { MatchAnalytics } from '../components/MatchAnalytics';
 import { playerIdentityKind, playerKeyFor, playerKeyForPrimaryId } from '../domain/playerIdentity';
+import { formatTeamScore, orderedTeams, profileTeamNumber } from '../domain/teamPresentation';
 import type { MatchState, ParticipantState } from '../domain/types';
 import { useMatch } from '../data/historyQueries';
 
@@ -44,12 +45,13 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
   if (!supplied && matchQuery.isLoading) return <div className="surface rounded-3xl p-8">Loading match…</div>;
   if (!supplied && matchQuery.isError) return <div className="surface rounded-3xl p-8">Match history could not be loaded.</div>;
   if (!match) return <div className="surface rounded-3xl p-8"><h1 className="text-2xl font-extrabold">Match not found</h1><Link className="button-secondary mt-5" to="/">Back to games</Link></div>;
-  const teams = [...match.teams].sort((a, b) => a.teamNumber - b.teamNumber);
+  const preferredTeamNumber = profileTeamNumber(match, profile?.primaryId);
+  const teams = orderedTeams(match.teams, preferredTeamNumber);
   return <div className="space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-6 xl:space-y-0">
     <Link to="/" className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"><ArrowLeft className="size-4" />Game timeline</Link>
     <header className="flex flex-wrap items-start justify-between gap-5">
       <div><h1 className="text-3xl font-black sm:text-4xl">{match.playlistName}</h1><p className="text-muted mt-2">{match.arena || 'Arena unavailable'} · {new Date(match.startedAt).toLocaleString()}</p></div>
-      <div className="text-right"><div className="text-4xl font-black">{teams.length > 1 ? `${teams[0]!.score} – ${teams.at(-1)!.score}` : '—'}</div><div className="text-fennec-orange mt-1 font-bold">{match.isOvertime ? 'OVERTIME · ' : ''}{Math.floor(match.timeSeconds / 60)}:{String(match.timeSeconds % 60).padStart(2, '0')}</div></div>
+      <div className="text-right"><div className="text-4xl font-black">{formatTeamScore(match.teams, preferredTeamNumber)}</div><div className="text-fennec-orange mt-1 font-bold">{match.isOvertime ? 'OVERTIME · ' : ''}{Math.floor(match.timeSeconds / 60)}:{String(match.timeSeconds % 60).padStart(2, '0')}</div></div>
     </header>
     <div className="grid min-w-0 gap-6 xl:min-h-0 xl:grid-cols-[minmax(0,3fr)_minmax(22rem,2fr)]">
       <section className="scoreboard-container min-w-0 xl:min-h-0 xl:overflow-y-auto">

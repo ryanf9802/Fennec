@@ -1,6 +1,7 @@
 import type { MatchState, ParticipantState } from './types';
 export { isTrackablePrimaryId } from './playerIdentity';
 import { normalizePlayerKey, playerKeyFor } from './playerIdentity';
+import { formatTeamScore } from './teamPresentation';
 
 export interface PlayerAverages {
   score: number;
@@ -106,7 +107,6 @@ export function calculatePlayerHistory(matches: MatchState[], profileId?: string
   const recent = [...related].reverse().slice(0, 8).map((match): RecentMeeting => {
     const you = match.participants.find((player) => playerKeyFor(player) === profileKey)!;
     const player = match.participants.find((item) => playerKeyFor(item) === playerKey)!;
-    const teams = [...match.teams].sort((a, b) => a.teamNumber - b.teamNumber);
     const completed = match.lifecycle === 'completed' && match.winnerTeamNumber !== undefined;
     return {
       matchId: match.id,
@@ -114,7 +114,7 @@ export function calculatePlayerHistory(matches: MatchState[], profileId?: string
       playlistName: match.playlistName,
       relationship: you.teamNumber === player.teamNumber ? 'together' : 'against',
       result: !completed ? 'incomplete' : match.winnerTeamNumber === you.teamNumber ? 'win' : 'loss',
-      score: teams.length >= 2 ? `${teams[0]!.score}–${teams.at(-1)!.score}` : '—',
+      score: formatTeamScore(match.teams, you.teamNumber, '–'),
     };
   });
   return {
