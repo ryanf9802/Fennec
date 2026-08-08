@@ -1,5 +1,10 @@
 # Fennec
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/fennec-a-lockup-primary.svg">
+  <img src="assets/brand/fennec-a-lockup-navy.svg" alt="Fennec" width="360">
+</picture>
+
 [![Windows build](https://github.com/ryanf9802/Fennec/actions/workflows/build.yml/badge.svg)](https://github.com/ryanf9802/Fennec/actions/workflows/build.yml)
 
 Fennec is a lightweight, native Windows second-monitor dashboard for Rocket

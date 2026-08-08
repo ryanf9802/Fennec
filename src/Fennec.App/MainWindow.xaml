@@ -9,7 +9,8 @@
                         ItemInvoked="Navigation_ItemInvoked">
             <NavigationView.PaneHeader>
                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="4,10,0,16">
-                    <Image Width="30" Height="30" Source="Assets/fennec-mark.svg" />
+                    <Image Width="34" Height="34" Source="Assets/fennec-mark.svg"
+                           AutomationProperties.Name="Fennec logo" />
                     <TextBlock Text="Fennec" FontFamily="Segoe UI Variable Display"
                                FontSize="21" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </StackPanel>

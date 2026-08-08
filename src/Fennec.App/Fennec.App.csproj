@@ -24,7 +24,8 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.1" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Assets\fennec-mark.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\brand\fennec-a-mark-primary.svg"
+             Link="Assets\fennec-mark.svg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Fennec.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\fennec-*.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />

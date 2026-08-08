@@ -18,6 +18,9 @@ public sealed class TrayIconService : IDisposable
     private const uint NifTip = 4;
     private const uint MfString = 0;
     private const uint TpmRightButton = 2;
+    private const uint ImageIcon = 1;
+    private const uint LrDefaultSize = 0x0040;
+    private const uint LrLoadFromFile = 0x0010;
     private const nuint SubclassId = 0xF3EC;
     private const int ExitCommand = 1001;
 
@@ -27,6 +30,8 @@ public sealed class TrayIconService : IDisposable
     private readonly nint _windowHandle;
     private readonly SubclassProcedure _procedure;
     private NotifyIconData _iconData;
+    private nint _iconHandle;
+    private bool _ownsIconHandle;
     private bool _disposed;
 
     public TrayIconService(Window window, AppWindow appWindow, Action exit)
@@ -38,6 +43,13 @@ public sealed class TrayIconService : IDisposable
         _procedure = WindowProcedure;
         if (!SetWindowSubclass(_windowHandle, _procedure, SubclassId, 0)) return;
 
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Fennec.ico");
+        _iconHandle = File.Exists(iconPath)
+            ? LoadImage(0, iconPath, ImageIcon, 0, 0, LrLoadFromFile | LrDefaultSize)
+            : 0;
+        _ownsIconHandle = _iconHandle != 0;
+        if (_iconHandle == 0) _iconHandle = LoadIcon(0, (nint)32512);
+
         _iconData = new NotifyIconData
         {
             Size = (uint)Marshal.SizeOf<NotifyIconData>(),
@@ -45,7 +57,7 @@ public sealed class TrayIconService : IDisposable
             Id = 1,
             Flags = NifMessage | NifIcon | NifTip,
             CallbackMessage = CallbackMessage,
-            IconHandle = LoadIcon(0, (nint)32512),
+            IconHandle = _iconHandle,
             Tip = "Fennec",
             Info = string.Empty,
             InfoTitle = string.Empty
@@ -94,6 +106,7 @@ public sealed class TrayIconService : IDisposable
         _disposed = true;
         ShellNotifyIcon(NimDelete, ref _iconData);
         RemoveWindowSubclass(_windowHandle, _procedure, SubclassId);
+        if (_ownsIconHandle) DestroyIcon(_iconHandle);
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -115,6 +128,9 @@ public sealed class TrayIconService : IDisposable
     [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconW", CharSet = CharSet.Unicode)]
     private static extern bool ShellNotifyIcon(uint message, ref NotifyIconData data);
     [DllImport("user32.dll")] private static extern nint LoadIcon(nint instance, nint iconName);
+    [DllImport("user32.dll", EntryPoint = "LoadImageW", CharSet = CharSet.Unicode)]
+    private static extern nint LoadImage(nint instance, string name, uint type, int width, int height, uint flags);
+    [DllImport("user32.dll")] private static extern bool DestroyIcon(nint icon);
     [DllImport("comctl32.dll")] private static extern bool SetWindowSubclass(nint window, SubclassProcedure procedure, nuint id, nuint data);
     [DllImport("comctl32.dll")] private static extern bool RemoveWindowSubclass(nint window, SubclassProcedure procedure, nuint id);
     [DllImport("comctl32.dll")] private static extern nint DefSubclassProc(nint window, uint message, nuint wParam, nint lParam);

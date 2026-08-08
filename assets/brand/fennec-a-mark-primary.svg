@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Fennec Concept A mark — primary</title>
+  <desc id="desc">F-first Fennec monogram with abstract fox-ear silhouette and controlled forward motion.</desc>
+  <g shape-rendering="geometricPrecision">
+    <path fill="#65D9EE" d="M45 28 L105 74 L93 85 L210 28 L190 92 L109 121 L107 141 L184 116 L172 151 L100 175 L91 226 L53 249 L65 158 L63 126 L49 91 Z"/>
+    <path fill="#FF8A3D" d="M164 145 L190 136 L180 170 L155 179 Z"/>
+  </g>
+</svg>

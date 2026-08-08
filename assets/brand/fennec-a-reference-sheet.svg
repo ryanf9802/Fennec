@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+<rect width="1400" height="900" fill="#0B111D"/>
+<style>
+  .h{font:600 28px Inter, sans-serif;fill:#F7FAFF}
+  .s{font:500 17px Inter, sans-serif;fill:#65D9EE}
+  .b{font:400 15px Inter, sans-serif;fill:#B9C5D4}
+</style>
+<text x="60" y="70" class="h">Fennec — Concept A vector set</text>
+<text x="60" y="105" class="b">F-first monogram · abstract fennec ears · 5–10° forward character · integrated orange activity accent</text>
+
+<g transform="translate(70 150) scale(1.6)"><path fill="#65D9EE" d="M45 28 L105 74 L93 85 L210 28 L190 92 L109 121 L107 141 L184 116 L172 151 L100 175 L91 226 L53 249 L65 158 L63 126 L49 91 Z"/><path fill="#FF8A3D" d="M164 145 L190 136 L180 170 L155 179 Z"/></g>
+<text x="70" y="585" class="s">Primary mark</text>
+<g transform="translate(540 150) scale(0.65)"><path fill="#65D9EE" d="M45 28 L105 74 L93 85 L210 28 L190 92 L109 121 L107 141 L184 116 L172 151 L100 175 L91 226 L53 249 L65 158 L63 126 L49 91 Z"/><path fill="#FF8A3D" d="M164 145 L190 136 L180 170 L155 179 Z"/></g>
+<text x="540" y="350" class="s">Primary</text>
+<g transform="translate(760 150) scale(0.65)"><path fill="#65D9EE" d="M45 28 L105 74 L93 85 L210 28 L190 92 L109 121 L107 141 L184 116 L172 151 L100 175 L91 226 L53 249 L65 158 L63 126 L49 91 Z"/><path fill="#65D9EE" d="M164 145 L190 136 L180 170 L155 179 Z"/></g>
+<text x="760" y="350" class="s">Cyan only</text>
+<g transform="translate(980 150) scale(0.65)"><path fill="#F7FAFF" d="M45 28 L105 74 L93 85 L210 28 L190 92 L109 121 L107 141 L184 116 L172 151 L100 175 L91 226 L53 249 L65 158 L63 126 L49 91 Z"/><path fill="#F7FAFF" d="M164 145 L190 136 L180 170 L155 179 Z"/></g>
+<text x="980" y="350" class="s">White mono</text>
+<rect x="1180" y="145" width="190" height="190" rx="24" fill="#F7FAFF"/>
+<g transform="translate(1200 150) scale(0.65)"><path fill="#0B111D" d="M45 28 L105 74 L93 85 L210 28 L190 92 L109 121 L107 141 L184 116 L172 151 L100 175 L91 226 L53 249 L65 158 L63 126 L49 91 Z"/><path fill="#0B111D" d="M164 145 L190 136 L180 170 L155 179 Z"/></g>
+<text x="1200" y="350" class="s">Navy mono</text>
+<text x="540" y="430" class="h">Optical micro mark</text>
+<g transform="translate(540 470) scale(0.18)"><path fill="#65D9EE" d="M48 34 L101 73 L93 82 L202 34 L187 92 L111 119 L109 140 L177 118 L167 150 L102 172 L93 218 L60 238 L70 159 L68 128 L55 94 Z"/><path fill="#FF8A3D" d="M158 147 L183 139 L174 170 L150 178 Z"/></g>
+<text x="540" y="585" class="b">16px target</text>
+<g transform="translate(670 470) scale(0.27)"><path fill="#65D9EE" d="M48 34 L101 73 L93 82 L202 34 L187 92 L111 119 L109 140 L177 118 L167 150 L102 172 L93 218 L60 238 L70 159 L68 128 L55 94 Z"/><path fill="#FF8A3D" d="M158 147 L183 139 L174 170 L150 178 Z"/></g>
+<text x="670" y="585" class="b">24px target</text>
+<g transform="translate(820 470) scale(0.36)"><path fill="#65D9EE" d="M48 34 L101 73 L93 82 L202 34 L187 92 L111 119 L109 140 L177 118 L167 150 L102 172 L93 218 L60 238 L70 159 L68 128 L55 94 Z"/><path fill="#FF8A3D" d="M158 147 L183 139 L174 170 L150 178 Z"/></g>
+<text x="820" y="585" class="b">32px preview</text>
+<g transform="translate(540 650) scale(0.34)"><path fill="#65D9EE" d="M45 28 L105 74 L93 85 L210 28 L190 92 L109 121 L107 141 L184 116 L172 151 L100 175 L91 226 L53 249 L65 158 L63 126 L49 91 Z"/><path fill="#FF8A3D" d="M164 145 L190 136 L180 170 L155 179 Z"/></g>
+<text x="650" y="735" style="font:600 62px Inter, sans-serif;fill:#F7FAFF;letter-spacing:.2px">Fennec</text>
+<text x="540" y="815" class="s">Horizontal lockup</text>
+<text x="60" y="855" class="b">Colors: cyan #65D9EE · orange #FF8A3D · navy #0B111D · soft white #F7FAFF</text>
+</svg>
