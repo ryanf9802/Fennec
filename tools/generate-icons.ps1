@@ -3,6 +3,7 @@ param(
     [string]$SourceDirectory = "$PSScriptRoot\..\assets\brand"
 )
 
+$ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 [System.IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
 
@@ -30,10 +31,10 @@ $microMark = Read-SvgPathPoints $microPath 0
 $microAccent = Read-SvgPathPoints $microPath 1
 
 function New-FennecBitmap([int]$Size) {
-    $bitmap = [System.Drawing.Bitmap]::new($Size, $Size)
+    $bitmap = [System.Drawing.Bitmap]::new($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $graphics.Clear([System.Drawing.Color]::FromArgb(11, 17, 29))
+    $graphics.Clear([System.Drawing.Color]::Transparent)
     $cyan = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(101, 217, 238))
     $orange = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 138, 61))
 
@@ -62,15 +63,44 @@ function New-FennecBitmap([int]$Size) {
     return $bitmap
 }
 
-$sizes = @(16, 24, 32, 48, 128, 256)
+$sizes = @(16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 96, 128, 256)
 foreach ($size in $sizes) {
     $bitmap = New-FennecBitmap $size
     $bitmap.Save((Join-Path $OutputDirectory "fennec-$size.png"), [System.Drawing.Imaging.ImageFormat]::Png)
     $bitmap.Dispose()
 }
 
-$iconBitmap = New-FennecBitmap 256
-$icon = [System.Drawing.Icon]::FromHandle($iconBitmap.GetHicon())
-$stream = [System.IO.File]::Create((Join-Path $OutputDirectory "Fennec.ico"))
-$icon.Save($stream)
-$stream.Dispose(); $icon.Dispose(); $iconBitmap.Dispose()
+function Write-MultiImageIcon([string]$Path, [int[]]$IconSizes) {
+    $images = [System.Collections.Generic.List[byte[]]]::new()
+    foreach ($size in $IconSizes) {
+        $images.Add([System.IO.File]::ReadAllBytes((Join-Path $OutputDirectory "fennec-$size.png")))
+    }
+    $stream = [System.IO.File]::Create($Path)
+    $writer = [System.IO.BinaryWriter]::new($stream)
+    try {
+        $writer.Write([uint16]0)
+        $writer.Write([uint16]1)
+        $writer.Write([uint16]$IconSizes.Count)
+        $offset = 6 + (16 * $IconSizes.Count)
+        for ($index = 0; $index -lt $IconSizes.Count; $index++) {
+            $size = $IconSizes[$index]
+            $image = $images[$index]
+            $writer.Write([byte]$(if ($size -eq 256) { 0 } else { $size }))
+            $writer.Write([byte]$(if ($size -eq 256) { 0 } else { $size }))
+            $writer.Write([byte]0)
+            $writer.Write([byte]0)
+            $writer.Write([uint16]1)
+            $writer.Write([uint16]32)
+            $writer.Write([uint32]$image.Length)
+            $writer.Write([uint32]$offset)
+            $offset += $image.Length
+        }
+        foreach ($image in $images) { $writer.Write($image) }
+    }
+    finally {
+        $writer.Dispose()
+        $stream.Dispose()
+    }
+}
+
+Write-MultiImageIcon (Join-Path $OutputDirectory "Fennec.ico") $sizes

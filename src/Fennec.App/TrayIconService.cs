@@ -19,8 +19,9 @@ public sealed class TrayIconService : IDisposable
     private const uint MfString = 0;
     private const uint TpmRightButton = 2;
     private const uint ImageIcon = 1;
-    private const uint LrDefaultSize = 0x0040;
     private const uint LrLoadFromFile = 0x0010;
+    private const int SmCxSmIcon = 49;
+    private const int SmCySmIcon = 50;
     private const nuint SubclassId = 0xF3EC;
     private const int ExitCommand = 1001;
 
@@ -44,8 +45,11 @@ public sealed class TrayIconService : IDisposable
         if (!SetWindowSubclass(_windowHandle, _procedure, SubclassId, 0)) return;
 
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Fennec.ico");
+        var dpi = GetDpiForWindow(_windowHandle);
+        var iconWidth = GetSystemMetricsForDpi(SmCxSmIcon, dpi);
+        var iconHeight = GetSystemMetricsForDpi(SmCySmIcon, dpi);
         _iconHandle = File.Exists(iconPath)
-            ? LoadImage(0, iconPath, ImageIcon, 0, 0, LrLoadFromFile | LrDefaultSize)
+            ? LoadImage(0, iconPath, ImageIcon, iconWidth, iconHeight, LrLoadFromFile)
             : 0;
         _ownsIconHandle = _iconHandle != 0;
         if (_iconHandle == 0) _iconHandle = LoadIcon(0, (nint)32512);
@@ -131,6 +135,8 @@ public sealed class TrayIconService : IDisposable
     [DllImport("user32.dll", EntryPoint = "LoadImageW", CharSet = CharSet.Unicode)]
     private static extern nint LoadImage(nint instance, string name, uint type, int width, int height, uint flags);
     [DllImport("user32.dll")] private static extern bool DestroyIcon(nint icon);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(nint window);
+    [DllImport("user32.dll")] private static extern int GetSystemMetricsForDpi(int index, uint dpi);
     [DllImport("comctl32.dll")] private static extern bool SetWindowSubclass(nint window, SubclassProcedure procedure, nuint id, nuint data);
     [DllImport("comctl32.dll")] private static extern bool RemoveWindowSubclass(nint window, SubclassProcedure procedure, nuint id);
     [DllImport("comctl32.dll")] private static extern nint DefSubclassProc(nint window, uint message, nuint wParam, nint lParam);
