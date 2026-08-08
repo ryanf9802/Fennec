@@ -1,7 +1,13 @@
 import type { MatchState } from './types';
-import type { SpatialEventPoint } from './analytics';
 
 export type ArenaProfileKind = 'soccar' | 'hoops' | 'dropshot' | 'generic';
+export type ArenaPoint = readonly [x: number, y: number];
+
+export interface ArenaGoal {
+  halfWidth: number;
+  height: number;
+  depth: number;
+}
 
 export interface ArenaProfile {
   kind: ArenaProfileKind;
@@ -11,7 +17,43 @@ export interface ArenaProfile {
   yMin: number;
   yMax: number;
   zMax: number;
+  footprint: readonly ArenaPoint[];
+  goal?: ArenaGoal;
 }
+
+const soccarFootprint: readonly ArenaPoint[] = [
+  [-2944, -5120],
+  [2944, -5120],
+  [4096, -3968],
+  [4096, 3968],
+  [2944, 5120],
+  [-2944, 5120],
+  [-4096, 3968],
+  [-4096, -3968],
+];
+
+const roundedFootprint = (
+  xExtent: number,
+  yExtent: number,
+  radius: number,
+): readonly ArenaPoint[] => {
+  const points: ArenaPoint[] = [];
+  for (const [cx, cy, start] of [
+    [xExtent - radius, yExtent - radius, 0],
+    [-xExtent + radius, yExtent - radius, 90],
+    [-xExtent + radius, -yExtent + radius, 180],
+    [xExtent - radius, -yExtent + radius, 270],
+  ] as const) {
+    for (let step = 0; step <= 4; step++) {
+      const angle = ((start + step * 22.5) * Math.PI) / 180;
+      points.push([
+        cx + Math.cos(angle) * radius,
+        cy + Math.sin(angle) * radius,
+      ]);
+    }
+  }
+  return points;
+};
 
 const profiles: Record<ArenaProfileKind, ArenaProfile> = {
   soccar: {
@@ -22,6 +64,8 @@ const profiles: Record<ArenaProfileKind, ArenaProfile> = {
     yMin: -5120,
     yMax: 5120,
     zMax: 2044,
+    footprint: soccarFootprint,
+    goal: { halfWidth: 892.755, height: 642.775, depth: 880 },
   },
   hoops: {
     kind: 'hoops',
@@ -31,15 +75,24 @@ const profiles: Record<ArenaProfileKind, ArenaProfile> = {
     yMin: -3581,
     yMax: 3581,
     zMax: 1820,
+    footprint: roundedFootprint(2967, 3581, 720),
   },
   dropshot: {
     kind: 'dropshot',
     label: 'Dropshot',
-    xMin: -4600,
-    xMax: 4600,
-    yMin: -5200,
-    yMax: 5200,
-    zMax: 2020,
+    xMin: -4555,
+    xMax: 4555,
+    yMin: -5026,
+    yMax: 5026,
+    zMax: 1986,
+    footprint: [
+      [-4555, -2513],
+      [0, -5026],
+      [4555, -2513],
+      [4555, 2513],
+      [0, 5026],
+      [-4555, 2513],
+    ],
   },
   generic: {
     kind: 'generic',
@@ -49,6 +102,8 @@ const profiles: Record<ArenaProfileKind, ArenaProfile> = {
     yMin: -5120,
     yMax: 5120,
     zMax: 2044,
+    footprint: soccarFootprint,
+    goal: { halfWidth: 892.755, height: 642.775, depth: 880 },
   },
 };
 
@@ -66,30 +121,6 @@ function profileKind(match: MatchState): ArenaProfileKind {
   return 'generic';
 }
 
-export function arenaProfile(
-  match: MatchState,
-  points: SpatialEventPoint[],
-): ArenaProfile {
-  const base = profiles[profileKind(match)];
-  const xExtent =
-    Math.max(
-      Math.abs(base.xMin),
-      Math.abs(base.xMax),
-      ...points.map((point) => Math.abs(point.x)),
-    ) * 1.05;
-  const yExtent =
-    Math.max(
-      Math.abs(base.yMin),
-      Math.abs(base.yMax),
-      ...points.map((point) => Math.abs(point.y)),
-    ) * 1.05;
-  const zMax = Math.max(base.zMax, ...points.map((point) => point.z));
-  return {
-    ...base,
-    xMin: -xExtent,
-    xMax: xExtent,
-    yMin: -yExtent,
-    yMax: yExtent,
-    zMax,
-  };
+export function arenaProfile(match: MatchState): ArenaProfile {
+  return profiles[profileKind(match)];
 }

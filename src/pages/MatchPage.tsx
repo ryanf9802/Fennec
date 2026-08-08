@@ -179,7 +179,7 @@ function DeleteMatchDialog({
 export function MatchPage({ match: supplied }: { match?: MatchState }) {
   const { matchId } = useParams();
   const navigate = useNavigate();
-  const { settings, profile, deleteMatch } = useFennec();
+  const { settings, profile, deleteMatch, updateSettings } = useFennec();
   const [profilePlayer, setProfilePlayer] = useState<{
     key: string;
     name: string;
@@ -351,7 +351,14 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
             </div>
           )}
           <div className="mt-6 border-t border-ui pt-6">
-            <MatchAnalytics match={match} profileId={profile?.primaryId} />
+            <MatchAnalytics
+              match={match}
+              profileId={profile?.primaryId}
+              view={settings.matchAnalyticsView}
+              onViewChange={(matchAnalyticsView) =>
+                updateSettings({ ...settings, matchAnalyticsView })
+              }
+            />
           </div>
         </section>
         <section className="flex min-w-0 flex-col xl:min-h-0">

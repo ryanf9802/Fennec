@@ -17,6 +17,11 @@ import {
   spatialEventPoints,
 } from '../src/domain/analytics';
 import { arenaProfile } from '../src/domain/arenaProfiles';
+import {
+  arenaWallPanels,
+  constrainCameraState,
+  gameToScene,
+} from '../src/domain/touchMapGeometry';
 import { normalizePlayerKey, playerKeyFor } from '../src/domain/playerIdentity';
 import {
   defaultSettings,
@@ -488,22 +493,64 @@ describe('Stats API domain', () => {
     );
   });
 
-  it('resolves mode-specific arena profiles and expands for outliers', () => {
+  it('resolves stable mode-specific arena geometry', () => {
     const value = match(
       'arena',
       '2026-08-08T00:00:00Z',
       '2026-08-08T00:05:00Z',
     );
     value.playlistId = 27;
-    expect(arenaProfile(value, []).kind).toBe('hoops');
+    expect(arenaProfile(value).kind).toBe('hoops');
     value.playlistId = 29;
-    expect(arenaProfile(value, []).kind).toBe('dropshot');
+    expect(arenaProfile(value).kind).toBe('dropshot');
     value.playlistId = 11;
+    const profile = arenaProfile(value);
+    expect(profile).toMatchObject({
+      kind: 'soccar',
+      xMin: -4096,
+      xMax: 4096,
+      yMin: -5120,
+      yMax: 5120,
+      zMax: 2044,
+      goal: { halfWidth: 892.755, height: 642.775, depth: 880 },
+    });
+    expect(profile.footprint).toContainEqual([4096, 3968]);
+    expect(arenaWallPanels(profile)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ zMin: 642.775, zMax: 2044 }),
+      ]),
+    );
+  });
+
+  it('maps raw XYZ coordinates and constrains the restricted 3D camera', () => {
+    const value = match(
+      'camera',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.playlistId = 11;
+    const profile = arenaProfile(value);
+    expect(gameToScene({ x: 100, y: -200, z: 300 })).toEqual({
+      x: -200,
+      y: 300,
+      z: 100,
+    });
     expect(
-      arenaProfile(value, [
-        { id: 'x', kind: 'touch', x: 9000, y: 0, z: 0, actors: [] },
-      ]).xMax,
-    ).toBeGreaterThan(9000);
+      constrainCameraState(profile, {
+        pitch: 120,
+        targetX: 5600,
+        targetZ: 0,
+        distance: Number.POSITIVE_INFINITY,
+      }),
+    ).toMatchObject({ pitch: 90, targetX: 5600, targetZ: 0 });
+    const besideGoal = constrainCameraState(profile, {
+      pitch: -20,
+      targetX: 5800,
+      targetZ: 3000,
+      distance: 0,
+    });
+    expect(besideGoal.pitch).toBe(0);
+    expect(besideGoal.targetX).toBeLessThanOrEqual(5120);
   });
 
   it('reports unavailable observed speed for legacy matches', () => {

@@ -133,9 +133,16 @@ describe('IndexedDB storage', () => {
   });
 
   it('stores settings and profile independently', async () => {
-    await saveSettings({ ...defaultSettings, sessionGapMinutes: 45 });
+    await saveSettings({
+      ...defaultSettings,
+      sessionGapMinutes: 45,
+      matchAnalyticsView: 'touch-map',
+    });
     await saveProfile({ primaryId: 'Steam|1|0', displayName: 'Me' });
-    expect((await loadSettings()).sessionGapMinutes).toBe(45);
+    expect(await loadSettings()).toMatchObject({
+      sessionGapMinutes: 45,
+      matchAnalyticsView: 'touch-map',
+    });
     expect((await loadProfile())?.displayName).toBe('Me');
   });
 

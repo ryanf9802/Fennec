@@ -106,12 +106,51 @@ test('demo feed opens a live match and settings remain usable', async ({
   await expect(
     page.getByRole('heading', { name: 'Ball analytics' }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('img', { name: /ball touch map/i }),
-  ).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Touch map' })).toBeVisible();
+  await expect(page.getByRole('img', { name: /ball touch map/i })).toHaveCount(
+    0,
+  );
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.getByLabel('WebSocket port')).toHaveValue('49124');
+});
+
+test('3D touch map controls and preference persist across matches', async ({
+  page,
+}) => {
+  await page.goto('/matches/demo-current-2?demo=1');
+  await expect(
+    page.getByRole('heading', { name: 'Ball analytics' }),
+  ).toBeVisible();
+  await page.getByRole('tab', { name: 'Touch map' }).click();
+  await expect(
+    page.getByRole('img', { name: /3d ball touch map/i }),
+  ).toBeVisible();
+
+  const pitch = page.getByRole('slider', { name: 'Field pitch' });
+  await expect(pitch).toHaveValue('0');
+  await pitch.fill('45');
+  await expect(pitch).toHaveAttribute('aria-valuetext', '45 degrees');
+
+  const viewport = page.getByTestId('ball-touch-map-viewport');
+  const box = (await viewport.boundingBox())!;
+  await page.mouse.move(box.x + 80, box.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 80, box.y + box.height - 80);
+  await page.mouse.up();
+  await expect(viewport).not.toHaveAttribute('data-camera-target', '0,0');
+  await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
+  await expect(pitch).toHaveValue('0');
+  await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
+
+  await page.goto('/matches/demo-current-1?demo=1');
+  await expect(
+    page.getByRole('heading', { name: 'Ball touch map' }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole('img', { name: /3d ball touch map/i }),
+  ).toBeVisible();
 });
 
 test('completed matches show continuous elapsed time', async ({ page }) => {

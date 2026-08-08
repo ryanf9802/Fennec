@@ -82,13 +82,26 @@ describe('portable data', () => {
           ...backup.settings,
           webSocketPort: 1,
           sessionGapMinutes: 0,
+          matchAnalyticsView: 'invalid',
         },
       }),
     );
     expect([
       parsed.settings.webSocketPort,
       parsed.settings.sessionGapMinutes,
-    ]).toEqual([49124, 30]);
+      parsed.settings.matchAnalyticsView,
+    ]).toEqual([49124, 30, 'analytics']);
+  });
+  it('defaults older backups without a saved telemetry view', () => {
+    const backup = createBackup([value], defaultSettings);
+    const legacySettings: Partial<typeof backup.settings> = {
+      ...backup.settings,
+    };
+    Reflect.deleteProperty(legacySettings, 'matchAnalyticsView');
+    const parsed = parseBackup(
+      JSON.stringify({ ...backup, version: 2, settings: legacySettings }),
+    );
+    expect(parsed.settings.matchAnalyticsView).toBe('analytics');
   });
   it('exports profile match summaries as CSV', () => {
     const csv = matchesCsv([value], 'Steam|1|0');

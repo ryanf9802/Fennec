@@ -1,6 +1,20 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { BallTouchMap } from '../src/components/BallTouchMap';
+import type { BallTouchSceneProps } from '../src/components/BallTouchScene';
 import type { MatchState } from '../src/domain/types';
+
+const scene = vi.hoisted(() => ({
+  props: undefined as BallTouchSceneProps | undefined,
+}));
+
+vi.mock('../src/components/BallTouchScene', () => ({
+  BallTouchScene: (props: BallTouchSceneProps) => {
+    scene.props = props;
+    return (
+      <div role="img" aria-label={`${props.profile.label} 3D ball touch map`} />
+    );
+  },
+}));
 
 const match: MatchState = {
   id: 'map',
@@ -65,6 +79,22 @@ const match: MatchState = {
       },
     },
     {
+      id: 'map:3',
+      matchId: 'map',
+      sequence: 3,
+      eventName: 'CrossbarHit',
+      receivedAt: '2026-08-08T00:03:00Z',
+      matchClockSeconds: 120,
+      elapsedSeconds: 180,
+      payload: {
+        BallLocation: { X: 100, Y: 5000, Z: 600 },
+        BallSpeed: 700,
+        BallLastTouch: {
+          Player: { Name: 'Them', Shortcut: 2, TeamNum: 1 },
+        },
+      },
+    },
+    {
       id: 'map:2',
       matchId: 'map',
       sequence: 2,
@@ -87,23 +117,17 @@ const match: MatchState = {
 describe('ball touch map', () => {
   it('defaults to the selected player and supports all-touch filtering', () => {
     render(<BallTouchMap match={match} profileId="Steam|1|0" />);
-    const map = screen.getByRole('img', { name: /soccar ball touch map/i });
+    const map = screen.getByRole('img', { name: /soccar 3d ball touch map/i });
     expect(map).toBeInTheDocument();
-    expect(
-      map.querySelector('line[x1="300"][y1="8"][x2="300"][y2="292"]'),
-    ).toBeInTheDocument();
-    expect(
-      map.querySelector('rect[x="8"][y="95"][width="28"][height="110"]'),
-    ).toBeInTheDocument();
-    expect(
-      map.querySelector('rect[x="564"][y="95"][width="28"][height="110"]'),
-    ).toBeInTheDocument();
+    expect(scene.props?.profile.goal).toEqual({
+      halfWidth: 892.755,
+      height: 642.775,
+      depth: 880,
+    });
+    expect(scene.props?.points.map((point) => point.kind)).toEqual(['touch']);
 
     const selectedTouch = screen.getByRole('button', { name: /Me, touch/ });
     expect(selectedTouch).toHaveAccessibleName(/touch at 1:00/);
-    const marker = selectedTouch.querySelector('circle');
-    expect(Number(marker?.getAttribute('cx'))).toBeCloseTo(301.09, 1);
-    expect(Number(marker?.getAttribute('cy'))).toBeCloseTo(149.66, 1);
     expect(selectedTouch).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Them, touch/ }),
@@ -115,5 +139,21 @@ describe('ball touch map', () => {
     expect(
       screen.getByRole('button', { name: /Them, touch/ }),
     ).toHaveAccessibleName(/touch at 2:00/);
+    expect(scene.props?.points.map((point) => point.kind)).toEqual([
+      'touch',
+      'touch',
+    ]);
+    expect(
+      screen.queryByRole('button', { name: /crossbar/i }),
+    ).not.toBeInTheDocument();
+
+    const pitch = screen.getByRole('slider', { name: 'Field pitch' });
+    expect(pitch).toHaveValue('0');
+    fireEvent.change(pitch, { target: { value: '45' } });
+    expect(scene.props?.cameraState.pitch).toBe(45);
+    fireEvent.click(
+      screen.getByRole('button', { name: /reset 3d touch map/i }),
+    );
+    expect(scene.props?.cameraState.pitch).toBe(0);
   });
 });

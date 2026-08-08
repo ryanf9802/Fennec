@@ -141,6 +141,7 @@ export interface FennecSettings {
   enabledTimelineEvents: string[];
   timelineAttributes: Record<string, string[]>;
   sidebarCollapsed: boolean;
+  matchAnalyticsView: 'analytics' | 'touch-map';
   analytics: {
     playlistMode: 'ranked';
     groupByPlaylist: true;
@@ -156,6 +157,7 @@ export const defaultSettings: FennecSettings = {
   enabledTimelineEvents: [],
   timelineAttributes: {},
   sidebarCollapsed: false,
+  matchAnalyticsView: 'analytics',
   analytics: { playlistMode: 'ranked', groupByPlaylist: true },
 };
 
@@ -177,6 +179,8 @@ export function normalizeSettings(
     ['curated', 'everything', 'custom'].includes(input.timelinePreset)
       ? input.timelinePreset
       : defaultSettings.timelinePreset;
+  const matchAnalyticsView =
+    input?.matchAnalyticsView === 'touch-map' ? 'touch-map' : 'analytics';
   return {
     ...defaultSettings,
     ...input,
@@ -204,6 +208,7 @@ export function normalizeSettings(
         ? input.timelineAttributes
         : {},
     sidebarCollapsed: input?.sidebarCollapsed === true,
+    matchAnalyticsView,
     autoOpenLiveMatch: input?.autoOpenLiveMatch === true,
     analytics: defaultSettings.analytics,
   };
