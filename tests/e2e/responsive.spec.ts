@@ -72,6 +72,22 @@ test('scoreboard columns align and the desktop timeline scrolls independently', 
   expect(await timelineScroller.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto');
 });
 
+test('scrollable areas use compact theme-aware scrollbars', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 620 });
+  await page.goto('/?demo=1');
+  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
+  await page.getByText('Live now').click();
+  const styles = await page.locator('.timeline-scroller').evaluate((element) => ({
+    width: getComputedStyle(element, '::-webkit-scrollbar').width,
+    thumb: getComputedStyle(element, '::-webkit-scrollbar-thumb').backgroundColor,
+    radius: getComputedStyle(element, '::-webkit-scrollbar-thumb').borderRadius,
+  }));
+  expect(styles).toEqual({ width: '8px', thumb: 'rgba(150, 168, 191, 0.32)', radius: '999px' });
+
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
+  expect(await page.locator('.timeline-scroller').evaluate((element) => getComputedStyle(element, '::-webkit-scrollbar-thumb').backgroundColor)).toBe('rgba(58, 84, 116, 0.28)');
+});
+
 test('mobile scoreboard scroll stays inside the page', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 760 });
   await page.goto('/?demo=1');
