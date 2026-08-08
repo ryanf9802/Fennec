@@ -136,8 +136,12 @@ test('3D touch map controls and preference persist across matches', async ({
   await expect(
     page.getByRole('img', { name: /3d ball touch map/i }),
   ).toBeVisible();
-  await expect(page.getByText('■ Blue goal')).toBeVisible();
-  await expect(page.getByText('■ Orange goal')).toBeVisible();
+  const viewport = page.getByTestId('ball-touch-map-viewport');
+  await expect(
+    viewport.getByText('Drag to pan · scroll or pinch to zoom'),
+  ).toBeVisible();
+  await expect(page.getByText('● Blue touch')).toHaveCount(0);
+  await expect(page.getByText('■ Blue goal')).toHaveCount(0);
 
   const documentSize = await page.evaluate(() => ({
     clientHeight: document.documentElement.clientHeight,
@@ -152,7 +156,6 @@ test('3D touch map controls and preference persist across matches', async ({
   await pitch.fill('45');
   await expect(pitch).toHaveAttribute('aria-valuetext', '45 degrees');
 
-  const viewport = page.getByTestId('ball-touch-map-viewport');
   const box = (await viewport.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 80);
   await expect(viewport).toHaveCSS('cursor', 'grab');
