@@ -38,7 +38,8 @@ new FennecSiteStack(app, 'FennecSite', {
 new FennecCiAccessStack(app, 'FennecCiAccess', {
   env,
   description: 'GitHub OIDC deployment access for Fennec',
-  repository:
-    process.env.FENNEC_GITHUB_REPOSITORY?.trim() || 'ryanf9802/Fennec',
+  oidcSubject:
+    process.env.FENNEC_GITHUB_OIDC_SUBJECT?.trim() ||
+    'repo:ryanf9802@59521826/Fennec@1327244735:ref:refs/heads/main',
   existingProviderArn: process.env.GITHUB_OIDC_PROVIDER_ARN?.trim(),
 });

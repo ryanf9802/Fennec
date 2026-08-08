@@ -3,13 +3,22 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import type { Construct } from 'constructs';
 
 export interface FennecCiAccessStackProps extends cdk.StackProps {
-  repository: string;
+  oidcSubject: string;
   existingProviderArn?: string;
 }
 
 export class FennecCiAccessStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: FennecCiAccessStackProps) {
     super(scope, id, props);
+    if (
+      !props.oidcSubject.startsWith('repo:') ||
+      !props.oidcSubject.endsWith(':ref:refs/heads/main') ||
+      props.oidcSubject.includes('*')
+    ) {
+      throw new Error(
+        'FENNEC_GITHUB_OIDC_SUBJECT must be an exact GitHub repository subject for refs/heads/main.',
+      );
+    }
     const provider = props.existingProviderArn
       ? iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
           this,
@@ -23,7 +32,7 @@ export class FennecCiAccessStack extends cdk.Stack {
     const principal = new iam.OpenIdConnectPrincipal(provider, {
       StringEquals: {
         'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
-        'token.actions.githubusercontent.com:sub': `repo:${props.repository}:ref:refs/heads/main`,
+        'token.actions.githubusercontent.com:sub': props.oidcSubject,
       },
     });
     const role = new iam.Role(this, 'DeployRole', {

@@ -110,6 +110,11 @@ The deployment intentionally fails before assuming AWS credentials unless
 `AWS_ACCOUNT_ID` is exactly `309418039962`. CDK also rejects every other
 explicit account ID.
 
+The CI role is pinned to GitHub's immutable owner and repository IDs for
+`ryanf9802/Fennec` as well as the `main` ref. If GitHub reports a different OIDC
+subject after a repository transfer, set `FENNEC_GITHUB_OIDC_SUBJECT` to the
+complete observed `sub` claim when redeploying `FennecCiAccess`.
+
 To establish or recreate deployment access:
 
 1. Configure a personal AWS CLI profile and bootstrap CDK in `us-east-1`.
