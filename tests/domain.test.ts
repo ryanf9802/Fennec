@@ -716,6 +716,69 @@ describe('Stats API domain', () => {
     );
   });
 
+  it('numbers goal points by match sequence without renumbering omitted goals', () => {
+    const value = match(
+      'goal-points',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.events = [
+      {
+        id: 'goal-points:9',
+        matchId: value.id,
+        sequence: 9,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        payload: {
+          Scorer: { Name: 'Late goal' },
+          ImpactLocation: { X: 90, Y: 5000, Z: 500 },
+        },
+      },
+      {
+        id: 'goal-points:3',
+        matchId: value.id,
+        sequence: 3,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        payload: {
+          Scorer: { Name: 'Middle goal' },
+          ImpactLocation: { X: 30, Y: 5000, Z: 500 },
+        },
+      },
+      {
+        id: 'goal-points:1',
+        matchId: value.id,
+        sequence: 1,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        payload: { Scorer: { Name: 'Unmapped goal' } },
+      },
+      {
+        id: 'goal-points:2',
+        matchId: value.id,
+        sequence: 2,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        payload: {
+          Scorer: { Name: 'Invalid goal packet' },
+          GoalSpeed: 0,
+          GoalTime: 0,
+          ImpactLocation: { X: 20, Y: 5000, Z: 500 },
+        },
+      },
+    ];
+
+    expect(
+      spatialEventPoints(value).map((point) => ({
+        id: point.id,
+        goalNumber: point.goalNumber,
+      })),
+    ).toEqual([
+      { id: 'goal-points:9', goalNumber: 3 },
+      { id: 'goal-points:3', goalNumber: 2 },
+    ]);
+  });
+
   it('resolves stable mode-specific arena geometry', () => {
     const value = match(
       'arena',

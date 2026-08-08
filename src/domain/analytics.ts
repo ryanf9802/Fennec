@@ -13,6 +13,7 @@ export interface SpatialActor {
 export interface SpatialEventPoint {
   id: string;
   kind: SpatialEventKind;
+  goalNumber?: number;
   x: number;
   y: number;
   z: number;
@@ -42,6 +43,16 @@ function finite(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value)
     ? value
     : undefined;
+}
+
+function isScoredGoal(event: TimelineEvent): boolean {
+  return (
+    event.eventName === 'GoalScored' &&
+    !(
+      finite(event.payload.GoalSpeed) === 0 &&
+      finite(event.payload.GoalTime) === 0
+    )
+  );
 }
 
 function vector(
@@ -104,6 +115,7 @@ function actor(match: MatchState, value: unknown): SpatialActor | undefined {
 function eventPoint(
   match: MatchState,
   event: TimelineEvent,
+  goalNumber?: number,
 ): SpatialEventPoint | undefined {
   if (event.eventName === 'BallHit') {
     const ball = record(event.payload.Ball);
@@ -125,12 +137,14 @@ function eventPoint(
     };
   }
   if (event.eventName === 'GoalScored') {
+    if (!isScoredGoal(event)) return undefined;
     const location = vector(event.payload.ImpactLocation);
     if (!location) return undefined;
     const scorer = actor(match, event.payload.Scorer);
     return {
       id: event.id,
       kind: 'goal',
+      goalNumber,
       ...location,
       elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
       actors: scorer ? [scorer] : [],
@@ -155,8 +169,14 @@ function eventPoint(
 }
 
 export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
+  const goalNumbers = new Map(
+    match.events
+      .filter(isScoredGoal)
+      .sort((first, second) => first.sequence - second.sequence)
+      .map((event, index) => [event.id, index + 1]),
+  );
   return match.events
-    .map((event) => eventPoint(match, event))
+    .map((event) => eventPoint(match, event, goalNumbers.get(event.id)))
     .filter((value): value is SpatialEventPoint => !!value);
 }
 

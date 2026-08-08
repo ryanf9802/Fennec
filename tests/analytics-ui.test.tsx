@@ -172,4 +172,57 @@ describe('ball touch map', () => {
     );
     expect(scene.props?.cameraState.pitch).toBe(0);
   });
+
+  it('identifies scored goals by their match-wide sequence number', () => {
+    const goalMatch: MatchState = {
+      ...match,
+      events: [
+        ...match.events,
+        {
+          id: 'map:5',
+          matchId: 'map',
+          sequence: 5,
+          eventName: 'GoalScored',
+          receivedAt: '2026-08-08T00:04:00Z',
+          matchClockSeconds: 60,
+          elapsedSeconds: 240,
+          payload: {
+            Scorer: { Name: 'Them', Shortcut: 2, TeamNum: 1 },
+            GoalSpeed: 1200,
+            ImpactLocation: { X: 200, Y: 5000, Z: 500 },
+          },
+        },
+        {
+          id: 'map:4',
+          matchId: 'map',
+          sequence: 4,
+          eventName: 'GoalScored',
+          receivedAt: '2026-08-08T00:03:30Z',
+          matchClockSeconds: 90,
+          elapsedSeconds: 210,
+          payload: {
+            Scorer: { Name: 'Me', Shortcut: 1, TeamNum: 0 },
+            GoalSpeed: 1100,
+            ImpactLocation: { X: -200, Y: -5000, Z: 450 },
+          },
+        },
+      ],
+    };
+    render(<BallTouchMap match={goalMatch} />);
+
+    expect(
+      scene.props?.points.filter((point) => point.kind === 'goal'),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'map:4', goalNumber: 1 }),
+        expect.objectContaining({ id: 'map:5', goalNumber: 2 }),
+      ]),
+    );
+    const secondGoal = screen.getByRole('button', {
+      name: /Them, Goal #2 scored at 4:00, 1200 uu\/s/,
+    });
+    fireEvent.focus(secondGoal);
+    expect(screen.getByText('Them · Goal #2 scored')).toBeInTheDocument();
+    expect(screen.getByText(/4:00 · XYZ 200, 5000, 500/)).toBeInTheDocument();
+  });
 });

@@ -52,7 +52,11 @@ function event(
     receivedAt,
     matchClockSeconds: 180,
     elapsedSeconds: 120,
-    payload: { Scorer: { Name: scorer }, GoalSpeed: 98.6 + sequence },
+    payload: {
+      Scorer: { Name: scorer },
+      GoalSpeed: 98.6 + sequence,
+      ImpactLocation: { X: 650, Y: 5000, Z: 550 },
+    },
   };
 }
 

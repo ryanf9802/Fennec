@@ -28,12 +28,23 @@ function formatSpeed(value?: number): string {
   return value === undefined ? '—' : `${Math.round(value)} uu/s`;
 }
 
+function goalLabel(point: SpatialEventPoint): string {
+  return point.goalNumber ? `Goal #${point.goalNumber} scored` : 'Goal scored';
+}
+
 function pointLabel(point: SpatialEventPoint): string {
   const actors =
     point.actors.map((actor) => actor.name).join(', ') || 'Unknown player';
   if (point.kind === 'touch')
     return `${actors}, touch at ${formatClock(point.elapsedSeconds)}, ${formatSpeed(point.postHitSpeed)}`;
-  return `${actors}, goal at ${formatClock(point.elapsedSeconds)}, ${formatSpeed(point.speed)}`;
+  return `${actors}, ${goalLabel(point)} at ${formatClock(point.elapsedSeconds)}, ${formatSpeed(point.speed)}`;
+}
+
+function pointTitle(point: SpatialEventPoint): string {
+  const actors =
+    point.actors.map((actor) => actor.name).join(', ') || 'Unknown player';
+  const event = point.kind === 'goal' ? goalLabel(point) : point.kind;
+  return `${actors} · ${event}`;
 }
 
 class SceneErrorBoundary extends Component<
@@ -316,11 +327,7 @@ export function BallTouchMap({
         )}
         {activePoint && (
           <div className="surface-strong pointer-events-none absolute bottom-4 left-4 right-4 rounded-xl px-3 py-2 text-xs shadow-xl sm:left-auto sm:max-w-sm">
-            <div className="font-bold">
-              {activePoint.actors.map((actor) => actor.name).join(', ') ||
-                'Unknown player'}{' '}
-              · {activePoint.kind}
-            </div>
+            <div className="font-bold">{pointTitle(activePoint)}</div>
             <div className="text-muted mt-1">
               {formatClock(activePoint.elapsedSeconds)} · XYZ{' '}
               {Math.round(activePoint.x)}, {Math.round(activePoint.y)},{' '}

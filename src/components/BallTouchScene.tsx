@@ -273,24 +273,16 @@ function Marker({
           onActivate(undefined);
         }}
       >
-        <sphereGeometry args={[active ? 125 : 91.25, 20, 14]} />
+        {point.kind === 'goal' ? (
+          <octahedronGeometry args={[active ? 150 : 115, 0]} />
+        ) : (
+          <sphereGeometry args={[active ? 125 : 91.25, 20, 14]} />
+        )}
         <meshStandardMaterial
           color={new Color(color)}
           emissive={active ? color : '#000000'}
           emissiveIntensity={active ? 0.28 : 0}
           roughness={0.38}
-        />
-      </mesh>
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[position.x, 5, position.z]}
-      >
-        <circleGeometry args={[active ? 145 : 115, 28]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={active ? 0.34 : 0.13}
-          depthWrite={false}
         />
       </mesh>
       {active && <ActiveGuide point={point} />}
