@@ -50,6 +50,8 @@ describe('IndexedDB storage', () => {
     const first = await historyRepository.getPlayerHistory('Steam|you|0', 'Epic|other|0', { limit: 1, relationship: 'against' });
     expect(first.summary).toMatchObject({ gamesTogether: 1, winsTogether: 1, gamesOpposed: 2, winsAgainst: 1, lossesAgainst: 1 });
     expect(first.matches.items.map((item) => item.id)).toEqual(['three']);
+    expect(first.matches.items[0]?.events).toEqual([]);
+    expect((await historyRepository.getMatch('three'))?.events).toHaveLength(1);
     expect(first.matches.nextCursor).toBeTruthy();
 
     const second = await historyRepository.getPlayerHistory('Steam|you|0', 'Epic|other|0', { limit: 1, relationship: 'against', cursor: first.matches.nextCursor });

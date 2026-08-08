@@ -318,9 +318,36 @@ async function hydrateMatches(records: StoredMatch[]): Promise<MatchState[]> {
   });
 }
 
+async function hydrateSummaries(records: StoredMatch[]): Promise<MatchState[]> {
+  if (!records.length) return [];
+  const ids = records.map((match) => match.id);
+  const appearances = await db.appearances.where('matchId').anyOf(ids).toArray();
+  const appearancesByMatch = new Map<string, AppearanceRecord[]>();
+  for (const item of appearances) {
+    const values = appearancesByMatch.get(item.matchId) ?? [];
+    values.push(item); appearancesByMatch.set(item.matchId, values);
+  }
+  return records.map((record) => {
+    const match = structuredClone(record) as Partial<StoredMatch>;
+    delete match.sessionId;
+    const participants = (appearancesByMatch.get(record.id) ?? []).map((item): ParticipantState => ({
+      name: item.name, primaryId: item.primaryId, shortcut: item.shortcut, teamNumber: item.teamNumber,
+      score: item.score, goals: item.goals, assists: item.assists, saves: item.saves, shots: item.shots,
+      touches: item.touches, carTouches: item.carTouches, demos: item.demos, loadout: item.loadout, isPresent: item.isPresent,
+    }));
+    return { ...match, participants, events: [] } as MatchState;
+  });
+}
+
 async function hydrateByIds(ids: string[]): Promise<MatchState[]> {
   const records = (await db.matches.bulkGet(ids)).filter((item): item is StoredMatch => !!item);
   const byId = new Map((await hydrateMatches(records)).map((match) => [match.id, match]));
+  return ids.map((id) => byId.get(id)).filter((match): match is MatchState => !!match);
+}
+
+async function hydrateSummariesByIds(ids: string[]): Promise<MatchState[]> {
+  const records = (await db.matches.bulkGet(ids)).filter((item): item is StoredMatch => !!item);
+  const byId = new Map((await hydrateSummaries(records)).map((match) => [match.id, match]));
   return ids.map((id) => byId.get(id)).filter((match): match is MatchState => !!match);
 }
 
@@ -347,7 +374,7 @@ async function listPlainMatches(query: MatchHistoryQuery): Promise<HistoryPage<M
     if (batch.length < 200) break;
   }
   const page = selected.slice(0, limit);
-  return { items: await hydrateMatches(page), nextCursor: selected.length > limit && page.length ? cursorFor(page.at(-1)!.startedAt, page.at(-1)!.id) : undefined };
+  return { items: await hydrateSummaries(page), nextCursor: selected.length > limit && page.length ? cursorFor(page.at(-1)!.startedAt, page.at(-1)!.id) : undefined };
 }
 
 async function listPlayerMatches(query: MatchHistoryQuery): Promise<HistoryPage<MatchState>> {
@@ -390,7 +417,7 @@ async function listPlayerMatches(query: MatchHistoryQuery): Promise<HistoryPage<
     }
   }
   const page = candidates.slice(0, limit);
-  return { items: await hydrateByIds(page.map((item) => item.matchId)), nextCursor: candidates.length > limit && page.length ? cursorFor(page.at(-1)!.startedAt, page.at(-1)!.matchId) : undefined };
+  return { items: await hydrateSummariesByIds(page.map((item) => item.matchId)), nextCursor: candidates.length > limit && page.length ? cursorFor(page.at(-1)!.startedAt, page.at(-1)!.matchId) : undefined };
 }
 
 async function resolveSessionId(match: MatchState, idleMinutes: number): Promise<string> {
@@ -566,6 +593,19 @@ export async function replaceAll(matches: MatchState[], settings: FennecSettings
     if (grouped.records.length) await db.sessions.bulkPut(grouped.records);
     await db.metadata.bulkPut([{ key: schemaMarker, value: true }, { key: 'eventCatalog', value: buildCatalog(events) }]);
   });
+  await compactRawEvents();
+}
+
+async function compactRawEvents(now = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - rawRetentionDays * 86_400_000).toISOString();
+  let deleted = 0;
+  while (true) {
+    const ids = await db.rawEvents.where('[receivedAt+id]').below([cutoff, stringMaxKey]).limit(500).primaryKeys();
+    if (!ids.length) break;
+    await db.rawEvents.bulkDelete(ids);
+    deleted += ids.length;
+  }
+  return deleted;
 }
 
 export const historyRepository: HistoryRepository = {
@@ -578,16 +618,17 @@ export const historyRepository: HistoryRepository = {
   countSessions: () => db.sessions.count(),
   async firstMatchStartedAt() { return (await db.matches.orderBy('[startedAt+id]').first())?.startedAt; },
   async listSessions(cursor, limit = 25) {
+    const pageSize = Math.min(Math.max(limit, 1), 50);
     const parsed = parseCursor(cursor);
     const collection = parsed ? db.sessions.where('[startedAt+id]').below(parsed).reverse() : db.sessions.orderBy('[startedAt+id]').reverse();
-    const records = await collection.limit(Math.min(limit, 50) + 1).toArray();
-    const page = records.slice(0, limit);
-    const groups = await Promise.all(page.map(async (record): Promise<SessionGroup> => ({ id: record.id, startedAt: record.startedAt, endedAt: record.endedAt, matches: await hydrateByIds(record.matchIds) })));
-    return { items: groups, nextCursor: records.length > limit && page.length ? cursorFor(page.at(-1)!.startedAt, page.at(-1)!.id) : undefined };
+    const records = await collection.limit(pageSize + 1).toArray();
+    const page = records.slice(0, pageSize);
+    const groups = await Promise.all(page.map(async (record): Promise<SessionGroup> => ({ id: record.id, startedAt: record.startedAt, endedAt: record.endedAt, matches: await hydrateSummariesByIds(record.matchIds) })));
+    return { items: groups, nextCursor: records.length > pageSize && page.length ? cursorFor(page.at(-1)!.startedAt, page.at(-1)!.id) : undefined };
   },
   async getSession(id) {
     const record = await db.sessions.get(id);
-    return record ? { id: record.id, startedAt: record.startedAt, endedAt: record.endedAt, matches: await hydrateByIds(record.matchIds) } : undefined;
+    return record ? { id: record.id, startedAt: record.startedAt, endedAt: record.endedAt, matches: await hydrateSummariesByIds(record.matchIds) } : undefined;
   },
   listMatches(query = {}) { return query.playerId ? listPlayerMatches(query) : listPlainMatches(query); },
   async getMatch(id) { return (await hydrateByIds([id]))[0]; },
@@ -610,24 +651,15 @@ export const historyRepository: HistoryRepository = {
     let cursor: string | undefined;
     do {
       const page = await listPlainMatches({ cursor, limit: Math.min(pageSize, 100) });
-      for (const match of page.items) yield match;
+      const detailed = await hydrateByIds(page.items.map((match) => match.id));
+      for (const match of detailed) yield match;
       cursor = page.nextCursor;
     } while (cursor);
   },
   saveMatch,
   clearHistory,
   replaceAll,
-  async compactRawEvents(now = new Date()) {
-    const cutoff = new Date(now.getTime() - rawRetentionDays * 86_400_000).toISOString();
-    let deleted = 0;
-    while (true) {
-      const ids = await db.rawEvents.where('[receivedAt+id]').below([cutoff, stringMaxKey]).limit(500).primaryKeys();
-      if (!ids.length) break;
-      await db.rawEvents.bulkDelete(ids);
-      deleted += ids.length;
-    }
-    return deleted;
-  },
+  compactRawEvents,
   async storageStatistics(): Promise<StorageStatistics> {
     const [matches, semanticEvents, rawEvents, players] = await Promise.all([db.matches.count(), db.events.count(), db.rawEvents.count(), db.players.count()]);
     const estimate = typeof navigator !== 'undefined' && navigator.storage?.estimate ? await navigator.storage.estimate() : undefined;

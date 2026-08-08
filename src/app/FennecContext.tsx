@@ -146,7 +146,6 @@ export function FennecProvider({ children }: { children: ReactNode }) {
     historyGenerationRef.current++;
     try {
       await replaceAll(backup.matches, backup.settings, backup.profile);
-      await historyRepository.compactRawEvents();
       const active = recoverActiveMatch(backup.matches); activeRef.current = active; profileRef.current = backup.profile;
       setActiveMatch(active); setSettings(backup.settings); setProfile(backup.profile); applyTheme(backup.settings.theme);
     } finally { setHistoryGeneration(historyGenerationRef.current); }
