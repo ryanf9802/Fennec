@@ -58,6 +58,7 @@ test('primary pages use the same full content width', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?demo=1');
   await expect(page.getByRole('heading', { name: 'Game timeline' })).toBeVisible();
+  await expect(page.getByText('Second-monitor dashboard')).toHaveCount(0);
   const gamesWidth = (await page.locator('main > div').first().boundingBox())!.width;
   for (const [path, heading] of [['/settings?demo=1', 'Settings'], ['/profile?demo=1', 'Profile'], ['/onboarding?demo=1', 'Connect Rocket League']] as const) {
     await page.goto(path);

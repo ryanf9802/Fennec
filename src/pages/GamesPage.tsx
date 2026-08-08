@@ -24,8 +24,7 @@ export function GamesPage() {
   return <div className="space-y-8">
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <div className="eyebrow">Second-monitor dashboard</div>
-        <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">Game timeline</h1>
+        <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Game timeline</h1>
         <p className="text-muted mt-2">Every match, automatically grouped into sessions.</p>
       </div>
       <ConnectionStatus connection={connection} className="surface-flat rounded-xl px-3 py-2 text-sm" />
