@@ -7,6 +7,13 @@ describe('portable data', () => {
   it('round-trips the versioned backup', () => {
     const backup = createBackup([value], defaultSettings, { primaryId: 'Steam|1|0', displayName: 'Me' });
     expect(parseBackup(JSON.stringify(backup)).matches[0]?.id).toBe('one');
+    expect(backup.version).toBe(2);
+  });
+  it('imports and normalizes version 1 backups', () => {
+    const backup = createBackup([value], defaultSettings);
+    const parsed = parseBackup(JSON.stringify({ ...backup, version: 1 }));
+    expect(parsed.version).toBe(2);
+    expect(parsed.matches[0]?.participants[0]?.carTouches).toBe(0);
   });
   it('rejects unrelated JSON', () => expect(() => parseBackup('{"version":1}')).toThrow(/supported/));
   it('normalizes invalid settings from imported data', () => {
@@ -14,5 +21,9 @@ describe('portable data', () => {
     const parsed = parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings, webSocketPort: 1, sessionGapMinutes: 0 } }));
     expect([parsed.settings.webSocketPort, parsed.settings.sessionGapMinutes]).toEqual([49124, 30]);
   });
-  it('exports profile match summaries as CSV', () => expect(matchesCsv([value], 'Steam|1|0')).toContain('"win","2","1","2"'));
+  it('exports profile match summaries as CSV', () => {
+    const csv = matchesCsv([value], 'Steam|1|0');
+    expect(csv).toContain('"win","2","1","2"');
+    expect(csv).toContain('"car_touches","ball_hits"');
+  });
 });

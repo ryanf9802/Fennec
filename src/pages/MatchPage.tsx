@@ -5,6 +5,7 @@ import { useFennec } from '../app/FennecContext';
 import { PlayerHistoryDialog } from '../components/PlayerHistoryDialog';
 import { PlayerName } from '../components/PlayerName';
 import { Timeline } from '../components/Timeline';
+import { MatchAnalytics } from '../components/MatchAnalytics';
 import { calculatePlayerHistory, isTrackablePrimaryId } from '../domain/playerHistory';
 import type { MatchState, ParticipantState } from '../domain/types';
 
@@ -15,6 +16,7 @@ const stats: Array<{ key: keyof ParticipantState; full: string; short: string }>
   { key: 'saves', full: 'Saves', short: 'SV' },
   { key: 'shots', full: 'Shots', short: 'SH' },
   { key: 'touches', full: 'Touches', short: 'T' },
+  { key: 'carTouches', full: 'Car touches', short: 'CT' },
   { key: 'demos', full: 'Demos', short: 'D' },
 ];
 
@@ -23,10 +25,10 @@ function PlayerRow({ player, profileId, onInspect }: { player: ParticipantState;
   return <tr className="border-t border-ui text-center text-sm">
     <th scope="row" className="scoreboard-player-cell px-3 py-3 text-left">
       {inspectable
-        ? <button className="hover:text-fennec-cyan max-w-full cursor-pointer text-left" onClick={() => onInspect(player)}><PlayerName name={player.name} teamNumber={player.teamNumber} /></button>
-        : <PlayerName name={player.name} teamNumber={player.teamNumber} you={player.primaryId === profileId} />}
+        ? <button className="hover:text-fennec-cyan max-w-full cursor-pointer text-left" onClick={() => onInspect(player)}><PlayerName name={player.name} teamNumber={player.teamNumber} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</button>
+        : <><PlayerName name={player.name} teamNumber={player.teamNumber} you={player.primaryId === profileId} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</>}
     </th>
-    {stats.map(({ key }) => <td key={key} className={`px-2 py-3 ${key === 'score' ? 'font-bold' : ''}`}>{player[key]}</td>)}
+    {stats.map(({ key }) => <td key={key} className={`px-2 py-3 ${key === 'score' ? 'font-bold' : ''}`}>{player[key] ?? 0}</td>)}
   </tr>;
 }
 
@@ -48,15 +50,16 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
     <div className="grid min-w-0 gap-6 xl:min-h-0 xl:grid-cols-[minmax(0,3fr)_minmax(22rem,2fr)]">
       <section className="scoreboard-container min-w-0 xl:min-h-0 xl:overflow-y-auto">
         <h2 className="mb-4 text-xl font-extrabold">Scoreboard</h2>
-        <div className="overflow-x-auto rounded-2xl"><table className="scoreboard-table surface-flat w-full min-w-[45rem] overflow-hidden rounded-2xl">
-          <colgroup><col className="w-[30%]" />{stats.map(({ key }) => <col key={key} className="w-[10%]" />)}</colgroup>
+        <div className="overflow-x-auto rounded-2xl"><table className="scoreboard-table surface-flat w-full min-w-[50rem] overflow-hidden rounded-2xl">
+          <colgroup><col className="w-[28%]" />{stats.map(({ key }) => <col key={key} className="w-[9%]" />)}</colgroup>
           <thead className="eyebrow"><tr><th scope="col" className="scoreboard-player-cell px-3 py-3 text-left">Player</th>{stats.map(({ key, full, short }) => <th key={key} scope="col" className="px-2 py-3 text-center"><span className="stat-label-full">{full}</span><abbr title={full} className="stat-label-short no-underline">{short}</abbr></th>)}</tr></thead>
           {teams.map((team) => <tbody key={team.teamNumber}>
-            <tr className="border-t border-ui"><th colSpan={8} className="px-3 py-2 text-left text-sm font-black uppercase tracking-wider"><span className={`mr-2 inline-block size-2.5 rounded-full ${team.teamNumber === 0 ? 'bg-fennec-cyan' : 'bg-fennec-orange'}`} />{team.name || `Team ${team.teamNumber + 1}`}{match.winnerTeamNumber === team.teamNumber && <Trophy className="ml-2 inline size-4 text-amber-400" />}</th></tr>
+            <tr className="border-t border-ui"><th colSpan={stats.length + 1} className="px-3 py-2 text-left text-sm font-black uppercase tracking-wider"><span className={`mr-2 inline-block size-2.5 rounded-full ${team.teamNumber === 0 ? 'bg-fennec-cyan' : 'bg-fennec-orange'}`} />{team.name || `Team ${team.teamNumber + 1}`}{match.winnerTeamNumber === team.teamNumber && <Trophy className="ml-2 inline size-4 text-amber-400" />}</th></tr>
             {match.participants.filter((player) => player.teamNumber === team.teamNumber).sort((a, b) => b.score - a.score).map((player, index) => <PlayerRow key={`${player.primaryId ?? player.name}:${index}`} player={player} profileId={profile?.primaryId} onInspect={(next) => setSelectedPlayerId(next.primaryId)} />)}
           </tbody>)}
         </table></div>
         {!match.participants.length && <div className="surface-flat text-muted mt-3 rounded-2xl p-8 text-center">Waiting for player data…</div>}
+        <div className="mt-6 border-t border-ui pt-6"><MatchAnalytics match={match} profileId={profile?.primaryId} /></div>
       </section>
       <section className="flex min-w-0 flex-col xl:min-h-0"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-extrabold">Event timeline</h2><span className="eyebrow">{settings.timelinePreset}</span></div><div className="timeline-scroller min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2"><Timeline match={match} settings={settings} /></div></section>
     </div>

@@ -27,6 +27,8 @@ test('demo feed opens a live match and settings remain usable', async ({ page })
   await expect(dialog.getByText('Played together')).toBeVisible();
   await expect(dialog.getByText('Played against')).toBeVisible();
   await dialog.getByRole('button', { name: 'Close player history' }).click();
+  await expect(page.getByRole('heading', { name: 'Ball analytics' })).toBeVisible();
+  await expect(page.getByRole('img', { name: /ball touch map/i })).toBeVisible();
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.getByLabel('WebSocket port')).toHaveValue('49124');

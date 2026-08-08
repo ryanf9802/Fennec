@@ -4,6 +4,8 @@ import { calculatePlayerHistory, isTrackablePrimaryId } from '../src/domain/play
 import { reduceStatsEnvelope, recoverActiveMatch } from '../src/domain/reducer';
 import { groupSessions } from '../src/domain/sessions';
 import { timelineCatalog, timelineDisplayItems } from '../src/domain/timeline';
+import { observedBallSpeed, playerTouchAnalytics, spatialEventPoints } from '../src/domain/analytics';
+import { arenaProfile } from '../src/domain/arenaProfiles';
 import { defaultSettings, type MatchState, type ParticipantState, type TimelineEvent } from '../src/domain/types';
 
 const player = (name: string, primaryId: string, teamNumber: number): ParticipantState => ({ name, primaryId, teamNumber, score: 0, goals: 0, assists: 0, saves: 0, shots: 0, touches: 0, demos: 0 });
@@ -37,6 +39,60 @@ describe('Stats API domain', () => {
     expect(first.playlistName).toBe('Ranked Doubles');
     const goal = reduceStatsEnvelope(first, parseEnvelope('{"Event":"GoalScored","Data":{"MatchGuid":"match-1","GoalSpeed":123.4}}'), '2026-08-08T00:00:01Z').current;
     expect(goal.events[0]?.payload.GoalSpeed).toBe(123.4);
+  });
+
+  it('captures complete normal-play snapshots and active ball aggregates', () => {
+    let value = reduceStatsEnvelope(undefined, { event: 'RoundStarted', data: { MatchGuid: 'normal' } }, '2026-08-08T00:00:00Z').current;
+    value = reduceStatsEnvelope(value, { event: 'UpdateState', data: {
+      MatchGuid: 'normal',
+      Players: [{ Name: 'Me', PrimaryId: 'Steam|1|0', Shortcut: 2, TeamNum: 0, Score: 120, CarTouches: 4, Loadout: ['Body_Fennec'] }],
+      Game: { PlaylistId: 11, TimeSeconds: 250, Ball: { Speed: 900.5, TeamNum: 0 }, bHasWinner: false, Teams: [{ TeamNum: 0, ColorSecondary: '001122' }] },
+    } }, '2026-08-08T00:00:01Z').current;
+    expect(value.participants[0]).toEqual(expect.objectContaining({ shortcut: 2, carTouches: 4, loadout: ['Body_Fennec'], isPresent: true }));
+    expect(value.teams[0]?.colorSecondary).toBe('001122');
+    expect(value.ball).toEqual({ speed: 900.5, lastTouchTeamNumber: 0 });
+    expect(value.capture).toEqual(expect.objectContaining({ updateStatePackets: 1, activePlayPackets: 1, ballSpeed: expect.objectContaining({ samples: 1, sum: 900.5, max: 900.5 }) }));
+
+    value = reduceStatsEnvelope(value, { event: 'MatchPaused', data: { MatchGuid: 'normal' } }).current;
+    value = reduceStatsEnvelope(value, { event: 'UpdateState', data: { MatchGuid: 'normal', Players: [], Game: { Ball: { Speed: 1500, TeamNum: 1 } } } }).current;
+    expect(value.capture?.activePlayPackets).toBe(1);
+    expect(value.participants[0]?.isPresent).toBe(false);
+
+    const shortcutOnly = { ...value, participants: [{ ...value.participants[0]!, primaryId: undefined, shortcut: 2 }] };
+    const identified = reduceStatsEnvelope(shortcutOnly, { event: 'UpdateState', data: { MatchGuid: 'normal', Players: [{ Name: 'Me', PrimaryId: 'Steam|1|0', Shortcut: 2, TeamNum: 0 }], Game: {} } }).current;
+    expect(identified.participants).toHaveLength(1);
+    expect(identified.participants[0]?.primaryId).toBe('Steam|1|0');
+  });
+
+  it('derives touch analytics and resolves event actors by shortcut', () => {
+    const value = match('touches', '2026-08-08T00:00:00Z', '2026-08-08T00:05:00Z');
+    value.participants = [{ ...player('Me', 'Steam|1|0', 0), shortcut: 4 }, { ...player('Mate', 'Epic|2|0', 0), shortcut: 5 }];
+    value.events = [
+      { id: 'touches:1', matchId: value.id, sequence: 1, eventName: 'BallHit', receivedAt: value.startedAt, matchClockSeconds: 210, payload: { Players: [{ Name: 'Me', Shortcut: 4, TeamNum: 0 }], Ball: { PreHitSpeed: 400, PostHitSpeed: 1000, Location: { X: 10, Y: 20, Z: 30 } } } },
+      { id: 'touches:2', matchId: value.id, sequence: 2, eventName: 'BallHit', receivedAt: value.startedAt, matchClockSeconds: 205, payload: { Players: [{ Name: 'Mate', Shortcut: 5, TeamNum: 0 }], Ball: { PreHitSpeed: 800, PostHitSpeed: 900, Location: { X: 40, Y: 50, Z: 60 } } } },
+    ];
+    expect(spatialEventPoints(value)[0]?.actors[0]?.primaryId).toBe('Steam|1|0');
+    expect(playerTouchAnalytics(value, 'Steam|1|0')).toEqual(expect.objectContaining({ touches: 1, teamTouches: 2, touchShare: 0.5, averagePostHitSpeed: 1000, averageSpeedChange: 600 }));
+  });
+
+  it('resolves mode-specific arena profiles and expands for outliers', () => {
+    const value = match('arena', '2026-08-08T00:00:00Z', '2026-08-08T00:05:00Z');
+    value.playlistId = 27;
+    expect(arenaProfile(value, []).kind).toBe('hoops');
+    value.playlistId = 29;
+    expect(arenaProfile(value, []).kind).toBe('dropshot');
+    value.playlistId = 11;
+    expect(arenaProfile(value, [{ id: 'x', kind: 'touch', x: 9000, y: 0, z: 0, actors: [] }]).xMax).toBeGreaterThan(9000);
+  });
+
+  it('reports unavailable observed speed for legacy matches', () => {
+    expect(observedBallSpeed(match('legacy', '2026-08-08T00:00:00Z', '2026-08-08T00:05:00Z'))).toEqual({});
+  });
+
+  it('begins active sampling when Fennec connects during a round', () => {
+    const value = reduceStatsEnvelope(undefined, { event: 'UpdateState', data: { MatchGuid: 'mid-round', Game: { bReplay: false, Ball: { Speed: 700, TeamNum: 0 } } } }).current;
+    expect(value.roundActive).toBe(true);
+    expect(value.capture?.activePlayPackets).toBe(1);
   });
 
   it('completes superseded live matches and continues event sequence', () => {

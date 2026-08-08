@@ -11,6 +11,7 @@ export interface StatsEnvelope {
 export interface ParticipantState {
   name: string;
   primaryId?: string;
+  shortcut?: number;
   teamNumber: number;
   score: number;
   goals: number;
@@ -18,7 +19,10 @@ export interface ParticipantState {
   saves: number;
   shots: number;
   touches: number;
+  carTouches?: number;
   demos: number;
+  loadout?: string[];
+  isPresent?: boolean;
 }
 
 export interface TeamState {
@@ -26,6 +30,33 @@ export interface TeamState {
   name: string;
   score: number;
   colorPrimary: string;
+  colorSecondary?: string;
+}
+
+export interface PlayerReference {
+  name: string;
+  shortcut?: number;
+  teamNumber: number;
+}
+
+export interface BallState {
+  speed: number;
+  lastTouchTeamNumber?: number;
+}
+
+export interface NumericAggregate {
+  samples: number;
+  sum: number;
+  min?: number;
+  max?: number;
+}
+
+export interface MatchCapture {
+  version: 1;
+  updateStatePackets: number;
+  activePlayPackets: number;
+  ballSpeed: NumericAggregate;
+  lastTouchSamplesByTeam: Record<string, number>;
 }
 
 export interface TimelineEvent {
@@ -52,6 +83,14 @@ export interface MatchState {
   timeSeconds: number;
   isOvertime: boolean;
   isReplay: boolean;
+  roundActive?: boolean;
+  roundPhaseObserved?: boolean;
+  isPaused?: boolean;
+  hasWinner?: boolean;
+  winnerName?: string;
+  ball?: BallState;
+  viewTarget?: PlayerReference;
+  capture?: MatchCapture;
   winnerTeamNumber?: number;
   teams: TeamState[];
   participants: ParticipantState[];

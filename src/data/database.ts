@@ -19,6 +19,22 @@ class FennecDatabase extends Dexie {
       settings: 'key',
       profiles: 'key, primaryId',
     });
+    this.version(2).stores({
+      matches: 'id, startedAt, lastEventAt, lifecycle, playlistCategory',
+      events: 'id, matchId, sequence, receivedAt, eventName, [matchId+sequence]',
+      settings: 'key',
+      profiles: 'key, primaryId',
+    }).upgrade(async (transaction) => {
+      await transaction.table<StoredMatch>('matches').toCollection().modify((match) => {
+        match.participants = match.participants.map((player) => ({
+          ...player,
+          carTouches: player.carTouches ?? 0,
+          loadout: player.loadout ?? [],
+          isPresent: player.isPresent ?? true,
+        }));
+        match.teams = match.teams.map((team) => ({ ...team, colorSecondary: team.colorSecondary ?? '' }));
+      });
+    });
   }
 }
 
@@ -35,12 +51,34 @@ export async function loadMatches(): Promise<MatchState[]> {
   return matches.map((match) => ({ ...match, events: (byMatch.get(match.id) ?? []).sort((a, b) => a.sequence - b.sequence) }));
 }
 
-export async function saveMatch(match: MatchState): Promise<void> {
+async function writeMatch(match: MatchState): Promise<void> {
   const { events, ...stored } = match;
   await db.transaction('rw', db.matches, db.events, async () => {
     await db.matches.put(stored);
     if (events.length) await db.events.bulkPut(events);
   });
+}
+
+const pendingMatches = new Map<string, MatchState>();
+const matchDrains = new Map<string, Promise<void>>();
+
+export function saveMatch(match: MatchState): Promise<void> {
+  pendingMatches.set(match.id, match);
+  const existing = matchDrains.get(match.id);
+  if (existing) return existing;
+  const drain = (async () => {
+    while (pendingMatches.has(match.id)) {
+      const latest = pendingMatches.get(match.id)!;
+      pendingMatches.delete(match.id);
+      await writeMatch(latest);
+    }
+  })().finally(() => matchDrains.delete(match.id));
+  matchDrains.set(match.id, drain);
+  return drain;
+}
+
+async function settleMatchWrites(): Promise<void> {
+  while (matchDrains.size) await Promise.all([...matchDrains.values()]);
 }
 
 export async function loadSettings(): Promise<FennecSettings> {
@@ -62,12 +100,14 @@ export async function saveProfile(value: FennecProfile): Promise<void> {
 }
 
 export async function clearHistory(): Promise<void> {
+  await settleMatchWrites();
   await db.transaction('rw', db.matches, db.events, async () => {
     await Promise.all([db.matches.clear(), db.events.clear()]);
   });
 }
 
 export async function replaceAll(matches: MatchState[], settings: FennecSettings, profile?: FennecProfile): Promise<void> {
+  await settleMatchWrites();
   await db.transaction('rw', db.matches, db.events, db.settings, db.profiles, async () => {
     await Promise.all([db.matches.clear(), db.events.clear(), db.settings.clear(), db.profiles.clear()]);
     const storedMatches = matches.map((match) => {

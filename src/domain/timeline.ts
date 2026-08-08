@@ -1,6 +1,6 @@
 import type { FennecSettings, MatchState, TimelineEvent } from './types';
 
-export const curatedEvents = ['GoalScored', 'CrossbarHit', 'PlayerJoined', 'PlayerLeft', 'MatchEnded', 'StatfeedEvent'];
+export const curatedEvents = ['GoalScored', 'CrossbarHit', 'PlayerJoined', 'PlayerLeft', 'MatchPaused', 'MatchUnpaused', 'GoalReplayStart', 'GoalReplayEnd', 'MatchEnded', 'StatfeedEvent'];
 
 export interface TimelineMessagePart {
   text: string;

@@ -9,7 +9,7 @@ const basePlayers = {
 
 function player(key: keyof typeof basePlayers, teamNumber: number, goals: number, score: number): ParticipantState {
   const [name, primaryId] = basePlayers[key];
-  return { name, primaryId, teamNumber, score, goals, assists: goals ? 0 : 1, saves: 1, shots: goals + 2, touches: 24 + goals * 5, demos: 0 };
+  return { name, primaryId, shortcut: Object.keys(basePlayers).indexOf(key) + 1, teamNumber, score, goals, assists: goals ? 0 : 1, saves: 1, shots: goals + 2, touches: 24 + goals * 5, carTouches: 7 + goals, demos: 0, loadout: [], isPresent: true };
 }
 
 function event(matchId: string, sequence: number, receivedAt: string, scorer: string): TimelineEvent {
@@ -38,7 +38,12 @@ function demoMatch(id: string, startedAt: Date, teammates: boolean, won: boolean
     participants: teammates
       ? [player('you', 0, Math.max(1, blueScore - 1), 510), player('luna', 0, 1, 360), player('drift', 1, orangeScore, 390), player('orbit', 1, 0, 220)]
       : [player('you', 0, blueScore, 480), player('orbit', 0, 0, 280), player('luna', 1, Math.max(1, orangeScore - 1), 430), player('drift', 1, 1, 340)],
-    events: [event(id, 1, new Date(startedAt.getTime() + 2 * 60_000).toISOString(), 'You'), { id: `${id}:2`, matchId: id, sequence: 2, eventName: 'MatchEnded', receivedAt: endedAt, matchClockSeconds: 0, payload: { WinnerTeamNum: won ? 0 : 1 } }],
+    capture: { version: 1, updateStatePackets: 600, activePlayPackets: 580, ballSpeed: { samples: 580, sum: 580 * 825, min: 0, max: 1720 }, lastTouchSamplesByTeam: { 0: won ? 330 : 250, 1: won ? 250 : 330 } },
+    events: [
+      { id: `${id}:1`, matchId: id, sequence: 1, eventName: 'BallHit', receivedAt: new Date(startedAt.getTime() + 60_000).toISOString(), matchClockSeconds: 240, payload: { Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }], Ball: { PreHitSpeed: 540, PostHitSpeed: 1120, Location: { X: -1200, Y: -900, Z: 170 } } } },
+      event(id, 2, new Date(startedAt.getTime() + 2 * 60_000).toISOString(), 'You'),
+      { id: `${id}:3`, matchId: id, sequence: 3, eventName: 'MatchEnded', receivedAt: endedAt, matchClockSeconds: 0, payload: { WinnerTeamNum: won ? 0 : 1 } },
+    ],
   };
 }
 
