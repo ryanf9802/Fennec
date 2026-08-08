@@ -56,6 +56,7 @@ other. CSV match-summary export is also available.
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm playwright:install
 pnpm lint
 pnpm typecheck
 pnpm test:run
@@ -63,6 +64,16 @@ pnpm build
 pnpm cdk:synth
 pnpm test:e2e
 ```
+
+All Playwright commands use a browser cache under the real `node_modules`
+directory. Muxpilot worktrees link that directory from the repository checkout,
+so installing Chromium once with `pnpm playwright:install` makes the matching
+browser available to every worktree. When the Playwright version changes, rerun
+the install command to add its matching Chromium build. Use
+`pnpm playwright -- <command>` for other Playwright CLI commands with the same
+shared cache. Muxpilot agents can bypass pnpm's shared-store bookkeeping and use
+`./scripts/playwright.mjs install chromium` or
+`./scripts/playwright.mjs test` directly; both forms use the same cache.
 
 The direct browser adapter connects to `ws://127.0.0.1:49124` and retries with
 bounded exponential backoff. The feed is isolated behind `StatsFeedAdapter` so
