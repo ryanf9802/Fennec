@@ -1,5 +1,5 @@
 import { ArrowUpRight, CalendarDays, Radio, Square } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { EmptyState } from '../components/EmptyState';
@@ -7,12 +7,12 @@ import { ConnectionStatus } from '../components/ConnectionStatus';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
 import { sessionMetrics } from '../domain/metrics';
+import { sessionIdleGapElapsed } from '../domain/sessions';
 import { formatClock, matchElapsedSeconds } from '../domain/timeline';
 import { formatTeamScore, profileTeamNumber } from '../domain/teamPresentation';
 import { useSessions } from '../data/historyQueries';
 
-function sessionTitle(startedAt: string, current: boolean): string {
-  if (current) return 'Current session';
+function sessionTitle(startedAt: string): string {
   const date = new Date(startedAt);
   const today = new Date();
   if (date.toDateString() === today.toDateString()) return 'Earlier today';
@@ -28,13 +28,47 @@ function sessionTitle(startedAt: string, current: boolean): string {
  * coordinating loading, pagination, and empty-history states.
  */
 export function GamesPage() {
-  const { activeMatch, profile, connection, endSession } = useFennec();
+  const { activeMatch, profile, connection, endSession, settings } =
+    useFennec();
   const [endingSession, setEndingSession] = useState(false);
   const [sessionMessage, setSessionMessage] = useState<string>();
+  const [deadlineClock, setDeadlineClock] = useState(() => Date.now());
   const sessionsQuery = useSessions();
   const orderedSessions =
     sessionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const current = orderedSessions[0];
+  const idleDeadline = current
+    ? new Date(current.endedAt).getTime() + settings.sessionGapMinutes * 60_000
+    : undefined;
+  useEffect(() => {
+    if (
+      activeMatch ||
+      !current ||
+      current.endedManually ||
+      idleDeadline === undefined
+    )
+      return;
+    const remaining = idleDeadline - Date.now();
+    const timer = window.setTimeout(
+      () => setDeadlineClock(Date.now()),
+      remaining > 0 ? remaining + 25 : 0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [activeMatch, current, idleDeadline]);
+  const currentIsClosed = Boolean(
+    current &&
+    !activeMatch &&
+    (current.endedManually ||
+      sessionIdleGapElapsed(
+        current,
+        settings.sessionGapMinutes,
+        deadlineClock,
+      )),
+  );
+  const focusedSession = currentIsClosed ? undefined : current;
+  const pastSessions = currentIsClosed
+    ? orderedSessions
+    : orderedSessions.slice(1);
   const handleEndSession = async () => {
     setEndingSession(true);
     setSessionMessage(undefined);
@@ -122,35 +156,27 @@ export function GamesPage() {
       {!sessionsQuery.isLoading && !orderedSessions.length && !activeMatch ? (
         <EmptyState />
       ) : (
-        current && (
+        focusedSession && (
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="eyebrow text-fennec-cyan">In focus</div>
                 <h2 className="mt-1 text-2xl font-extrabold">
-                  {current.endedManually && !activeMatch
-                    ? 'Latest session'
-                    : 'Current session'}
+                  Current session
                 </h2>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-3">
-                {current.endedManually && !activeMatch ? (
-                  <span className="text-muted text-sm font-bold">
-                    Session ended
-                  </span>
-                ) : (
-                  <button
-                    className="button-secondary"
-                    disabled={endingSession}
-                    onClick={() => void handleEndSession()}
-                  >
-                    <Square className="size-3.5 fill-current" />
-                    {endingSession ? 'Ending…' : 'End session'}
-                  </button>
-                )}
+                <button
+                  className="button-secondary"
+                  disabled={endingSession}
+                  onClick={() => void handleEndSession()}
+                >
+                  <Square className="size-3.5 fill-current" />
+                  {endingSession ? 'Ending…' : 'End session'}
+                </button>
                 <Link
                   className="text-fennec-cyan flex items-center gap-1 text-sm font-bold"
-                  to={`/sessions/${current.id}`}
+                  to={`/sessions/${focusedSession.id}`}
                 >
                   Full session <ArrowUpRight className="size-4" />
                 </Link>
@@ -167,11 +193,14 @@ export function GamesPage() {
             )}
             <div className="surface rounded-3xl p-5 sm:p-6">
               <MetricsGrid
-                metrics={sessionMetrics(current.matches, profile?.primaryId)}
+                metrics={sessionMetrics(
+                  focusedSession.matches,
+                  profile?.primaryId,
+                )}
               />
             </div>
             <div className="space-y-2">
-              {[...current.matches].reverse().map((match) => (
+              {[...focusedSession.matches].reverse().map((match) => (
                 <MatchRow
                   key={match.id}
                   match={match}
@@ -183,14 +212,31 @@ export function GamesPage() {
         )
       )}
 
-      {orderedSessions.slice(1).length > 0 && (
+      {currentIsClosed && (
+        <section className="surface rounded-3xl p-5 sm:p-6">
+          <div className="eyebrow text-fennec-cyan">Between sessions</div>
+          <h2 className="mt-1 text-2xl font-extrabold">
+            Ready for a new session?
+          </h2>
+          <p className="text-muted mt-2">
+            Start a new match in Rocket League to begin a new session.
+          </p>
+          {sessionMessage && (
+            <p className="text-muted mt-3 text-sm" role="status">
+              {sessionMessage}
+            </p>
+          )}
+        </section>
+      )}
+
+      {pastSessions.length > 0 && (
         <section className="space-y-4">
           <div>
             <div className="eyebrow">History</div>
             <h2 className="mt-1 text-2xl font-extrabold">Past sessions</h2>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
-            {orderedSessions.slice(1).map((session) => {
+            {pastSessions.map((session) => {
               const metrics = sessionMetrics(
                 session.matches,
                 profile?.primaryId,
@@ -205,7 +251,7 @@ export function GamesPage() {
                     <div>
                       <div className="flex items-center gap-2 font-extrabold">
                         <CalendarDays className="text-fennec-cyan size-4" />
-                        {sessionTitle(session.startedAt, false)}
+                        {sessionTitle(session.startedAt)}
                       </div>
                       <div className="text-muted mt-1 text-sm">
                         {session.matches.length} game

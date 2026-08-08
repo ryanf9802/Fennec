@@ -5,7 +5,7 @@ import {
   isTrackablePrimaryId,
 } from '../src/domain/playerHistory';
 import { reduceStatsEnvelope, recoverActiveMatch } from '../src/domain/reducer';
-import { groupSessions } from '../src/domain/sessions';
+import { groupSessions, sessionIdleGapElapsed } from '../src/domain/sessions';
 import {
   formatClock,
   timelineCatalog,
@@ -573,6 +573,28 @@ describe('Stats API domain', () => {
       [['one'], ['two']],
     );
     expect(groups.map((group) => group.endedManually)).toEqual([true, false]);
+  });
+
+  it('closes a session when its idle threshold is reached', () => {
+    const session = groupSessions(
+      [match('one', '2026-08-08T00:00:00Z', '2026-08-08T00:05:00Z')],
+      30,
+    )[0]!;
+
+    expect(
+      sessionIdleGapElapsed(
+        session,
+        30,
+        new Date('2026-08-08T00:34:59Z').getTime(),
+      ),
+    ).toBe(false);
+    expect(
+      sessionIdleGapElapsed(
+        session,
+        30,
+        new Date('2026-08-08T00:35:00Z').getTime(),
+      ),
+    ).toBe(true);
   });
 
   it('separates teammate and opponent records', () => {

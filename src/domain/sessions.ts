@@ -1,5 +1,13 @@
 import type { MatchState, SessionGroup } from './types';
 
+export function sessionIdleGapElapsed(
+  session: Pick<SessionGroup, 'endedAt'>,
+  idleMinutes: number,
+  now = Date.now(),
+): boolean {
+  return now >= new Date(session.endedAt).getTime() + idleMinutes * 60_000;
+}
+
 export function startsNewSession(
   prior: Pick<MatchState, 'endedAt' | 'lastEventAt' | 'sessionEndedAfter'>,
   match: Pick<MatchState, 'startedAt'>,

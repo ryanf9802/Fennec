@@ -163,6 +163,9 @@ test('ending a session moves the live game into a new session', async ({
     }),
   ).toBeVisible();
   await expect(page.getByText('Live now')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Ready for a new session?' }),
+  ).toHaveCount(0);
   const dimensions = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
