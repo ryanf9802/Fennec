@@ -252,6 +252,20 @@ test('settings show installation-relative Stats API instructions', async ({
   ).toBeVisible();
   await expect(page.getByRole('button', { name: /copy/i })).toHaveCount(0);
   await expect(page.getByText(/Program Files/)).toHaveCount(0);
+  await expect(page.getByText('Allow local network access')).toBeVisible();
+  await expect(
+    page.getByText(/set Local network access to Allow, then reload Fennec/),
+  ).toBeVisible();
+});
+
+test('onboarding explains the browser local network prompt', async ({
+  page,
+}) => {
+  await page.goto('/onboarding?demo=1');
+  await expect(page.getByText('Allow local network access')).toBeVisible();
+  await expect(
+    page.getByText(/Choose Allow so Fennec can read Rocket League/),
+  ).toBeVisible();
 });
 
 test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {

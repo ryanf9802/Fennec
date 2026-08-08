@@ -9,8 +9,10 @@ import type { Construct } from 'constructs';
 
 export interface FennecSiteStackProps extends cdk.StackProps {
   domainName?: string;
+  redirectDomain?: string;
   zoneName?: string;
   hostedZoneId?: string;
+  webAclId?: string;
 }
 
 export class FennecSiteStack extends cdk.Stack {
@@ -24,6 +26,16 @@ export class FennecSiteStack extends cdk.Stack {
     if (domainValues.some(Boolean) && !domainValues.every(Boolean)) {
       throw new Error(
         'FENNEC_APP_DOMAIN, FENNEC_ZONE_NAME, and FENNEC_HOSTED_ZONE_ID must be provided together.',
+      );
+    }
+    if (props.redirectDomain && !props.domainName) {
+      throw new Error(
+        'FENNEC_REDIRECT_DOMAIN requires the complete custom-domain configuration.',
+      );
+    }
+    if (props.redirectDomain && props.redirectDomain !== props.zoneName) {
+      throw new Error(
+        'FENNEC_REDIRECT_DOMAIN must be the configured Route 53 zone apex.',
       );
     }
 
@@ -45,9 +57,51 @@ export class FennecSiteStack extends cdk.Stack {
       });
       certificate = new acm.Certificate(this, 'Certificate', {
         domainName: props.domainName,
+        subjectAlternativeNames: props.redirectDomain
+          ? [props.redirectDomain]
+          : undefined,
         validation: acm.CertificateValidation.fromDns(zone),
       });
     }
+
+    const redirectFunction =
+      props.domainName && props.redirectDomain
+        ? new cloudfront.Function(this, 'ApexRedirect', {
+            comment: `Redirect ${props.redirectDomain} to ${props.domainName}`,
+            runtime: cloudfront.FunctionRuntime.JS_2_0,
+            code: cloudfront.FunctionCode.fromInline(`
+function querySuffix(querystring) {
+  var parts = [];
+  for (var name in querystring) {
+    if (!Object.prototype.hasOwnProperty.call(querystring, name)) continue;
+    var parameter = querystring[name];
+    var values = parameter.multiValue || [parameter];
+    for (var index = 0; index < values.length; index += 1) {
+      parts.push(name + '=' + values[index].value);
+    }
+  }
+  return parts.length ? '?' + parts.join('&') : '';
+}
+
+function handler(event) {
+  var request = event.request;
+  var host = request.headers.host && request.headers.host.value.toLowerCase();
+  if (host === ${JSON.stringify(props.redirectDomain)}) {
+    return {
+      statusCode: 308,
+      statusDescription: 'Permanent Redirect',
+      headers: {
+        location: {
+          value: 'https://${props.domainName}' + request.uri + querySuffix(request.querystring),
+        },
+      },
+    };
+  }
+  return request;
+}
+`),
+          })
+        : undefined;
 
     const cachePolicy = new cloudfront.CachePolicy(this, 'AssetCachePolicy', {
       defaultTtl: cdk.Duration.seconds(0),
@@ -93,8 +147,13 @@ export class FennecSiteStack extends cdk.Stack {
 
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultRootObject: 'index.html',
-      domainNames: props.domainName ? [props.domainName] : undefined,
+      domainNames: props.domainName
+        ? [props.domainName, props.redirectDomain].filter(
+            (domain): domain is string => Boolean(domain),
+          )
+        : undefined,
       certificate,
+      webAclId: props.webAclId,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       enableIpv6: true,
@@ -107,6 +166,14 @@ export class FennecSiteStack extends cdk.Stack {
         compress: true,
         cachePolicy,
         responseHeadersPolicy,
+        functionAssociations: redirectFunction
+          ? [
+              {
+                eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+                function: redirectFunction,
+              },
+            ]
+          : undefined,
       },
       errorResponses: [403, 404].map((httpStatus) => ({
         httpStatus,
@@ -130,6 +197,18 @@ export class FennecSiteStack extends cdk.Stack {
         recordName: props.domainName,
         target,
       });
+      if (props.redirectDomain) {
+        new route53.ARecord(this, 'RedirectAliasA', {
+          zone,
+          recordName: props.redirectDomain,
+          target,
+        });
+        new route53.AaaaRecord(this, 'RedirectAliasAaaa', {
+          zone,
+          recordName: props.redirectDomain,
+          target,
+        });
+      }
     }
 
     new cdk.CfnOutput(this, 'SiteBucketName', { value: bucket.bucketName });

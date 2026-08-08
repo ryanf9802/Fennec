@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { useFennec } from '../app/FennecContext';
 import { StatsApiSetup } from '../components/StatsApiSetup';
 import { ConnectionStatus } from '../components/ConnectionStatus';
+import { LocalNetworkAccessHelp } from '../components/LocalNetworkAccessHelp';
 import {
   createBackup,
   downloadText,
@@ -162,6 +163,9 @@ export function SettingsPage() {
               className="surface-strong mt-2 min-h-11 rounded-xl px-4"
             />
           </div>
+        </div>
+        <div className="mt-5">
+          <LocalNetworkAccessHelp />
         </div>
         <div className="mt-6">
           <div className="eyebrow">Rocket League configuration</div>

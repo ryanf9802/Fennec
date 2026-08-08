@@ -26,7 +26,7 @@ export function connectionPresentation(
       };
     case 'unavailable':
       return {
-        label: 'Rocket League offline',
+        label: 'Stats API unavailable',
         indicatorClass: 'bg-fennec-orange',
         pulse: false,
       };

@@ -55,10 +55,12 @@ archive into memory. The IndexedDB implementation sits behind a storage-neutral
 repository contract so a future optional companion or remote service can use
 the same domain records and query behavior without changing the UI.
 
-`http://localhost:5173` and `https://app.fennec.gg` have separate storage. Use
-Settings to export a versioned backup from one origin and restore it on the
-other. Chrome and Edge stream large backups as NDJSON; JSON fallback and CSV
-match-summary export are also available.
+`http://localhost:5173` and `https://app.fennec.gg` have separate storage.
+`https://fennec.gg` permanently redirects to the app origin so it cannot create
+a second production data store. Use Settings to export a versioned backup from
+localhost and restore it on the production origin. Chrome and Edge stream large
+backups as NDJSON; JSON fallback and CSV match-summary export are also
+available.
 
 ## Development
 
@@ -98,41 +100,46 @@ packets; production builds omit this reporting path.
 
 ## AWS deployment
 
-AWS infrastructure is defined in TypeScript CDK and remains account-neutral
-until deployment variables are supplied. `FennecSite` creates a private S3
-origin, CloudFront Origin Access Control, SPA routing, security headers, and
-optional ACM/Route 53 records. `FennecCiAccess` creates a GitHub OIDC role whose
-trust is restricted to this repository's `main` branch.
+AWS infrastructure is defined in TypeScript CDK and is pinned to personal
+account `309418039962`. `FennecSite` creates a private S3 origin, CloudFront
+Origin Access Control, SPA routing, security headers, ACM/Route 53 records, and
+a permanent `fennec.gg` to `app.fennec.gg` redirect. `FennecCiAccess` creates a
+GitHub OIDC role whose trust is restricted to this repository's `main` branch.
 
-The `main` deployment intentionally fails before touching AWS when the GitHub
-repository variable `AWS_ACCOUNT_ID` is absent. Do not configure it with a work
-account.
+The deployment intentionally fails before assuming AWS credentials unless
+`AWS_ACCOUNT_ID` is exactly `309418039962`. CDK also rejects every other
+explicit account ID.
 
-When the personal AWS account and `fennec.gg` are ready:
+To establish or recreate deployment access:
 
 1. Configure a personal AWS CLI profile and bootstrap CDK in `us-east-1`.
 2. Set `AWS_ACCOUNT_ID` locally and deploy `FennecCiAccess` once:
 
    ```bash
-   AWS_ACCOUNT_ID=123456789012 AWS_REGION=us-east-1 \
-     pnpm cdk deploy FennecCiAccess --profile your-personal-profile
+   AWS_ACCOUNT_ID=309418039962 AWS_REGION=us-east-1 \
+     pnpm cdk deploy FennecCiAccess --profile fennec
    ```
 
 3. Add these GitHub repository variables:
 
-   | Variable                | Value                            |
-   | ----------------------- | -------------------------------- |
-   | `AWS_ACCOUNT_ID`        | Personal 12-digit AWS account ID |
-   | `AWS_REGION`            | `us-east-1`                      |
-   | `FENNEC_APP_DOMAIN`     | `app.fennec.gg`                  |
-   | `FENNEC_ZONE_NAME`      | `fennec.gg`                      |
-   | `FENNEC_HOSTED_ZONE_ID` | Route 53 public hosted-zone ID   |
+   | Variable                 | Value                            |
+   | ------------------------ | -------------------------------- |
+   | `AWS_ACCOUNT_ID`         | Personal 12-digit AWS account ID |
+   | `AWS_REGION`             | `us-east-1`                      |
+   | `FENNEC_APP_DOMAIN`      | `app.fennec.gg`                  |
+   | `FENNEC_REDIRECT_DOMAIN` | `fennec.gg`                      |
+   | `FENNEC_ZONE_NAME`       | `fennec.gg`                      |
+   | `FENNEC_HOSTED_ZONE_ID`  | Route 53 public hosted-zone ID   |
 
-4. Rerun the failed workflow or push to `main`. CI assumes
+4. Dispatch the workflow on `main` or push to `main`. CI assumes
    `FennecGitHubDeployRole`, deploys `FennecSite`, publishes `dist`, invalidates
    CloudFront, and smoke-tests the URL.
-5. Subscribe the distribution to CloudFront's Free flat-rate plan in the AWS
-   console if pricing-plan subscription is still unavailable through CDK.
+5. In the CloudFront console, subscribe the distribution to the Free flat-rate
+   plan and attach the `fennec.gg` hosted zone. Do not enable paid add-ons or
+   separately billed logging.
+6. Copy the dedicated plan WAF ARN into the `FENNEC_WEB_ACL_ARN` repository
+   variable, then dispatch the workflow again. This makes CloudFormation
+   declare the plan-managed association so later deployments do not drift.
 
 If the AWS account already has the GitHub Actions OIDC provider, set
 `GITHUB_OIDC_PROVIDER_ARN` while deploying `FennecCiAccess` so CDK imports it

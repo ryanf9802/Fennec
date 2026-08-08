@@ -17,4 +17,12 @@ describe('connection presentation', () => {
       pulse: true,
     });
   });
+
+  it('does not misdiagnose denied browser access as an offline game', () => {
+    expect(connectionPresentation('unavailable')).toEqual({
+      label: 'Stats API unavailable',
+      indicatorClass: 'bg-fennec-orange',
+      pulse: false,
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { ExternalLink, Radio } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { LocalNetworkAccessHelp } from '../components/LocalNetworkAccessHelp';
 import { StatsApiSetup } from '../components/StatsApiSetup';
 
 export function OnboardingPage() {
@@ -22,6 +23,7 @@ export function OnboardingPage() {
         </p>
         <StatsApiSetup />
       </section>
+      <LocalNetworkAccessHelp />
       <section className="surface-flat rounded-2xl p-5">
         <div className="flex items-start gap-3">
           <Radio className="mt-0.5 size-5 shrink-0 text-fennec-orange" />
