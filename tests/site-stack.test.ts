@@ -28,7 +28,7 @@ describe('Fennec site infrastructure', () => {
         Aliases: ['app.fennec.gg', 'fennec.gg'],
         PriceClass: Match.absent(),
         DefaultCacheBehavior: Match.objectLike({
-          CachePolicyId: '83da9c7e-98b4-4e11-a168-04f0df8e2c65',
+          CachePolicyId: '658327ea-f89d-4fab-a63d-7e88639e58f6',
           FunctionAssociations: [
             Match.objectLike({ EventType: 'viewer-request' }),
             Match.objectLike({ EventType: 'viewer-response' }),
