@@ -1,6 +1,6 @@
-import { ArrowLeft, History, Trophy } from 'lucide-react';
+import { ArrowLeft, History, Trash2, Trophy } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { PlayerName } from '../components/PlayerName';
 import { PlayerProfileDialog } from '../components/PlayerProfileDialog';
@@ -101,11 +101,14 @@ function PlayerRow({
  */
 export function MatchPage({ match: supplied }: { match?: MatchState }) {
   const { matchId } = useParams();
-  const { settings, profile } = useFennec();
+  const navigate = useNavigate();
+  const { settings, profile, deleteMatch } = useFennec();
   const [profilePlayer, setProfilePlayer] = useState<{
     key: string;
     name: string;
   }>();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
   const matchQuery = useMatch(supplied ? undefined : matchId);
   const match = supplied ?? matchQuery.data;
   if (!supplied && matchQuery.isLoading)
@@ -127,15 +130,58 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
     );
   const preferredTeamNumber = profileTeamNumber(match, profile?.primaryId);
   const teams = orderedTeams(match.teams, preferredTeamNumber);
+  const canDelete = !supplied && match.lifecycle !== 'live';
+  const removeMatch = async () => {
+    if (
+      !confirm(
+        'Delete this match? This cannot be undone, and the match will be removed from history and stats.',
+      )
+    )
+      return;
+    setDeleting(true);
+    setDeleteError(undefined);
+    try {
+      await deleteMatch(match.id);
+      navigate('/', { replace: true });
+    } catch (error) {
+      setDeleteError(
+        `Could not delete match: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      setDeleting(false);
+    }
+  };
   return (
     <div className="space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-6 xl:space-y-0">
-      <Link
-        to="/"
-        className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"
-      >
-        <ArrowLeft className="size-4" />
-        Game timeline
-      </Link>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            to="/"
+            className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"
+          >
+            <ArrowLeft className="size-4" />
+            Game timeline
+          </Link>
+          {canDelete && (
+            <button
+              type="button"
+              className="button-danger"
+              disabled={deleting}
+              onClick={() => void removeMatch()}
+            >
+              <Trash2 className="size-4" />
+              {deleting ? 'Deleting…' : 'Delete match'}
+            </button>
+          )}
+        </div>
+        {deleteError && (
+          <div
+            role="alert"
+            className="surface-flat text-fennec-orange rounded-2xl p-4"
+          >
+            {deleteError}
+          </div>
+        )}
+      </div>
       <header className="flex flex-wrap items-start justify-between gap-5">
         <div>
           <h1 className="text-3xl font-black sm:text-4xl">

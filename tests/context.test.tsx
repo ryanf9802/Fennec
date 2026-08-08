@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../src/data/database', () => ({
   clearHistory: vi.fn(),
+  deleteMatch: vi.fn(async () => true),
   historyRepository: {
     initialize: vi.fn(async () => undefined),
     countMatches: vi.fn(async () => 0),

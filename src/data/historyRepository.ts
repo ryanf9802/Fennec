@@ -76,6 +76,7 @@ export interface HistoryRepository {
   getTimelineCatalog(): Promise<Record<string, string[]>>;
   iterateMatches(pageSize?: number): AsyncIterable<MatchState>;
   saveMatch(match: MatchState, sessionGapMinutes: number): Promise<void>;
+  deleteMatch(id: string): Promise<boolean>;
   clearHistory(): Promise<void>;
   replaceAll(
     matches: MatchState[],

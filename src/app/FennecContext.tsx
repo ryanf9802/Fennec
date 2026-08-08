@@ -18,6 +18,7 @@ import {
 } from '../domain/types';
 import {
   clearHistory,
+  deleteMatch as deleteStoredMatch,
   historyRepository,
   loadProfile,
   loadSettings,
@@ -42,6 +43,7 @@ interface FennecContextValue {
   demoMode: boolean;
   updateSettings(next: FennecSettings): Promise<void>;
   selectProfile(next: FennecProfile): Promise<void>;
+  deleteMatch(id: string): Promise<boolean>;
   deleteHistory(): Promise<void>;
   restoreBackup(backup: FennecBackup): Promise<void>;
 }
@@ -245,6 +247,11 @@ export function FennecProvider({ children }: { children: ReactNode }) {
     await saveProfile(next);
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
+  const deleteMatch = useCallback(async (id: string) => {
+    const deleted = await deleteStoredMatch(id);
+    await queryClient.invalidateQueries({ queryKey: historyKeys.all });
+    return deleted;
+  }, []);
   const deleteHistory = useCallback(async () => {
     historyGenerationRef.current++;
     try {
@@ -283,6 +290,7 @@ export function FennecProvider({ children }: { children: ReactNode }) {
       demoMode,
       updateSettings,
       selectProfile,
+      deleteMatch,
       deleteHistory,
       restoreBackup,
     }),
@@ -296,6 +304,7 @@ export function FennecProvider({ children }: { children: ReactNode }) {
       demoMode,
       updateSettings,
       selectProfile,
+      deleteMatch,
       deleteHistory,
       restoreBackup,
     ],

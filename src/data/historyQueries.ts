@@ -44,7 +44,7 @@ export function useSession(id?: string) {
 export function useMatch(id?: string) {
   return useQuery({
     queryKey: historyKeys.match(id),
-    queryFn: () => historyRepository.getMatch(id!),
+    queryFn: async () => (await historyRepository.getMatch(id!)) ?? null,
     enabled: !!id,
   });
 }

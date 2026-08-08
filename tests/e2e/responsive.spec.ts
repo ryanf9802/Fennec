@@ -46,6 +46,9 @@ test('demo feed opens a live match and settings remain usable', async ({
   await expect(
     page.getByRole('heading', { name: 'Event timeline' }),
   ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete match' })).toHaveCount(
+    0,
+  );
   await expect(
     page.getByText('Select another player to view their profile'),
   ).toBeVisible();
@@ -109,6 +112,22 @@ test('demo feed opens a live match and settings remain usable', async ({
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.getByLabel('WebSocket port')).toHaveValue('49124');
+});
+
+test('a historical match can be permanently deleted', async ({ page }) => {
+  await page.goto('/matches/demo-history-1?demo=1');
+  await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('removed from history and stats');
+    await dialog.accept();
+  });
+
+  await page.getByRole('button', { name: 'Delete match' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto('/matches/demo-history-1?demo=1');
+  await expect(
+    page.getByRole('heading', { name: 'Match not found' }),
+  ).toBeVisible();
 });
 
 test('settings show installation-relative Stats API instructions', async ({

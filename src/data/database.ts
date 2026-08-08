@@ -1035,6 +1035,123 @@ async function settleMatchWrites(): Promise<void> {
   while (matchDrains.size) await Promise.all([...matchDrains.values()]);
 }
 
+export async function deleteMatch(id: string): Promise<boolean> {
+  await settleMatchWrites();
+  await normalizeExistingData();
+  return db.transaction(
+    'rw',
+    [
+      db.matches,
+      db.events,
+      db.rawEvents,
+      db.appearances,
+      db.players,
+      db.pairs,
+      db.relationships,
+      db.sessions,
+      db.settings,
+      db.metadata,
+    ],
+    async () => {
+      const match = await db.matches.get(id);
+      if (!match) return false;
+      if (match.lifecycle === 'live')
+        throw new Error('Live matches cannot be deleted.');
+
+      const [deletedAppearances, deletedPairs, session, settings] =
+        await Promise.all([
+          db.appearances.where('matchId').equals(id).toArray(),
+          db.pairs.where('matchId').equals(id).toArray(),
+          db.sessions.get(match.sessionId),
+          loadSettings(),
+        ]);
+      await Promise.all([
+        db.matches.delete(id),
+        db.events.where('matchId').equals(id).delete(),
+        db.rawEvents.where('matchId').equals(id).delete(),
+        db.appearances.where('matchId').equals(id).delete(),
+        db.pairs.where('matchId').equals(id).delete(),
+      ]);
+
+      const affectedPlayerKeys = new Set(
+        deletedAppearances
+          .map((item) => item.playerKey)
+          .filter((playerKey): playerKey is string => !!playerKey),
+      );
+      for (const playerKey of affectedPlayerKeys) {
+        const remaining = await db.appearances
+          .where('[playerKey+startedAt+matchId]')
+          .between(
+            [playerKey, stringMinKey, stringMinKey],
+            [playerKey, stringMaxKey, stringMaxKey],
+          )
+          .toArray();
+        const earliest = remaining[0];
+        const latest = remaining.at(-1);
+        if (!earliest || !latest) {
+          await db.players.delete(playerKey);
+          continue;
+        }
+        await db.players.put({
+          primaryId: playerKey,
+          platformPrimaryId: playerPrimaryId(playerKey),
+          identityKind: playerIdentityKind(playerKey)!,
+          latestName: latest.name,
+          normalizedName: latest.name.normalize('NFKC').trim().toLowerCase(),
+          firstSeen: earliest.startedAt,
+          lastSeen: latest.startedAt,
+        });
+      }
+
+      const affectedRelationships = new Map(
+        deletedPairs.map((pair) => [
+          `${pair.playerAKey}\u0000${pair.playerBKey}`,
+          pair,
+        ]),
+      );
+      for (const [relationshipId, pair] of affectedRelationships) {
+        const remaining = await db.pairs
+          .where('[playerAKey+playerBKey+startedAt+matchId]')
+          .between(
+            [pair.playerAKey, pair.playerBKey, stringMinKey, stringMinKey],
+            [pair.playerAKey, pair.playerBKey, stringMaxKey, stringMaxKey],
+          )
+          .toArray();
+        const rebuilt = relationshipRecords(remaining)[0];
+        if (rebuilt) await db.relationships.put(rebuilt);
+        else await db.relationships.delete(relationshipId);
+      }
+
+      if (session) {
+        const remainingMatches = (
+          await db.matches.bulkGet(
+            session.matchIds.filter((matchId) => matchId !== id),
+          )
+        ).filter((item): item is StoredMatch => !!item);
+        const grouped = groupSessionRecords(
+          remainingMatches,
+          settings.sessionGapMinutes,
+        );
+        await db.sessions.delete(session.id);
+        if (grouped.records.length) await db.sessions.bulkPut(grouped.records);
+        if (remainingMatches.length)
+          await db.matches.bulkPut(
+            remainingMatches.map((item) => ({
+              ...item,
+              sessionId: grouped.byMatch.get(item.id)!,
+            })),
+          );
+      }
+
+      await db.metadata.put({
+        key: 'eventCatalog',
+        value: buildCatalog(await db.events.toArray()),
+      });
+      return true;
+    },
+  );
+}
+
 export async function loadMatches(): Promise<MatchState[]> {
   await historyRepository.initialize();
   return hydrateMatches(await db.matches.orderBy('[startedAt+id]').toArray());
@@ -1371,6 +1488,7 @@ export const historyRepository: HistoryRepository = {
     } while (cursor);
   },
   saveMatch,
+  deleteMatch,
   clearHistory,
   replaceAll,
   compactRawEvents,

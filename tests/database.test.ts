@@ -1,6 +1,7 @@
 import {
   db,
   clearHistory,
+  deleteMatch,
   historyRepository,
   loadMatches,
   loadProfile,
@@ -162,6 +163,90 @@ describe('IndexedDB storage', () => {
     );
     expect(second.matches.items.map((item) => item.id)).toEqual(['two']);
     expect(second.matches.nextCursor).toBeUndefined();
+  });
+
+  it('deletes a match and repairs every affected history projection', async () => {
+    await saveSettings({ ...defaultSettings, sessionGapMinutes: 30 });
+    await saveProfile({ primaryId: 'Steam|you|0', displayName: 'You' });
+    const first = playedMatch('first', '2026-08-08T00:00:00Z', false, true);
+    const bridge = playedMatch('bridge', '2026-08-08T00:20:00Z', false, false);
+    bridge.participants.push(player('Temporary', 'Epic|temporary|0', 1));
+    bridge.events = [
+      {
+        id: 'bridge:1',
+        matchId: 'bridge',
+        sequence: 1,
+        eventName: 'CrossbarHit',
+        receivedAt: bridge.startedAt,
+        payload: { BallSpeed: 777 },
+      },
+    ];
+    const last = playedMatch('last', '2026-08-08T00:40:00Z', false, true);
+    await saveMatch(first, 30);
+    await saveMatch(bridge, 30);
+    await saveMatch(last, 30);
+
+    expect(await historyRepository.countSessions()).toBe(1);
+    expect(
+      await historyRepository.getPlayerHistory(
+        'id:Steam|you|0',
+        'id:Epic|other|0',
+      ),
+    ).toMatchObject({
+      summary: { gamesOpposed: 3, winsAgainst: 2, lossesAgainst: 1 },
+    });
+    expect((await historyRepository.getTimelineCatalog()).CrossbarHit).toEqual([
+      'BallSpeed',
+    ]);
+
+    expect(await deleteMatch('bridge')).toBe(true);
+    expect(await historyRepository.getMatch('bridge')).toBeUndefined();
+    expect(await historyRepository.countMatches()).toBe(2);
+    expect(await historyRepository.countSessions()).toBe(2);
+    expect(
+      (await historyRepository.listSessions()).items.map((session) =>
+        session.matches.map((item) => item.id),
+      ),
+    ).toEqual([['last'], ['first']]);
+    expect(
+      await historyRepository.getPlayerHistory(
+        'id:Steam|you|0',
+        'id:Epic|other|0',
+      ),
+    ).toMatchObject({
+      summary: { gamesOpposed: 2, winsAgainst: 2, lossesAgainst: 0 },
+    });
+    expect(
+      (await historyRepository.searchPlayers()).some(
+        (item) => item.playerKey === 'id:Epic|temporary|0',
+      ),
+    ).toBe(false);
+    expect(
+      (await historyRepository.getTimelineCatalog()).CrossbarHit,
+    ).toBeUndefined();
+    expect(
+      await Promise.all([
+        db.events.where('matchId').equals('bridge').count(),
+        db.rawEvents.where('matchId').equals('bridge').count(),
+        db.appearances.where('matchId').equals('bridge').count(),
+        db.pairs.where('matchId').equals('bridge').count(),
+      ]),
+    ).toEqual([0, 0, 0, 0]);
+    const exported: string[] = [];
+    for await (const item of historyRepository.iterateMatches())
+      exported.push(item.id);
+    expect(exported).toEqual(['last', 'first']);
+    expect((await loadProfile())?.primaryId).toBe('Steam|you|0');
+    expect((await loadSettings()).sessionGapMinutes).toBe(30);
+    expect(await deleteMatch('bridge')).toBe(false);
+  });
+
+  it('does not delete a live match that the feed can still update', async () => {
+    await saveMatch({ ...match, id: 'live', lifecycle: 'live', events: [] });
+    await expect(deleteMatch('live')).rejects.toThrow(
+      'Live matches cannot be deleted.',
+    );
+    expect(await historyRepository.getMatch('live')).toBeDefined();
   });
 
   it('builds player history for bots by normalized name', async () => {
