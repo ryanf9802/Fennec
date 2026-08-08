@@ -1,14 +1,9 @@
 # Third-party notices
 
-Fennec uses the following runtime components. Their licenses are not replaced
-by Fennec's MIT License.
+Fennec uses open-source packages distributed through the pnpm lockfile,
+including React, React Router, Vite, Tailwind CSS, Dexie, Lucide, Vitest,
+Playwright, TypeScript, ESLint, AWS CDK, and their transitive dependencies.
 
-- Microsoft .NET — MIT License
-- Microsoft Windows App SDK / WinUI 3 — MIT License
-- Microsoft.Data.Sqlite.Core — MIT License
-- SQLitePCLRaw system SQLite provider — Apache License 2.0
-- SQLite — Public Domain
-- WiX Toolset — Microsoft Reciprocal License
-
-The temporary Fennec logo in this repository is original project artwork and
-is distributed under the repository's MIT License.
+Each package remains available under the license declared in its package
+metadata. The Fennec logo and application source are covered by this
+repository's MIT license unless a file states otherwise.

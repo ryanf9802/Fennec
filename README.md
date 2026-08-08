@@ -1,34 +1,39 @@
 # Fennec
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/fennec-a-lockup-primary.svg">
-  <img src="assets/brand/fennec-a-lockup-navy.svg" alt="Fennec" width="360">
+  <source media="(prefers-color-scheme: dark)" srcset="public/assets/brand/fennec-a-lockup-primary.svg">
+  <img src="public/assets/brand/fennec-a-lockup-navy.svg" alt="Fennec" width="360">
 </picture>
 
-[![Windows build](https://github.com/ryanf9802/Fennec/actions/workflows/build.yml/badge.svg)](https://github.com/ryanf9802/Fennec/actions/workflows/build.yml)
+[![Web build and deploy](https://github.com/ryanf9802/Fennec/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanf9802/Fennec/actions/workflows/ci.yml)
 
-Fennec is a lightweight, native Windows second-monitor dashboard for Rocket
-League's local Stats API. It records matches locally, groups them into automatic
-sessions, presents a dedicated live-match monitor, and recognizes recurring
-teammates and opponents.
+Fennec is a local-first, second-monitor dashboard for Rocket League's local
+Stats API. It records games in the browser, creates automatic sessions, presents
+a dedicated live-match monitor, and recognizes recurring teammates and
+opponents.
 
-## Current feature set
+## Run locally on Windows
 
-- Game-first timeline with an expanded current session
-- Live scoreboards and configurable event timelines
-- Past match and session detail
-- Recurring teammate and opponent context
-- Local SQLite history with JSON and CSV export foundations
-- Guided and one-click Stats API configuration
-- Windows startup and tray-ready application lifecycle
+Install [Node.js 24 or newer](https://nodejs.org/) and
+[pnpm](https://pnpm.io/installation), then double-click
+`Run-Fennec-Web-Dev.cmd`. The console remains visible while Vite is running and
+opens <http://localhost:5173> in your browser.
 
-Fennec does not upload gameplay or identity data. Rank and MMR are not exposed
-by the Rocket League Stats API and are not inferred.
+The equivalent commands are:
 
-## Stats API setup
+```powershell
+corepack enable
+pnpm install
+pnpm dev
+```
 
-Before launching Rocket League, edit
-`<Install Dir>\TAGame\Config\TAStatsAPI.ini` (or `DefaultStatsAPI.ini`) and add:
+Use `pnpm dev:demo` to exercise a simulated live game without opening Rocket
+League. Fennec officially targets current Chrome and Edge on Windows.
+
+## Rocket League setup
+
+Close Rocket League, find `TAGame\Config\TAStatsAPI.ini` inside the game
+installation, and add:
 
 ```ini
 [TAGame.MatchStatsExporter_TA]
@@ -37,78 +42,84 @@ Port=49123
 WebPort=49124
 ```
 
-Fennec can also make the minimal `PacketSendRate` and `WebPort` changes after
-showing the target file and creating a backup. Rocket League must be restarted
-after a configuration change.
+Restart Rocket League after saving the file. Keep the Fennec browser tab open
+while playing. A browser cannot edit protected game files, elevate to
+administrator, launch at Windows startup, or continue recording after the tab
+closes.
+
+## Local data
+
+Matches, raw discrete event payloads, preferences, and profile selection are
+stored in versioned IndexedDB under the current browser origin. Sessions and
+encounter summaries are derived from that history.
+
+`http://localhost:5173` and `https://app.fennec.gg` have separate storage. Use
+Settings to export a versioned JSON backup from one origin and restore it on the
+other. CSV match-summary export is also available. The former native SQLite
+database is not migrated.
 
 ## Development
 
-The solution targets .NET 10 and Windows App SDK 2.3.1. The domain project is
-platform-neutral; the UI, local configuration helper, and installer target
-Windows 11 x64. Keep the checkout on a Windows-local path such as
-`C:\dev\Fennec`; the WinUI XAML compiler does not reliably support WSL UNC
-paths.
-
-### Run a downloaded developer build
-
-Every push and pull request produces a self-contained `fennec-dev-win-x64`
-artifact in the workflow run. Download and extract it, then run
-`Run-Fennec-Dev.cmd`. The artifact includes the .NET runtime, Windows App SDK,
-and PDB symbols, so it does not require an installed SDK. The developer launcher
-keeps a console open, prints startup checkpoints and managed exceptions, and
-pauses with the process exit code if Fennec terminates.
-
-Developer artifacts are unsigned. Windows may show a SmartScreen warning until
-the project adopts code signing.
-
-### Run from source
-
-From PowerShell, the development script can install the .NET 10 SDK through
-WinGet, restore dependencies, and launch Fennec with diagnostics enabled:
-
-```powershell
-.\scripts\dev.ps1 -InstallSdk
+```bash
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test:run
+pnpm build
+pnpm cdk:synth
+pnpm test:e2e
 ```
 
-After the SDK is installed, normal launches only need:
+The direct browser adapter connects to `ws://127.0.0.1:49124` and retries with
+bounded exponential backoff. The feed is isolated behind `StatsFeedAdapter` so
+a future optional background companion can use the same application model.
 
-```powershell
-.\scripts\dev.ps1
-```
+## AWS deployment
 
-Use `-BuildOnly` to compile without launching or `-Clean` to force a clean
-rebuild. Visual Studio can open `Fennec.sln` and use the
-`Fennec (Developer Mode)` launch profile for breakpoints and PDB debugging.
+AWS infrastructure is defined in TypeScript CDK and remains account-neutral
+until deployment variables are supplied. `FennecSite` creates a private S3
+origin, CloudFront Origin Access Control, SPA routing, security headers, and
+optional ACM/Route 53 records. `FennecCiAccess` creates a GitHub OIDC role whose
+trust is restricted to this repository's `main` branch.
 
-The underlying commands remain available directly:
+The `main` deployment intentionally fails before touching AWS when the GitHub
+repository variable `AWS_ACCOUNT_ID` is absent. Do not configure it with a work
+account.
 
-```powershell
-dotnet build Fennec.sln
-dotnet run --project tests/Fennec.Core.Tests
-```
+When the personal AWS account and `fennec.gg` are ready:
 
-### Diagnostics
+1. Configure a personal AWS CLI profile and bootstrap CDK in `us-east-1`.
+2. Set `AWS_ACCOUNT_ID` locally and deploy `FennecCiAccess` once:
 
-Developer mode can also be enabled with `Fennec.exe --dev` or the
-`FENNEC_DEV_MODE=1` environment variable. It adds a diagnostics section to
-Settings and writes seven days of rolling logs under
-`%LOCALAPPDATA%\Fennec\logs`. Logs record connection and lifecycle state but do
-not record raw Stats API payloads or player display names.
+   ```bash
+   AWS_ACCOUNT_ID=123456789012 AWS_REGION=us-east-1 \
+     pnpm cdk deploy FennecCiAccess --profile your-personal-profile
+   ```
 
-The Settings panel can copy a diagnostic summary and open the log or local data
-folders. Include the summary, relevant log lines, and the workflow build SHA
-when reporting a problem.
+3. Add these GitHub repository variables:
 
-### Release artifacts
+   | Variable | Value |
+   | --- | --- |
+   | `AWS_ACCOUNT_ID` | Personal 12-digit AWS account ID |
+   | `AWS_REGION` | `us-east-1` |
+   | `FENNEC_APP_DOMAIN` | `app.fennec.gg` |
+   | `FENNEC_ZONE_NAME` | `fennec.gg` |
+   | `FENNEC_HOSTED_ZONE_ID` | Route 53 public hosted-zone ID |
 
-Pushes to `main` and manually dispatched workflow runs additionally produce a
-self-contained Release ZIP and per-user MSI installer. These are CI artifacts,
-not signed production releases.
+4. Rerun the failed workflow or push to `main`. CI assumes
+   `FennecGitHubDeployRole`, deploys `FennecSite`, publishes `dist`, invalidates
+   CloudFront, and smoke-tests the URL.
+5. Subscribe the distribution to CloudFront's Free flat-rate plan in the AWS
+   console if pricing-plan subscription is still unavailable through CDK.
+
+If the AWS account already has the GitHub Actions OIDC provider, set
+`GITHUB_OIDC_PROVIDER_ARN` while deploying `FennecCiAccess` so CDK imports it
+instead of creating a duplicate.
 
 ## License
 
 Fennec is available under the [MIT License](LICENSE). Third-party components
-remain subject to their respective licenses; see
+remain subject to their own licenses; see
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 Rocket League and related names are trademarks of their respective owners.

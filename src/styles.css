@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fennec-cyan: #36d7ff;
+  --color-fennec-orange: #ff8a3d;
+  --color-fennec-navy: #07111f;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+  --background: #07111f;
+  --background-elevated: #0b1728;
+  --surface: rgba(18, 35, 57, 0.82);
+  --surface-strong: #142642;
+  --surface-hover: #1a3152;
+  --border: rgba(145, 177, 215, 0.16);
+  --text: #f4f8ff;
+  --muted: #96a8bf;
+  --shadow: 0 18px 55px rgba(0, 0, 0, 0.24);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background: #f0f5fb;
+  --background-elevated: #ffffff;
+  --surface: rgba(255, 255, 255, 0.9);
+  --surface-strong: #e8f0fa;
+  --surface-hover: #dae7f5;
+  --border: rgba(30, 65, 105, 0.14);
+  --text: #10233d;
+  --muted: #60738b;
+  --shadow: 0 18px 50px rgba(26, 56, 91, 0.12);
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; background: var(--background); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--background); color: var(--text); }
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #36d7ff;
+  outline-offset: 2px;
+}
+
+.app-backdrop {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(54, 215, 255, 0.08), transparent 34rem),
+    radial-gradient(circle at 88% 12%, rgba(255, 138, 61, 0.07), transparent 30rem),
+    var(--background);
+}
+.surface { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); backdrop-filter: blur(20px); }
+.surface-flat { background: var(--surface); border: 1px solid var(--border); }
+.surface-strong { background: var(--surface-strong); }
+.text-main { color: var(--text); }
+.text-muted { color: var(--muted); }
+.border-ui { border-color: var(--border); }
+.hover-surface:hover { background: var(--surface-hover); }
+.control {
+  display: block;
+  width: min(100%, 34rem);
+  min-height: 2.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--background-elevated);
+  color: var(--text);
+  padding: 0.65rem 0.85rem;
+}
+.button-primary, .button-secondary, .button-danger {
+  display: inline-flex;
+  min-height: 2.65rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.button-primary { background: linear-gradient(135deg, #36d7ff, #1aa7db); color: #041321; }
+.button-secondary { background: var(--surface-strong); border-color: var(--border); color: var(--text); }
+.button-danger { background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.35); color: #ff9292; }
+.button-primary:hover, .button-secondary:hover, .button-danger:hover { filter: brightness(1.07); }
+.eyebrow { color: var(--muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.metric-value { color: var(--text); font-size: clamp(1.2rem, 2.2vw, 1.65rem); font-weight: 800; letter-spacing: -0.025em; }
+.live-pulse { box-shadow: 0 0 0 0 rgba(54, 215, 255, 0.5); animation: live-pulse 2s infinite; }
+@keyframes live-pulse { 70% { box-shadow: 0 0 0 8px rgba(54, 215, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(54, 215, 255, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}

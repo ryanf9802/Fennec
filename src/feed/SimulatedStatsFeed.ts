@@ -1,0 +1,47 @@
+import type { StatsEnvelope } from '../domain/types';
+import type { StatsFeedAdapter, StatsFeedHandlers } from './StatsFeedAdapter';
+
+export class SimulatedStatsFeed implements StatsFeedAdapter {
+  private timers: number[] = [];
+  private stopped = true;
+
+  start(handlers: StatsFeedHandlers): void {
+    this.stop();
+    this.stopped = false;
+    handlers.onState('connecting');
+    const guid = `demo-${Date.now()}`;
+    const update = (timeSeconds: number, blue: number, orange: number): StatsEnvelope => ({
+      event: 'UpdateState',
+      data: {
+        MatchGuid: guid,
+        Players: [
+          { Name: 'You', PrimaryId: 'Steam|demo-you|0', TeamNum: 0, Score: 420 + blue * 100, Goals: blue, Assists: 1, Saves: 2, Shots: blue + 3, Touches: 38, Demos: 1 },
+          { Name: 'Luna', PrimaryId: 'Epic|demo-luna|0', TeamNum: 0, Score: 335, Goals: 1, Assists: blue, Saves: 1, Shots: 3, Touches: 29, Demos: 0 },
+          { Name: 'Drift', PrimaryId: 'Steam|demo-drift|0', TeamNum: 1, Score: 310, Goals: orange, Assists: 0, Saves: 3, Shots: 4, Touches: 35, Demos: 1 },
+          { Name: 'Orbit', PrimaryId: 'Epic|demo-orbit|0', TeamNum: 1, Score: 240, Goals: 0, Assists: orange, Saves: 1, Shots: 2, Touches: 22, Demos: 0 },
+        ],
+        Game: { Teams: [{ Name: 'Blue', TeamNum: 0, Score: blue, ColorPrimary: '42d9ff' }, { Name: 'Orange', TeamNum: 1, Score: orange, ColorPrimary: 'ff8a3d' }], PlaylistId: 11, TimeSeconds: timeSeconds, bOvertime: false, bReplay: false, Arena: 'DFH Stadium' },
+      },
+    });
+    const emit = (delay: number, envelope: StatsEnvelope) => this.timers.push(window.setTimeout(async () => {
+      if (this.stopped) return;
+      await handlers.onEnvelope(envelope);
+      handlers.onState('live');
+    }, delay));
+    this.timers.push(window.setTimeout(() => handlers.onState('waiting'), 250));
+    emit(500, { event: 'MatchCreated', data: { MatchGuid: guid } });
+    emit(750, update(238, 1, 1));
+    emit(2_500, { event: 'GoalScored', data: { MatchGuid: guid, Scorer: { Name: 'You' }, Assister: { Name: 'Luna' }, GoalSpeed: 105.4 } });
+    emit(2_800, update(181, 2, 1));
+    emit(5_000, { event: 'StatfeedEvent', data: { MatchGuid: guid, Type: 'Demolish', MainTarget: { Name: 'You' }, SecondaryTarget: { Name: 'Drift' } } });
+    emit(5_300, update(116, 2, 1));
+    emit(8_000, { event: 'GoalScored', data: { MatchGuid: guid, Scorer: { Name: 'Drift' }, GoalSpeed: 92.7 } });
+    emit(8_250, update(52, 2, 2));
+  }
+
+  stop(): void {
+    this.stopped = true;
+    for (const timer of this.timers) window.clearTimeout(timer);
+    this.timers = [];
+  }
+}
