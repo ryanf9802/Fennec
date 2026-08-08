@@ -93,11 +93,34 @@ describe('user-first team presentation', () => {
     expect(
       screen.getByRole('columnheader', { name: /^50s/ }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: /Car touches/ }),
+    ).not.toBeInTheDocument();
     const teamSections = screen.getByRole('table').querySelectorAll('tbody');
     expect([...teamSections].map((section) => section.textContent)).toEqual([
       expect.stringMatching(/^Orange.*You/),
       expect.stringMatching(/^Blue.*Opponent/),
     ]);
+  });
+
+  it('caps and truncates long player names without hiding their full value', () => {
+    const longName = 'An extraordinarily long Rocket League player name';
+    const longNameMatch = {
+      ...match,
+      participants: match.participants.map((player) =>
+        player.name === 'Opponent' ? { ...player, name: longName } : player,
+      ),
+    };
+    render(
+      <MemoryRouter>
+        <MatchPage match={longNameMatch} />
+      </MemoryRouter>,
+    );
+
+    const name = screen.getByText(longName);
+    expect(name).toHaveAttribute('title', longName);
+    expect(name).toHaveClass('min-w-0', 'truncate');
+    expect(name.parentElement).toHaveClass('max-w-full');
   });
 
   it('shows the user score first in recent player meetings', () => {

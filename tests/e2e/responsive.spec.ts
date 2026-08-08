@@ -452,6 +452,56 @@ test('scoreboard columns align and the desktop timeline scrolls independently', 
   ).toBe('auto');
 });
 
+test('wide split-layout scoreboards fit without horizontal scrolling', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 780 });
+  await page.goto('/?demo=1');
+  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
+  await page.getByText('Live now').click();
+  const scoreboardScroller = page.locator('.scoreboard-table').locator('..');
+  const dimensions = () =>
+    scoreboardScroller.evaluate((element) => ({
+      scroll: element.scrollWidth,
+      client: element.clientWidth,
+    }));
+  const expectScoreboardToFit = async () => {
+    const value = await dimensions();
+    expect(value.scroll).toBeLessThanOrEqual(value.client);
+  };
+
+  for (const label of ['S', 'G', 'A', 'P', '50', 'SV', 'SH', 'T', 'D'])
+    await expect(
+      page.getByRole('columnheader', { name: label, exact: true }),
+    ).toBeVisible();
+  await expect(
+    page.getByRole('columnheader', { name: 'CT', exact: true }),
+  ).toHaveCount(0);
+  await expectScoreboardToFit();
+
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Expand sidebar' }),
+  ).toBeVisible();
+  await expect
+    .poll(async () => (await page.locator('aside').boundingBox())?.width)
+    .toBeLessThan(90);
+  await expectScoreboardToFit();
+
+  const name = page
+    .getByRole('button', { name: 'View profile for Luna' })
+    .locator('strong');
+  await name.evaluate((element) => {
+    element.textContent = 'An extraordinarily long Rocket League player name';
+  });
+  const nameDimensions = await name.evaluate((element) => ({
+    scroll: element.scrollWidth,
+    client: element.clientWidth,
+  }));
+  expect(nameDimensions.scroll).toBeGreaterThan(nameDimensions.client);
+  await expectScoreboardToFit();
+});
+
 test('scrollable areas use compact theme-aware scrollbars', async ({
   page,
 }) => {

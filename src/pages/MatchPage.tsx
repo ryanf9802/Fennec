@@ -25,7 +25,7 @@ const stats: Array<{
   full: string;
   short: string;
 }> = [
-  { key: 'score', full: 'Score', short: 'Score' },
+  { key: 'score', full: 'Score', short: 'S' },
   { key: 'goals', full: 'Goals', short: 'G' },
   { key: 'assists', full: 'Assists', short: 'A' },
   { key: 'passes', full: 'Passes', short: 'P' },
@@ -33,7 +33,6 @@ const stats: Array<{
   { key: 'saves', full: 'Saves', short: 'SV' },
   { key: 'shots', full: 'Shots', short: 'SH' },
   { key: 'touches', full: 'Touches', short: 'T' },
-  { key: 'carTouches', full: 'Car touches', short: 'CT' },
   { key: 'demos', full: 'Demos', short: 'D' },
 ];
 
@@ -286,9 +285,9 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
             )}
           </div>
           <div className="overflow-x-auto rounded-2xl">
-            <table className="scoreboard-table surface-flat w-full min-w-[61rem] overflow-hidden rounded-2xl">
+            <table className="scoreboard-table surface-flat w-full min-w-[42rem] overflow-hidden rounded-2xl xl:min-w-0">
               <colgroup>
-                <col className="w-1/4" />
+                <col className="w-[clamp(8rem,22%,12rem)]" />
                 {stats.map(({ key }) => (
                   <col key={key} />
                 ))}
