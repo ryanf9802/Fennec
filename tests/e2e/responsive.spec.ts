@@ -452,7 +452,7 @@ test('scoreboard columns align and the desktop timeline scrolls independently', 
   ).toBe('auto');
 });
 
-test('wide split-layout scoreboards fit without horizontal scrolling', async ({
+test('wide split-layout scoreboards preserve readable player names', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 780 });
@@ -477,19 +477,13 @@ test('wide split-layout scoreboards fit without horizontal scrolling', async ({
   await expect(
     page.getByRole('columnheader', { name: 'CT', exact: true }),
   ).toHaveCount(0);
-  await expectScoreboardToFit();
 
-  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
-  await expect(
-    page.getByRole('button', { name: 'Expand sidebar' }),
-  ).toBeVisible();
-  await expect
-    .poll(async () => (await page.locator('aside').boundingBox())?.width)
-    .toBeLessThan(90);
-  await expectScoreboardToFit();
+  const expandedDimensions = await dimensions();
+  expect(expandedDimensions.scroll).toBeGreaterThan(expandedDimensions.client);
 
   const name = page
-    .getByRole('button', { name: 'View profile for Luna' })
+    .getByRole('row')
+    .filter({ has: page.getByText('YOU', { exact: true }) })
     .locator('strong');
   await name.evaluate((element) => {
     element.textContent = 'An extraordinarily long Rocket League player name';
@@ -498,7 +492,21 @@ test('wide split-layout scoreboards fit without horizontal scrolling', async ({
     scroll: element.scrollWidth,
     client: element.clientWidth,
   }));
+  expect(nameDimensions.client).toBeGreaterThanOrEqual(112);
   expect(nameDimensions.scroll).toBeGreaterThan(nameDimensions.client);
+
+  await page.setViewportSize({ width: 1440, height: 780 });
+  await expectScoreboardToFit();
+
+  await page.setViewportSize({ width: 1280, height: 780 });
+
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Expand sidebar' }),
+  ).toBeVisible();
+  await expect
+    .poll(async () => (await page.locator('aside').boundingBox())?.width)
+    .toBeLessThan(90);
   await expectScoreboardToFit();
 });
 

@@ -9,6 +9,7 @@ export function PlayerName({
   you = false,
   bot = false,
   nameWeight = 'bold',
+  fill = false,
 }: {
   name: string;
   teamNumber?: number;
@@ -16,6 +17,7 @@ export function PlayerName({
   you?: boolean;
   bot?: boolean;
   nameWeight?: 'medium' | 'bold';
+  fill?: boolean;
 }) {
   const teamName =
     teamNumber === 0
@@ -25,7 +27,9 @@ export function PlayerName({
         : 'Team unknown';
   const playerStatus = present ? teamName : `${teamName}, no longer in match`;
   return (
-    <span className="inline-flex max-w-full min-w-0 items-center gap-2">
+    <span
+      className={`${fill ? 'flex w-full' : 'inline-flex'} max-w-full min-w-0 items-center gap-2`}
+    >
       <span
         aria-label={playerStatus}
         title={playerStatus}

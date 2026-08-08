@@ -52,7 +52,10 @@ function PlayerRow({
   const profileLabel = `View profile for ${player.name}${player.isPresent === false ? ' (no longer in match)' : ''}`;
   return (
     <tr className="border-t border-ui text-center text-sm">
-      <th scope="row" className="scoreboard-player-cell px-3 py-3 text-left">
+      <th
+        scope="row"
+        className="scoreboard-player-cell w-56 min-w-56 px-3 py-3 text-left"
+      >
         {inspectable ? (
           <button
             aria-label={profileLabel}
@@ -60,13 +63,14 @@ function PlayerRow({
             className="hover-surface group/player -mx-2 inline-flex w-[calc(100%+1rem)] cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 text-left hover:text-fennec-cyan"
             onClick={() => onInspect(playerKey, player.name)}
           >
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <PlayerName
                 name={player.name}
                 teamNumber={player.teamNumber}
                 present={player.isPresent !== false}
                 bot={bot}
                 nameWeight="medium"
+                fill
               />
             </span>
             <History
@@ -82,6 +86,7 @@ function PlayerRow({
             you={player.primaryId === profileId}
             bot={bot}
             nameWeight="medium"
+            fill
           />
         )}
       </th>
@@ -266,7 +271,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
           </div>
         </div>
       </header>
-      <div className="grid min-w-0 gap-6 xl:min-h-0 xl:grid-cols-[minmax(0,3fr)_minmax(22rem,2fr)]">
+      <div className="grid min-w-0 gap-6 xl:min-h-0 xl:grid-cols-[minmax(0,7fr)_minmax(16.5rem,3fr)]">
         <section className="scoreboard-container min-w-0 xl:min-h-0 xl:overflow-y-auto">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xl font-extrabold">Scoreboard</h2>
@@ -285,9 +290,9 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
             )}
           </div>
           <div className="overflow-x-auto rounded-2xl">
-            <table className="scoreboard-table surface-flat w-full min-w-[42rem] overflow-hidden rounded-2xl xl:min-w-0">
+            <table className="scoreboard-table surface-flat w-full min-w-[47.25rem] overflow-hidden rounded-2xl">
               <colgroup>
-                <col className="w-[clamp(8rem,22%,12rem)]" />
+                <col className="w-56" />
                 {stats.map(({ key }) => (
                   <col key={key} />
                 ))}
@@ -296,7 +301,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
                 <tr>
                   <th
                     scope="col"
-                    className="scoreboard-player-cell px-3 py-3 text-left"
+                    className="scoreboard-player-cell w-56 min-w-56 px-3 py-3 text-left"
                   >
                     Player
                   </th>
