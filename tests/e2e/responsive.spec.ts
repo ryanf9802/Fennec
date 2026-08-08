@@ -26,6 +26,7 @@ test('demo feed opens a live match and settings remain usable', async ({ page })
   await page.getByRole('button', { name: 'View history with Luna' }).click();
   await expect(page).toHaveURL(/\/players\//);
   await expect(page.getByRole('heading', { name: 'Luna' })).toBeVisible();
+  await expect(page.getByText('All-time player history')).toHaveCount(0);
   await expect(page.locator('.eyebrow').filter({ hasText: /^Together$/ })).toBeVisible();
   await expect(page.locator('.eyebrow').filter({ hasText: /^Opposed$/ })).toBeVisible();
   await page.goBack();

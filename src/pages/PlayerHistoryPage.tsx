@@ -27,7 +27,7 @@ export function PlayerHistoryPage() {
   const matches = historyQuery.data?.pages.flatMap((page) => page.matches.items) ?? [];
   return <div className="space-y-7">
     <Link to="/" className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"><ArrowLeft className="size-4" />Game timeline</Link>
-    <header><div className="eyebrow">All-time player history</div><div className="mt-1 flex items-center gap-3"><h1 className="text-3xl font-black sm:text-4xl">{summary?.latestName ?? 'Player history'}</h1>{identityKind === 'name' && <span className="text-fennec-orange text-xs font-black tracking-wider">BOT</span>}</div><p className="text-muted mt-2 break-all font-mono text-sm">{identityKind === 'name' ? 'Name-based identity' : summary?.primaryId ?? playerPrimaryId(playerKey)}</p></header>
+    <header><div className="flex items-center gap-3"><h1 className="text-3xl font-black sm:text-4xl">{summary?.latestName ?? 'Player history'}</h1>{identityKind === 'name' && <span className="text-fennec-orange text-xs font-black tracking-wider">BOT</span>}</div><p className="text-muted mt-2 break-all font-mono text-sm">{identityKind === 'name' ? 'Name-based identity' : summary?.primaryId ?? playerPrimaryId(playerKey)}</p></header>
     {summary && <section className="surface grid grid-cols-2 gap-4 rounded-3xl p-5 sm:grid-cols-4 sm:p-7">{[
       ['Together', summary.gamesTogether], ['Record together', `${summary.winsTogether}–${summary.lossesTogether}`], ['Opposed', summary.gamesOpposed], ['Record against', `${summary.winsAgainst}–${summary.lossesAgainst}`],
     ].map(([label, value]) => <div key={label}><div className="eyebrow">{label}</div><div className="mt-1 text-2xl font-extrabold">{value}</div></div>)}</section>}

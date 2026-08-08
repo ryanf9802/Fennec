@@ -63,6 +63,7 @@ describe('bot player history UI', () => {
     </Routes></MemoryRouter>);
 
     expect(screen.getByRole('heading', { name: 'Boomer' })).toBeInTheDocument();
+    expect(screen.queryByText('All-time player history')).not.toBeInTheDocument();
     expect(screen.getByText('Name-based identity')).toBeInTheDocument();
     expect(screen.getByText('BOT')).toBeInTheDocument();
     expect(screen.queryByText('Unknown|0|0')).not.toBeInTheDocument();
