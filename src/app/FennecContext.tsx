@@ -1,8 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { calculateEncounters } from '../domain/encounters';
 import { recoverActiveMatch, reduceStatsEnvelope } from '../domain/reducer';
 import { groupSessions } from '../domain/sessions';
-import { defaultSettings, type EncounterSummary, type FeedConnectionState, type FennecProfile, type FennecSettings, type MatchState, type SessionGroup } from '../domain/types';
+import { defaultSettings, type FeedConnectionState, type FennecProfile, type FennecSettings, type MatchState, type SessionGroup } from '../domain/types';
 import { clearHistory, loadMatches, loadProfile, loadSettings, replaceAll, saveMatch, saveProfile, saveSettings } from '../data/database';
 import type { FennecBackup } from '../data/backup';
 import { SimulatedStatsFeed } from '../feed/SimulatedStatsFeed';
@@ -14,7 +13,6 @@ interface FennecContextValue {
   matches: MatchState[];
   activeMatch?: MatchState;
   sessions: SessionGroup[];
-  encounters: EncounterSummary[];
   profile?: FennecProfile;
   settings: FennecSettings;
   connection: FeedConnectionState;
@@ -143,11 +141,10 @@ export function FennecProvider({ children }: { children: ReactNode }) {
 
   const activeMatch = matches.find((match) => match.lifecycle === 'live');
   const sessions = useMemo(() => groupSessions(matches, settings.sessionGapMinutes), [matches, settings.sessionGapMinutes]);
-  const encounters = useMemo(() => calculateEncounters(matches, profile?.primaryId), [matches, profile?.primaryId]);
   const value = useMemo<FennecContextValue>(() => ({
-    ready, matches, activeMatch, sessions, encounters, profile, settings, connection, diagnostic, demoMode,
+    ready, matches, activeMatch, sessions, profile, settings, connection, diagnostic, demoMode,
     updateSettings, selectProfile, deleteHistory, restoreBackup,
-  }), [ready, matches, activeMatch, sessions, encounters, profile, settings, connection, diagnostic, demoMode, updateSettings, selectProfile, deleteHistory, restoreBackup]);
+  }), [ready, matches, activeMatch, sessions, profile, settings, connection, diagnostic, demoMode, updateSettings, selectProfile, deleteHistory, restoreBackup]);
 
   return <FennecContext.Provider value={value}>{children}</FennecContext.Provider>;
 }

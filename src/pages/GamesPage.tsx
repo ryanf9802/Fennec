@@ -15,7 +15,7 @@ function sessionTitle(startedAt: string, current: boolean): string {
 }
 
 export function GamesPage() {
-  const { matches, activeMatch, sessions, profile, encounters, connection } = useFennec();
+  const { matches, activeMatch, sessions, profile, connection } = useFennec();
   const orderedSessions = [...sessions].reverse();
   const current = orderedSessions[0];
   return <div className="space-y-8">
@@ -45,7 +45,7 @@ export function GamesPage() {
     {!matches.length ? <EmptyState /> : current && <section className="space-y-4">
       <div className="flex items-center justify-between gap-3"><div><div className="eyebrow text-fennec-cyan">In focus</div><h2 className="mt-1 text-2xl font-extrabold">Current session</h2></div><Link className="text-fennec-cyan flex items-center gap-1 text-sm font-bold" to={`/sessions/${current.id}`}>Full session <ArrowUpRight className="size-4" /></Link></div>
       <div className="surface rounded-3xl p-5 sm:p-6"><MetricsGrid metrics={sessionMetrics(current.matches, profile?.primaryId)} /></div>
-      <div className="space-y-2">{[...current.matches].reverse().map((match) => <MatchRow key={match.id} match={match} profileId={profile?.primaryId} encounters={encounters} />)}</div>
+      <div className="space-y-2">{[...current.matches].reverse().map((match) => <MatchRow key={match.id} match={match} profileId={profile?.primaryId} />)}</div>
     </section>}
 
     {orderedSessions.slice(1).length > 0 && <section className="space-y-4">
