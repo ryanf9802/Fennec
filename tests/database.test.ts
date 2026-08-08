@@ -47,16 +47,33 @@ describe('IndexedDB storage', () => {
     await saveMatch(playedMatch('two', '2026-08-02T00:00:00Z', false, false));
     await saveMatch(playedMatch('three', '2026-08-03T00:00:00Z', false, true));
 
-    const first = await historyRepository.getPlayerHistory('Steam|you|0', 'Epic|other|0', { limit: 1, relationship: 'against' });
+    const first = await historyRepository.getPlayerHistory('id:Steam|you|0', 'id:Epic|other|0', { limit: 1, relationship: 'against' });
     expect(first.summary).toMatchObject({ gamesTogether: 1, winsTogether: 1, gamesOpposed: 2, winsAgainst: 1, lossesAgainst: 1 });
     expect(first.matches.items.map((item) => item.id)).toEqual(['three']);
     expect(first.matches.items[0]?.events).toEqual([]);
     expect((await historyRepository.getMatch('three'))?.events).toHaveLength(1);
     expect(first.matches.nextCursor).toBeTruthy();
 
-    const second = await historyRepository.getPlayerHistory('Steam|you|0', 'Epic|other|0', { limit: 1, relationship: 'against', cursor: first.matches.nextCursor });
+    const second = await historyRepository.getPlayerHistory('id:Steam|you|0', 'id:Epic|other|0', { limit: 1, relationship: 'against', cursor: first.matches.nextCursor });
     expect(second.matches.items.map((item) => item.id)).toEqual(['two']);
     expect(second.matches.nextCursor).toBeUndefined();
+  });
+
+  it('builds player history for bots by normalized name', async () => {
+    const first = playedMatch('bot-one', '2026-08-04T00:00:00Z', true, true);
+    first.participants[1] = { ...first.participants[1]!, name: 'Boomer', primaryId: 'Unknown|0|0', shortcut: 2 };
+    const second = playedMatch('bot-two', '2026-08-05T00:00:00Z', false, false);
+    second.participants[1] = { ...second.participants[1]!, name: ' boomer ', primaryId: undefined, shortcut: 7 };
+    await saveMatch(first);
+    first.participants[1] = { ...first.participants[1]!, shortcut: 9 };
+    await saveMatch(first);
+    await saveMatch(second);
+
+    const history = await historyRepository.getPlayerHistory('id:Steam|you|0', 'name:boomer');
+    expect(history.summary).toMatchObject({ playerKey: 'name:boomer', identityKind: 'name', latestName: ' boomer ', gamesTogether: 1, gamesOpposed: 1 });
+    expect(history.matches.items.map((item) => item.id)).toEqual(['bot-two', 'bot-one']);
+    expect((await historyRepository.getMatch('bot-one'))?.participants.filter((item) => item.name === 'Boomer')).toHaveLength(1);
+    expect((await historyRepository.searchPlayers()).find((item) => item.playerKey === 'name:boomer')).toMatchObject({ primaryId: undefined, identityKind: 'name' });
   });
 
   it('expires raw payloads while retaining semantic event detail', async () => {

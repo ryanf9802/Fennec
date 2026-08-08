@@ -1,4 +1,6 @@
 import type { MatchState, ParticipantState } from './types';
+export { isTrackablePrimaryId } from './playerIdentity';
+import { normalizePlayerKey, playerKeyFor } from './playerIdentity';
 
 export interface PlayerAverages {
   score: number;
@@ -35,7 +37,7 @@ export interface RecentMeeting {
 }
 
 export interface PlayerHistory {
-  primaryId: string;
+  playerKey: string;
   latestName: string;
   totalMeetings: number;
   firstSeen: string;
@@ -43,12 +45,6 @@ export interface PlayerHistory {
   together: RelationshipHistory;
   against: RelationshipHistory;
   recent: RecentMeeting[];
-}
-
-export function isTrackablePrimaryId(primaryId?: string): primaryId is string {
-  if (!primaryId) return false;
-  const [platform, uid] = primaryId.split('|');
-  return !!platform && platform.toLowerCase() !== 'unknown' && !!uid && uid !== '0';
 }
 
 const emptyAverages = (): PlayerAverages => ({ score: 0, goals: 0, assists: 0, saves: 0, shots: 0, touches: 0, demos: 0 });
@@ -69,18 +65,18 @@ function averages(players: ParticipantState[]): PlayerAverages {
 
 function relationship(matches: MatchState[], profileId: string, playerId: string, together: boolean): RelationshipHistory {
   const related = matches.filter((match) => {
-    const you = match.participants.find((player) => player.primaryId === profileId);
-    const player = match.participants.find((participant) => participant.primaryId === playerId);
+    const you = match.participants.find((player) => playerKeyFor(player) === profileId);
+    const player = match.participants.find((participant) => playerKeyFor(participant) === playerId);
     return !!you && !!player && (you.teamNumber === player.teamNumber) === together;
   });
   const completed = related.filter((match) => match.lifecycle === 'completed' && match.winnerTeamNumber !== undefined);
-  const wins = completed.filter((match) => match.participants.find((player) => player.primaryId === profileId)?.teamNumber === match.winnerTeamNumber).length;
+  const wins = completed.filter((match) => match.participants.find((player) => playerKeyFor(player) === profileId)?.teamNumber === match.winnerTeamNumber).length;
   const goalsFor = completed.reduce((sum, match) => {
-    const team = match.participants.find((player) => player.primaryId === profileId)?.teamNumber;
+    const team = match.participants.find((player) => playerKeyFor(player) === profileId)?.teamNumber;
     return sum + (match.teams.find((item) => item.teamNumber === team)?.score ?? 0);
   }, 0);
   const goalsAgainst = completed.reduce((sum, match) => {
-    const team = match.participants.find((player) => player.primaryId === profileId)?.teamNumber;
+    const team = match.participants.find((player) => playerKeyFor(player) === profileId)?.teamNumber;
     return sum + match.teams.filter((item) => item.teamNumber !== team).reduce((total, item) => total + item.score, 0);
   }, 0);
   const divisor = completed.length || 1;
@@ -95,19 +91,21 @@ function relationship(matches: MatchState[], profileId: string, playerId: string
     goalsAgainstPerGame: Math.round(goalsAgainst * 10 / divisor) / 10,
     firstSeen: completed.at(0)?.startedAt,
     lastSeen: completed.at(-1)?.startedAt,
-    you: averages(completed.flatMap((match) => match.participants.filter((player) => player.primaryId === profileId))),
-    player: averages(completed.flatMap((match) => match.participants.filter((player) => player.primaryId === playerId))),
+    you: averages(completed.flatMap((match) => match.participants.filter((player) => playerKeyFor(player) === profileId))),
+    player: averages(completed.flatMap((match) => match.participants.filter((player) => playerKeyFor(player) === playerId))),
   };
 }
 
 export function calculatePlayerHistory(matches: MatchState[], profileId?: string, playerId?: string): PlayerHistory | undefined {
-  if (!isTrackablePrimaryId(profileId) || !isTrackablePrimaryId(playerId) || profileId === playerId) return undefined;
-  const related = [...matches].filter((match) => match.participants.some((player) => player.primaryId === profileId) && match.participants.some((player) => player.primaryId === playerId)).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  const profileKey = normalizePlayerKey(profileId);
+  const playerKey = normalizePlayerKey(playerId);
+  if (!profileKey || !playerKey || profileKey === playerKey) return undefined;
+  const related = [...matches].filter((match) => match.participants.some((player) => playerKeyFor(player) === profileKey) && match.participants.some((player) => playerKeyFor(player) === playerKey)).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   if (!related.length) return undefined;
-  const latestPlayer = [...related].reverse().flatMap((match) => match.participants).find((player) => player.primaryId === playerId)!;
+  const latestPlayer = [...related].reverse().flatMap((match) => match.participants).find((player) => playerKeyFor(player) === playerKey)!;
   const recent = [...related].reverse().slice(0, 8).map((match): RecentMeeting => {
-    const you = match.participants.find((player) => player.primaryId === profileId)!;
-    const player = match.participants.find((item) => item.primaryId === playerId)!;
+    const you = match.participants.find((player) => playerKeyFor(player) === profileKey)!;
+    const player = match.participants.find((item) => playerKeyFor(item) === playerKey)!;
     const teams = [...match.teams].sort((a, b) => a.teamNumber - b.teamNumber);
     const completed = match.lifecycle === 'completed' && match.winnerTeamNumber !== undefined;
     return {
@@ -120,13 +118,13 @@ export function calculatePlayerHistory(matches: MatchState[], profileId?: string
     };
   });
   return {
-    primaryId: playerId,
+    playerKey,
     latestName: latestPlayer.name,
     totalMeetings: related.length,
     firstSeen: related[0]!.startedAt,
     lastSeen: related.at(-1)!.startedAt,
-    together: relationship(related, profileId, playerId, true),
-    against: relationship(related, profileId, playerId, false),
+    together: relationship(related, profileKey, playerKey, true),
+    against: relationship(related, profileKey, playerKey, false),
     recent,
   };
 }

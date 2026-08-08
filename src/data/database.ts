@@ -1,11 +1,11 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
 import { flattenPayload } from '../domain/timeline';
-import { isTrackablePrimaryId } from '../domain/playerHistory';
+import { normalizePlayerName, playerIdentityKind, playerKeyFor, playerPrimaryId } from '../domain/playerIdentity';
 import { normalizeSettings, type EncounterSummary, type FennecProfile, type FennecSettings, type MatchState, type ParticipantState, type SessionGroup, type TimelineEvent } from '../domain/types';
 import type { HistoryPage, HistoryRepository, MatchHistoryQuery, PlayerHistoryResult, PlayerRecord, StorageStatistics } from './historyRepository';
 
 const rawRetentionDays = 90;
-const schemaMarker = 'normalized-v3';
+const schemaMarker = 'normalized-v4';
 const stringMinKey = '';
 const stringMaxKey = '\uffff';
 
@@ -14,10 +14,20 @@ type LegacyStoredMatch = Omit<MatchState, 'events'> & { sessionId?: string };
 interface SettingRecord { key: 'settings'; value: FennecSettings }
 interface ProfileRecord extends FennecProfile { key: 'profile' }
 interface MetadataRecord { key: string; value: unknown }
+interface StoredPlayerRecord {
+  // IndexedDB v3 established this primary-key path; its v4 value is the opaque player key.
+  primaryId: string;
+  platformPrimaryId?: string;
+  identityKind: 'platform' | 'name';
+  latestName: string;
+  normalizedName: string;
+  firstSeen: string;
+  lastSeen: string;
+}
 interface RawEventRecord { id: string; matchId: string; receivedAt: string; payload: Record<string, unknown> }
 interface AppearanceRecord extends ParticipantState {
   id: string;
-  playerKey: string;
+  playerKey?: string;
   matchId: string;
   startedAt: string;
   playlistId: number;
@@ -26,8 +36,8 @@ interface AppearanceRecord extends ParticipantState {
 }
 interface PairRecord {
   id: string;
-  playerAId: string;
-  playerBId: string;
+  playerAKey: string;
+  playerBKey: string;
   matchId: string;
   startedAt: string;
   playlistId: number;
@@ -38,8 +48,8 @@ interface PairRecord {
 }
 interface RelationshipRecord {
   id: string;
-  playerAId: string;
-  playerBId: string;
+  playerAKey: string;
+  playerBKey: string;
   gamesTogether: number;
   winsTogetherA: number;
   winsTogetherB: number;
@@ -60,18 +70,19 @@ function resultFor(match: Pick<MatchState, 'lifecycle' | 'winnerTeamNumber'>, te
   return match.winnerTeamNumber === teamNumber ? 'win' : 'loss';
 }
 
-function playerKey(player: ParticipantState): string {
-  if (player.primaryId) return `id:${player.primaryId}`;
+function appearanceKey(player: ParticipantState): string {
+  const playerKey = playerKeyFor(player);
+  if (playerKey?.startsWith('id:')) return playerKey;
   if (player.shortcut !== undefined) return `slot:${player.shortcut}`;
-  return `name:${player.teamNumber}:${player.name.trim().toLocaleLowerCase()}`;
+  return `${playerKey ?? 'unknown'}:${player.teamNumber}`;
 }
 
 function appearance(match: MatchState, player: ParticipantState): AppearanceRecord {
-  const key = playerKey(player);
+  const key = appearanceKey(player);
   return {
     ...player,
     id: `${match.id}\u0000${key}`,
-    playerKey: key,
+    playerKey: playerKeyFor(player),
     matchId: match.id,
     startedAt: match.startedAt,
     playlistId: match.playlistId,
@@ -81,24 +92,25 @@ function appearance(match: MatchState, player: ParticipantState): AppearanceReco
 }
 
 function pairRecords(match: MatchState): PairRecord[] {
-  const players = match.participants.filter((player): player is ParticipantState & { primaryId: string } => isTrackablePrimaryId(player.primaryId));
+  const players = match.participants.map((player) => ({ player, playerKey: playerKeyFor(player) })).filter((value): value is { player: ParticipantState; playerKey: string } => !!value.playerKey);
   const result: PairRecord[] = [];
   for (let left = 0; left < players.length; left++) {
     for (let right = left + 1; right < players.length; right++) {
       const first = players[left]!;
       const second = players[right]!;
-      const [a, b] = first.primaryId.localeCompare(second.primaryId) <= 0 ? [first, second] : [second, first];
+      if (first.playerKey === second.playerKey) continue;
+      const [a, b] = first.playerKey.localeCompare(second.playerKey) <= 0 ? [first, second] : [second, first];
       result.push({
-        id: `${a.primaryId}\u0000${b.primaryId}\u0000${match.id}`,
-        playerAId: a.primaryId,
-        playerBId: b.primaryId,
+        id: `${a.playerKey}\u0000${b.playerKey}\u0000${match.id}`,
+        playerAKey: a.playerKey,
+        playerBKey: b.playerKey,
         matchId: match.id,
         startedAt: match.startedAt,
         playlistId: match.playlistId,
         playlistCategory: match.playlistCategory,
-        relationship: a.teamNumber === b.teamNumber ? 'together' : 'against',
-        resultA: resultFor(match, a.teamNumber),
-        resultB: resultFor(match, b.teamNumber),
+        relationship: a.player.teamNumber === b.player.teamNumber ? 'together' : 'against',
+        resultA: resultFor(match, a.player.teamNumber),
+        resultB: resultFor(match, b.player.teamNumber),
       });
     }
   }
@@ -108,8 +120,8 @@ function pairRecords(match: MatchState): PairRecord[] {
 function relationshipRecords(pairs: PairRecord[]): RelationshipRecord[] {
   const values = new Map<string, RelationshipRecord>();
   for (const pair of [...pairs].sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
-    const id = `${pair.playerAId}\u0000${pair.playerBId}`;
-    const value = values.get(id) ?? { id, playerAId: pair.playerAId, playerBId: pair.playerBId, gamesTogether: 0, winsTogetherA: 0, winsTogetherB: 0, lossesTogetherA: 0, lossesTogetherB: 0, gamesOpposed: 0, winsAgainstA: 0, winsAgainstB: 0, lossesAgainstA: 0, lossesAgainstB: 0, firstSeen: pair.startedAt, lastSeen: pair.startedAt };
+    const id = `${pair.playerAKey}\u0000${pair.playerBKey}`;
+    const value = values.get(id) ?? { id, playerAKey: pair.playerAKey, playerBKey: pair.playerBKey, gamesTogether: 0, winsTogetherA: 0, winsTogetherB: 0, lossesTogetherA: 0, lossesTogetherB: 0, gamesOpposed: 0, winsAgainstA: 0, winsAgainstB: 0, lossesAgainstA: 0, lossesAgainstB: 0, firstSeen: pair.startedAt, lastSeen: pair.startedAt };
     value.firstSeen = pair.startedAt < value.firstSeen ? pair.startedAt : value.firstSeen;
     value.lastSeen = pair.startedAt > value.lastSeen ? pair.startedAt : value.lastSeen;
     if (pair.relationship === 'together') {
@@ -190,7 +202,7 @@ class FennecDatabase extends Dexie {
   events!: EntityTable<TimelineEvent, 'id'>;
   rawEvents!: EntityTable<RawEventRecord, 'id'>;
   appearances!: EntityTable<AppearanceRecord, 'id'>;
-  players!: EntityTable<PlayerRecord, 'primaryId'>;
+  players!: EntityTable<StoredPlayerRecord, 'primaryId'>;
   pairs!: EntityTable<PairRecord, 'id'>;
   relationships!: EntityTable<RelationshipRecord, 'id'>;
   sessions!: EntityTable<SessionRecord, 'id'>;
@@ -226,6 +238,17 @@ class FennecDatabase extends Dexie {
       sessions: 'id, startedAt, [startedAt+id]',
       settings: 'key', profiles: 'key, primaryId', metadata: 'key',
     });
+    this.version(4).stores({
+      matches: 'id, startedAt, [startedAt+id], lastEventAt, lifecycle, playlistCategory, playlistId, sessionId',
+      events: 'id, matchId, sequence, receivedAt, eventName, [matchId+sequence]',
+      rawEvents: 'id, matchId, receivedAt, [receivedAt+id]',
+      appearances: 'id, matchId, playerKey, primaryId, [matchId+playerKey], [playerKey+startedAt+matchId], [playerKey+playlistCategory+startedAt+matchId], [playerKey+playlistId+startedAt+matchId], [playerKey+result+startedAt+matchId]',
+      players: 'primaryId, platformPrimaryId, normalizedName, firstSeen, lastSeen',
+      pairs: 'id, matchId, [playerAKey+playerBKey+startedAt+matchId]',
+      relationships: 'id, [playerAKey+playerBKey]',
+      sessions: 'id, startedAt, [startedAt+id]',
+      settings: 'key', profiles: 'key, primaryId', metadata: 'key',
+    });
   }
 }
 
@@ -236,31 +259,41 @@ async function normalizeExistingData(): Promise<void> {
   await db.transaction('rw', [db.matches, db.events, db.rawEvents, db.appearances, db.players, db.pairs, db.relationships, db.sessions, db.settings, db.metadata], async () => {
     if ((await db.metadata.get(schemaMarker))?.value === true) return;
     const legacyMatches = await (db.matches as unknown as Table<LegacyStoredMatch, string>).toArray();
+    const existingAppearances = await db.appearances.toArray();
     const events = await db.events.toArray();
+    const existingRawEvents = await db.rawEvents.toArray();
+    const rawById = new Map(existingRawEvents.map((event) => [event.id, event.payload]));
     const settings = normalizeSettings((await db.settings.get('settings'))?.value);
     const eventsByMatch = new Map<string, TimelineEvent[]>();
     for (const event of events) {
       const values = eventsByMatch.get(event.matchId) ?? [];
-      values.push(event); eventsByMatch.set(event.matchId, values);
+      values.push({ ...event, payload: rawById.get(event.id) ?? event.payload }); eventsByMatch.set(event.matchId, values);
     }
-    const hydrated = legacyMatches.map((match) => ({ ...match, participants: match.participants ?? [], events: eventsByMatch.get(match.id) ?? [] } as MatchState));
+    const appearancesByMatch = new Map<string, ParticipantState[]>();
+    for (const item of existingAppearances) {
+      const values = appearancesByMatch.get(item.matchId) ?? [];
+      values.push(item); appearancesByMatch.set(item.matchId, values);
+    }
+    const hydrated = legacyMatches.map((match) => ({ ...match, participants: match.participants ?? appearancesByMatch.get(match.id) ?? [], events: eventsByMatch.get(match.id) ?? [] } as MatchState));
     const grouped = groupSessionRecords(hydrated, settings.sessionGapMinutes);
     const appearances = hydrated.flatMap((match) => match.participants.map((player) => appearance(match, player)));
-    const players = new Map<string, PlayerRecord>();
+    const players = new Map<string, StoredPlayerRecord>();
     for (const item of appearances) {
-      if (!isTrackablePrimaryId(item.primaryId)) continue;
-      const prior = players.get(item.primaryId);
-      players.set(item.primaryId, {
-        primaryId: item.primaryId,
+      if (!item.playerKey) continue;
+      const prior = players.get(item.playerKey);
+      players.set(item.playerKey, {
+        primaryId: item.playerKey,
+        platformPrimaryId: playerPrimaryId(item.playerKey),
+        identityKind: playerIdentityKind(item.playerKey)!,
         latestName: !prior || item.startedAt >= prior.lastSeen ? item.name : prior.latestName,
-        normalizedName: (!prior || item.startedAt >= prior.lastSeen ? item.name : prior.latestName).toLocaleLowerCase(),
+        normalizedName: (!prior || item.startedAt >= prior.lastSeen ? item.name : prior.latestName).normalize('NFKC').trim().toLowerCase(),
         firstSeen: !prior || item.startedAt < prior.firstSeen ? item.startedAt : prior.firstSeen,
         lastSeen: !prior || item.startedAt > prior.lastSeen ? item.startedAt : prior.lastSeen,
       });
     }
     await Promise.all([db.rawEvents.clear(), db.appearances.clear(), db.players.clear(), db.pairs.clear(), db.relationships.clear(), db.sessions.clear()]);
     if (events.length) {
-      await db.rawEvents.bulkPut(events.map((event) => ({ id: event.id, matchId: event.matchId, receivedAt: event.receivedAt, payload: event.payload })));
+      await db.rawEvents.bulkPut(existingRawEvents.length ? existingRawEvents : events.map((event) => ({ id: event.id, matchId: event.matchId, receivedAt: event.receivedAt, payload: event.payload })));
       await db.events.bulkPut(events.map(semanticEvent));
     }
     if (appearances.length) await db.appearances.bulkPut(appearances);
@@ -381,17 +414,17 @@ async function listPlayerMatches(query: MatchHistoryQuery): Promise<HistoryPage<
   const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
   const cursor = parseCursor(query.cursor);
   const candidates: Array<{ matchId: string; startedAt: string }> = [];
-  if (query.profileId && query.playerId && query.profileId !== query.playerId) {
-    const [a, b] = query.profileId.localeCompare(query.playerId) <= 0 ? [query.profileId, query.playerId] : [query.playerId, query.profileId];
+  if (query.profileKey && query.playerKey && query.profileKey !== query.playerKey) {
+    const [a, b] = query.profileKey.localeCompare(query.playerKey) <= 0 ? [query.profileKey, query.playerKey] : [query.playerKey, query.profileKey];
     const upper: [string, string, string, string] = cursor ? [a, b, cursor[0], cursor[1]] : [a, b, stringMaxKey, stringMaxKey];
-    const collection = db.pairs.where('[playerAId+playerBId+startedAt+matchId]').between([a, b, stringMinKey, stringMinKey], upper, true, !cursor).reverse();
+    const collection = db.pairs.where('[playerAKey+playerBKey+startedAt+matchId]').between([a, b, stringMinKey, stringMinKey], upper, true, !cursor).reverse();
     let offset = 0;
     while (candidates.length <= limit) {
       const rows = await collection.offset(offset).limit(200).toArray();
       if (!rows.length) break;
       offset += rows.length;
       candidates.push(...rows.filter((row) => {
-        const playerIsA = row.playerAId === query.profileId;
+        const playerIsA = row.playerAKey === query.profileKey;
         const result = playerIsA ? row.resultA : row.resultB;
         return (!query.relationship || row.relationship === query.relationship)
           && (!query.result || result === query.result)
@@ -401,9 +434,9 @@ async function listPlayerMatches(query: MatchHistoryQuery): Promise<HistoryPage<
       }).map((row) => ({ matchId: row.matchId, startedAt: row.startedAt })).slice(0, limit + 1 - candidates.length));
       if (rows.length < 200) break;
     }
-  } else if (query.playerId) {
-    const upper: [string, string, string] = cursor ? [query.playerId, cursor[0], cursor[1]] : [query.playerId, stringMaxKey, stringMaxKey];
-    const collection = db.appearances.where('[primaryId+startedAt+matchId]').between([query.playerId, stringMinKey, stringMinKey], upper, true, !cursor).reverse();
+  } else if (query.playerKey) {
+    const upper: [string, string, string] = cursor ? [query.playerKey, cursor[0], cursor[1]] : [query.playerKey, stringMaxKey, stringMaxKey];
+    const collection = db.appearances.where('[playerKey+startedAt+matchId]').between([query.playerKey, stringMinKey, stringMinKey], upper, true, !cursor).reverse();
     let offset = 0;
     while (candidates.length <= limit) {
       const rows = await collection.offset(offset).limit(200).toArray();
@@ -446,14 +479,19 @@ async function writeMatch(match: MatchState, idleMinutes: number): Promise<void>
     const newEvents = match.events.filter((event) => event.sequence > (lastEvent?.sequence ?? 0));
     await db.matches.put(storedMatch(match, sessionId));
     const appearances = match.participants.map((player) => appearance(match, player));
+    const appearanceIds = new Set(appearances.map((item) => item.id));
+    const staleAppearanceIds = (await db.appearances.where('matchId').equals(match.id).primaryKeys()).filter((id) => !appearanceIds.has(String(id)));
+    if (staleAppearanceIds.length) await db.appearances.bulkDelete(staleAppearanceIds);
     if (appearances.length) await db.appearances.bulkPut(appearances);
     for (const item of appearances) {
-      if (!isTrackablePrimaryId(item.primaryId)) continue;
-      const prior = await db.players.get(item.primaryId);
+      if (!item.playerKey) continue;
+      const prior = await db.players.get(item.playerKey);
       await db.players.put({
-        primaryId: item.primaryId,
+        primaryId: item.playerKey,
+        platformPrimaryId: playerPrimaryId(item.playerKey),
+        identityKind: playerIdentityKind(item.playerKey)!,
         latestName: !prior || item.startedAt >= prior.lastSeen ? item.name : prior.latestName,
-        normalizedName: (!prior || item.startedAt >= prior.lastSeen ? item.name : prior.latestName).toLocaleLowerCase(),
+        normalizedName: (!prior || item.startedAt >= prior.lastSeen ? item.name : prior.latestName).normalize('NFKC').trim().toLowerCase(),
         firstSeen: !prior || item.startedAt < prior.firstSeen ? item.startedAt : prior.firstSeen,
         lastSeen: !prior || item.startedAt > prior.lastSeen ? item.startedAt : prior.lastSeen,
       });
@@ -463,7 +501,7 @@ async function writeMatch(match: MatchState, idleMinutes: number): Promise<void>
       for (const pair of pairs) {
         const existingPair = await db.pairs.get(pair.id);
         if (!existingPair) {
-          const id = `${pair.playerAId}\u0000${pair.playerBId}`;
+          const id = `${pair.playerAKey}\u0000${pair.playerBKey}`;
           const prior = await db.relationships.get(id);
           const next = relationshipRecords([pair])[0]!;
           if (prior) {
@@ -475,7 +513,7 @@ async function writeMatch(match: MatchState, idleMinutes: number): Promise<void>
         }
         await db.pairs.put(pair);
         if (existingPair && (existingPair.relationship !== pair.relationship || existingPair.resultA !== pair.resultA || existingPair.resultB !== pair.resultB)) {
-          const related = await db.pairs.where('[playerAId+playerBId+startedAt+matchId]').between([pair.playerAId, pair.playerBId, stringMinKey, stringMinKey], [pair.playerAId, pair.playerBId, stringMaxKey, stringMaxKey]).toArray();
+          const related = await db.pairs.where('[playerAKey+playerBKey+startedAt+matchId]').between([pair.playerAKey, pair.playerBKey, stringMinKey, stringMinKey], [pair.playerAKey, pair.playerBKey, stringMaxKey, stringMaxKey]).toArray();
           await db.relationships.put(relationshipRecords(related)[0]!);
         }
       }
@@ -568,12 +606,12 @@ export async function replaceAll(matches: MatchState[], settings: FennecSettings
   const grouped = groupSessionRecords(ordered, settings.sessionGapMinutes);
   const appearances = ordered.flatMap((match) => match.participants.map((player) => appearance(match, player)));
   const events = ordered.flatMap((match) => match.events);
-  const players = new Map<string, PlayerRecord>();
+  const players = new Map<string, StoredPlayerRecord>();
   for (const item of appearances) {
-    if (!isTrackablePrimaryId(item.primaryId)) continue;
-    const prior = players.get(item.primaryId);
+    if (!item.playerKey) continue;
+    const prior = players.get(item.playerKey);
     const latestName = !prior || item.startedAt >= prior.lastSeen ? item.name : prior.latestName;
-    players.set(item.primaryId, { primaryId: item.primaryId, latestName, normalizedName: latestName.toLocaleLowerCase(), firstSeen: !prior || item.startedAt < prior.firstSeen ? item.startedAt : prior.firstSeen, lastSeen: !prior || item.startedAt > prior.lastSeen ? item.startedAt : prior.lastSeen });
+    players.set(item.playerKey, { primaryId: item.playerKey, platformPrimaryId: playerPrimaryId(item.playerKey), identityKind: playerIdentityKind(item.playerKey)!, latestName, normalizedName: latestName.normalize('NFKC').trim().toLowerCase(), firstSeen: !prior || item.startedAt < prior.firstSeen ? item.startedAt : prior.firstSeen, lastSeen: !prior || item.startedAt > prior.lastSeen ? item.startedAt : prior.lastSeen });
   }
   await db.transaction('rw', [db.matches, db.events, db.rawEvents, db.appearances, db.players, db.pairs, db.relationships, db.sessions, db.settings, db.profiles, db.metadata], async () => {
     await Promise.all([db.matches.clear(), db.events.clear(), db.rawEvents.clear(), db.appearances.clear(), db.players.clear(), db.pairs.clear(), db.relationships.clear(), db.sessions.clear(), db.profiles.clear()]);
@@ -630,21 +668,21 @@ export const historyRepository: HistoryRepository = {
     const record = await db.sessions.get(id);
     return record ? { id: record.id, startedAt: record.startedAt, endedAt: record.endedAt, matches: await hydrateSummariesByIds(record.matchIds) } : undefined;
   },
-  listMatches(query = {}) { return query.playerId ? listPlayerMatches(query) : listPlainMatches(query); },
+  listMatches(query = {}) { return query.playerKey ? listPlayerMatches(query) : listPlainMatches(query); },
   async getMatch(id) { return (await hydrateByIds([id]))[0]; },
   async loadLiveMatches() { return hydrateMatches(await db.matches.where('lifecycle').equals('live').toArray()); },
   async searchPlayers(query = '', limit = 100) {
-    const normalized = query.trim().toLocaleLowerCase();
-    if (!normalized) return db.players.orderBy('lastSeen').reverse().limit(limit).toArray();
-    return db.players.where('normalizedName').startsWith(normalized).limit(limit).toArray();
+    const normalized = normalizePlayerName(query) ?? '';
+    const records = !normalized ? await db.players.orderBy('lastSeen').reverse().limit(limit).toArray() : await db.players.where('normalizedName').startsWith(normalized).limit(limit).toArray();
+    return records.map((record): PlayerRecord => ({ playerKey: record.primaryId, primaryId: record.platformPrimaryId, identityKind: record.identityKind, latestName: record.latestName, normalizedName: record.normalizedName, firstSeen: record.firstSeen, lastSeen: record.lastSeen }));
   },
-  async getPlayerHistory(profileId, playerId, query = {}): Promise<PlayerHistoryResult> {
-    const [a, b] = profileId.localeCompare(playerId) <= 0 ? [profileId, playerId] : [playerId, profileId];
+  async getPlayerHistory(profileKey, playerKey, query = {}): Promise<PlayerHistoryResult> {
+    const [a, b] = profileKey.localeCompare(playerKey) <= 0 ? [profileKey, playerKey] : [playerKey, profileKey];
     const relationship = await db.relationships.get(`${a}\u0000${b}`);
-    const player = await db.players.get(playerId);
-    const profileIsA = relationship?.playerAId === profileId;
-    const summary = relationship ? { primaryId: playerId, latestName: player?.latestName ?? playerId, gamesTogether: relationship.gamesTogether, winsTogether: profileIsA ? relationship.winsTogetherA : relationship.winsTogetherB, lossesTogether: profileIsA ? relationship.lossesTogetherA : relationship.lossesTogetherB, gamesOpposed: relationship.gamesOpposed, winsAgainst: profileIsA ? relationship.winsAgainstA : relationship.winsAgainstB, lossesAgainst: profileIsA ? relationship.lossesAgainstA : relationship.lossesAgainstB, firstSeen: relationship.firstSeen, lastSeen: relationship.lastSeen } satisfies EncounterSummary : undefined;
-    return { summary, matches: await listPlayerMatches({ ...query, profileId, playerId }) };
+    const player = await db.players.get(playerKey);
+    const profileIsA = relationship?.playerAKey === profileKey;
+    const summary = relationship ? { playerKey, primaryId: player?.platformPrimaryId, identityKind: player?.identityKind ?? playerIdentityKind(playerKey)!, latestName: player?.latestName ?? playerKey, gamesTogether: relationship.gamesTogether, winsTogether: profileIsA ? relationship.winsTogetherA : relationship.winsTogetherB, lossesTogether: profileIsA ? relationship.lossesTogetherA : relationship.lossesTogetherB, gamesOpposed: relationship.gamesOpposed, winsAgainst: profileIsA ? relationship.winsAgainstA : relationship.winsAgainstB, lossesAgainst: profileIsA ? relationship.lossesAgainstA : relationship.lossesAgainstB, firstSeen: relationship.firstSeen, lastSeen: relationship.lastSeen } satisfies EncounterSummary : undefined;
+    return { summary, matches: await listPlayerMatches({ ...query, profileKey, playerKey }) };
   },
   async getTimelineCatalog() { return (((await db.metadata.get('eventCatalog'))?.value ?? {}) as Record<string, string[]>); },
   async *iterateMatches(pageSize = 100) {

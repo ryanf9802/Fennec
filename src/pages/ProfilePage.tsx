@@ -7,7 +7,7 @@ export function ProfilePage() {
   const { profile, selectProfile } = useFennec();
   const playersQuery = usePlayers();
   const overviewQuery = useOverview();
-  const players = (playersQuery.data ?? []).map((player) => ({ primaryId: player.primaryId, displayName: player.latestName })).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const players = (playersQuery.data ?? []).filter((player) => player.identityKind === 'platform' && !!player.primaryId).map((player) => ({ primaryId: player.primaryId!, displayName: player.latestName })).sort((a, b) => a.displayName.localeCompare(b.displayName));
   const [selected, setSelected] = useState(profile?.primaryId ?? '');
   const [saved, setSaved] = useState(false);
   const trackingSince = overviewQuery.data?.firstMatchStartedAt ? new Date(overviewQuery.data.firstMatchStartedAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : '—';

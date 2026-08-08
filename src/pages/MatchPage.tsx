@@ -4,7 +4,7 @@ import { useFennec } from '../app/FennecContext';
 import { PlayerName } from '../components/PlayerName';
 import { Timeline } from '../components/Timeline';
 import { MatchAnalytics } from '../components/MatchAnalytics';
-import { isTrackablePrimaryId } from '../domain/playerHistory';
+import { playerIdentityKind, playerKeyFor, playerKeyForPrimaryId } from '../domain/playerIdentity';
 import type { MatchState, ParticipantState } from '../domain/types';
 import { useMatch } from '../data/historyQueries';
 
@@ -20,12 +20,14 @@ const stats: Array<{ key: keyof ParticipantState; full: string; short: string }>
 ];
 
 function PlayerRow({ player, profileId, onInspect }: { player: ParticipantState; profileId?: string; onInspect(player: ParticipantState): void }) {
-  const inspectable = player.primaryId !== profileId && isTrackablePrimaryId(player.primaryId);
+  const playerKey = playerKeyFor(player);
+  const inspectable = !!playerKey && playerKey !== playerKeyForPrimaryId(profileId);
+  const bot = playerIdentityKind(playerKey) === 'name';
   return <tr className="border-t border-ui text-center text-sm">
     <th scope="row" className="scoreboard-player-cell px-3 py-3 text-left">
       {inspectable
-        ? <button aria-label={`View history with ${player.name}`} title={`View history with ${player.name}`} className="hover-surface group/player -mx-2 inline-flex w-[calc(100%+1rem)] cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 text-left hover:text-fennec-cyan" onClick={() => onInspect(player)}><span className="min-w-0"><PlayerName name={player.name} teamNumber={player.teamNumber} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</span><History aria-hidden="true" className="text-muted size-3.5 shrink-0 group-hover/player:text-fennec-cyan" /></button>
-        : <><PlayerName name={player.name} teamNumber={player.teamNumber} you={player.primaryId === profileId} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</>}
+        ? <button aria-label={`View history with ${player.name}`} title={`View history with ${player.name}`} className="hover-surface group/player -mx-2 inline-flex w-[calc(100%+1rem)] cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 text-left hover:text-fennec-cyan" onClick={() => onInspect(player)}><span className="min-w-0"><PlayerName name={player.name} teamNumber={player.teamNumber} bot={bot} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</span><History aria-hidden="true" className="text-muted size-3.5 shrink-0 group-hover/player:text-fennec-cyan" /></button>
+        : <><PlayerName name={player.name} teamNumber={player.teamNumber} you={player.primaryId === profileId} bot={bot} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</>}
     </th>
     {stats.map(({ key }) => <td key={key} className={`px-2 py-3 ${key === 'score' ? 'font-bold' : ''}`}>{player[key] ?? 0}</td>)}
   </tr>;
@@ -55,7 +57,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
           <thead className="eyebrow"><tr><th scope="col" className="scoreboard-player-cell px-3 py-3 text-left">Player</th>{stats.map(({ key, full, short }) => <th key={key} scope="col" className="px-2 py-3 text-center"><span className="stat-label-full">{full}</span><abbr title={full} className="stat-label-short no-underline">{short}</abbr></th>)}</tr></thead>
           {teams.map((team) => <tbody key={team.teamNumber}>
             <tr className="border-t border-ui"><th colSpan={stats.length + 1} className="px-3 py-2 text-left text-sm font-black uppercase tracking-wider"><span className={`mr-2 inline-block size-2.5 rounded-full ${team.teamNumber === 0 ? 'bg-fennec-cyan' : 'bg-fennec-orange'}`} />{team.name || `Team ${team.teamNumber + 1}`}{match.winnerTeamNumber === team.teamNumber && <Trophy className="ml-2 inline size-4 text-amber-400" />}</th></tr>
-            {match.participants.filter((player) => player.teamNumber === team.teamNumber).sort((a, b) => b.score - a.score).map((player, index) => <PlayerRow key={`${player.primaryId ?? player.name}:${index}`} player={player} profileId={profile?.primaryId} onInspect={(next) => { if (next.primaryId) navigate(`/players/${encodeURIComponent(next.primaryId)}`); }} />)}
+            {match.participants.filter((player) => player.teamNumber === team.teamNumber).sort((a, b) => b.score - a.score).map((player, index) => <PlayerRow key={`${player.shortcut ?? playerKeyFor(player) ?? player.name}:${index}`} player={player} profileId={profile?.primaryId} onInspect={(next) => { const playerKey = playerKeyFor(next); if (playerKey) navigate(`/players/${encodeURIComponent(playerKey)}`); }} />)}
           </tbody>)}
         </table></div>
         {!match.participants.length && <div className="surface-flat text-muted mt-3 rounded-2xl p-8 text-center">Waiting for player data…</div>}

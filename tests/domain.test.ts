@@ -6,6 +6,7 @@ import { groupSessions } from '../src/domain/sessions';
 import { timelineCatalog, timelineDisplayItems } from '../src/domain/timeline';
 import { observedBallSpeed, playerTouchAnalytics, spatialEventPoints } from '../src/domain/analytics';
 import { arenaProfile } from '../src/domain/arenaProfiles';
+import { normalizePlayerKey, playerKeyFor } from '../src/domain/playerIdentity';
 import { defaultSettings, type MatchState, type ParticipantState, type TimelineEvent } from '../src/domain/types';
 
 const player = (name: string, primaryId: string, teamNumber: number): ParticipantState => ({ name, primaryId, teamNumber, score: 0, goals: 0, assists: 0, saves: 0, shots: 0, touches: 0, demos: 0 });
@@ -62,6 +63,35 @@ describe('Stats API domain', () => {
     const identified = reduceStatsEnvelope(shortcutOnly, { event: 'UpdateState', data: { MatchGuid: 'normal', Players: [{ Name: 'Me', PrimaryId: 'Steam|1|0', Shortcut: 2, TeamNum: 0 }], Game: {} } }).current;
     expect(identified.participants).toHaveLength(1);
     expect(identified.participants[0]?.primaryId).toBe('Steam|1|0');
+  });
+
+  it('keeps bots with a shared unknown platform ID distinct by shortcut', () => {
+    const players = [
+      { Name: 'Fitz', PrimaryId: 'Steam|76561198080090519|0', Shortcut: 5, TeamNum: 1 },
+      { Name: 'Boomer', PrimaryId: 'Unknown|0|0', Shortcut: 1, TeamNum: 0 },
+      { Name: 'Iceman', PrimaryId: 'Unknown|0|0', Shortcut: 6, TeamNum: 1 },
+      { Name: 'Maverick', PrimaryId: 'Unknown|0|0', Shortcut: 2, TeamNum: 0 },
+      { Name: 'Merlin', PrimaryId: 'Unknown|0|0', Shortcut: 3, TeamNum: 0 },
+      { Name: 'Centice', PrimaryId: 'Unknown|0|0', Shortcut: 7, TeamNum: 1 },
+    ];
+    let value = reduceStatsEnvelope(undefined, { event: 'UpdateState', data: { MatchGuid: 'bots', Players: players, Game: {} } }).current;
+    value = reduceStatsEnvelope(value, { event: 'UpdateState', data: { MatchGuid: 'bots', Players: players.map((item, index) => ({ ...item, Shortcut: item.Name === 'Merlin' ? 13 : item.Shortcut, Score: index + 10 })), Game: {} } }).current;
+
+    expect(value.participants).toHaveLength(6);
+    expect(value.participants.map((item) => item.name)).toEqual(['Fitz', 'Boomer', 'Iceman', 'Maverick', 'Merlin', 'Centice']);
+    expect(value.participants.find((item) => item.name === 'Merlin')).toMatchObject({ shortcut: 13, score: 14, isPresent: true });
+
+    value = reduceStatsEnvelope(value, { event: 'PlayerLeft', data: { MatchGuid: 'bots', PrimaryId: 'Unknown|0|0', Shortcut: 2, PlayerName: 'Maverick' } }).current;
+    expect(value.participants.find((item) => item.name === 'Maverick')?.isPresent).toBe(false);
+    expect(value.participants.filter((item) => item.name !== 'Maverick').every((item) => item.isPresent)).toBe(true);
+  });
+
+  it('creates normalized name identities when a platform ID is unavailable', () => {
+    expect(playerKeyFor({ name: '  BÖÖMER  ', primaryId: 'Unknown|0|0' })).toBe('name:böömer');
+    expect(playerKeyFor({ name: 'Boomer', primaryId: undefined })).toBe('name:boomer');
+    expect(playerKeyFor({ name: 'Unknown player', primaryId: undefined })).toBeUndefined();
+    expect(normalizePlayerKey('Steam|1|0')).toBe('id:Steam|1|0');
+    expect(normalizePlayerKey('name: BOOMER ')).toBe('name:boomer');
   });
 
   it('derives touch analytics and resolves event actors by shortcut', () => {

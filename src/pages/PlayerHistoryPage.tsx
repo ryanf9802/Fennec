@@ -5,25 +5,29 @@ import { useFennec } from '../app/FennecContext';
 import { MatchRow } from '../components/MatchRow';
 import { usePlayerHistory } from '../data/historyQueries';
 import type { MatchResultFilter, RelationshipFilter } from '../data/historyRepository';
+import { normalizePlayerKey, playerIdentityKind, playerKeyForPrimaryId, playerPrimaryId } from '../domain/playerIdentity';
 
 type PlaylistFilter = '' | 'ranked' | 'casual' | 'private' | 'lan' | 'unknown';
 
 export function PlayerHistoryPage() {
   const { playerId } = useParams();
   const { profile } = useFennec();
+  const playerKey = normalizePlayerKey(playerId);
+  const profileKey = playerKeyForPrimaryId(profile?.primaryId);
   const [relationship, setRelationship] = useState<RelationshipFilter | ''>('');
   const [result, setResult] = useState<MatchResultFilter | ''>('');
   const [playlistCategory, setPlaylistCategory] = useState<PlaylistFilter>('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const historyQuery = usePlayerHistory(profile?.primaryId, playerId, { relationship: relationship || undefined, result: result || undefined, playlistCategory: playlistCategory || undefined, from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined, to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined });
+  const historyQuery = usePlayerHistory(profileKey, playerKey, { relationship: relationship || undefined, result: result || undefined, playlistCategory: playlistCategory || undefined, from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined, to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined });
   if (!profile) return <div className="surface rounded-3xl p-8"><h1 className="text-2xl font-extrabold">Select your profile first</h1><Link className="button-secondary mt-5" to="/profile">Choose profile</Link></div>;
-  if (!playerId || playerId === profile.primaryId) return <div className="surface rounded-3xl p-8">Player history is unavailable.</div>;
+  if (!playerKey || playerKey === profileKey) return <div className="surface rounded-3xl p-8">Player history is unavailable.</div>;
   const summary = historyQuery.data?.pages[0]?.summary;
+  const identityKind = summary?.identityKind ?? playerIdentityKind(playerKey);
   const matches = historyQuery.data?.pages.flatMap((page) => page.matches.items) ?? [];
   return <div className="space-y-7">
     <Link to="/" className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"><ArrowLeft className="size-4" />Game timeline</Link>
-    <header><div className="eyebrow">All-time player history</div><h1 className="mt-1 text-3xl font-black sm:text-4xl">{summary?.latestName ?? 'Player history'}</h1><p className="text-muted mt-2 break-all font-mono text-sm">{playerId}</p></header>
+    <header><div className="eyebrow">All-time player history</div><div className="mt-1 flex items-center gap-3"><h1 className="text-3xl font-black sm:text-4xl">{summary?.latestName ?? 'Player history'}</h1>{identityKind === 'name' && <span className="text-fennec-orange text-xs font-black tracking-wider">BOT</span>}</div><p className="text-muted mt-2 break-all font-mono text-sm">{identityKind === 'name' ? 'Name-based identity' : summary?.primaryId ?? playerPrimaryId(playerKey)}</p></header>
     {summary && <section className="surface grid grid-cols-2 gap-4 rounded-3xl p-5 sm:grid-cols-4 sm:p-7">{[
       ['Together', summary.gamesTogether], ['Record together', `${summary.winsTogether}–${summary.lossesTogether}`], ['Opposed', summary.gamesOpposed], ['Record against', `${summary.winsAgainst}–${summary.lossesAgainst}`],
     ].map(([label, value]) => <div key={label}><div className="eyebrow">{label}</div><div className="mt-1 text-2xl font-extrabold">{value}</div></div>)}</section>}

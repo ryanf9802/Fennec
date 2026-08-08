@@ -1,4 +1,5 @@
 import { resolvePlaylist } from './playlists';
+import { isTrackablePrimaryId, normalizePlayerName } from './playerIdentity';
 import type { MatchState, ParticipantState, StatsEnvelope, TeamState, TimelineEvent } from './types';
 
 export interface ReduceResult {
@@ -93,9 +94,10 @@ function playerReference(value: unknown) {
 function mergeParticipants(previous: ParticipantState[], current: ParticipantState[]): ParticipantState[] {
   const merged: ParticipantState[] = previous.map((value) => ({ ...value, isPresent: false }));
   for (const value of current) {
-    let index = value.primaryId ? merged.findIndex((candidate) => candidate.primaryId === value.primaryId) : -1;
+    let index = isTrackablePrimaryId(value.primaryId) ? merged.findIndex((candidate) => candidate.primaryId === value.primaryId) : -1;
     if (index < 0 && value.shortcut !== undefined) index = merged.findIndex((candidate) => candidate.shortcut === value.shortcut);
-    if (index < 0) index = merged.findIndex((candidate) => candidate.teamNumber === value.teamNumber && candidate.name === value.name);
+    const normalizedName = normalizePlayerName(value.name);
+    if (index < 0 && normalizedName) index = merged.findIndex((candidate) => candidate.teamNumber === value.teamNumber && normalizePlayerName(candidate.name) === normalizedName);
     if (index < 0) merged.push(value);
     else merged[index] = { ...merged[index], ...value, isPresent: true };
   }
@@ -218,8 +220,13 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
     else if (envelope.event === 'MatchUnpaused') match.isPaused = false;
     else if (envelope.event === 'PlayerLeft') {
       const primaryId = stringValue(envelope.data.PrimaryId);
+      const shortcut = optionalNumber(envelope.data.Shortcut);
+      const teamNumber = optionalNumber(envelope.data.TeamNum);
       const playerName = stringValue(envelope.data.PlayerName);
-      const leaving = match.participants.find((value) => primaryId ? value.primaryId === primaryId : value.name === playerName);
+      const normalizedName = normalizePlayerName(playerName);
+      let leaving = isTrackablePrimaryId(primaryId) ? match.participants.find((value) => value.primaryId === primaryId) : undefined;
+      if (!leaving && shortcut !== undefined) leaving = match.participants.find((value) => value.shortcut === shortcut);
+      if (!leaving && normalizedName) leaving = match.participants.find((value) => normalizePlayerName(value.name) === normalizedName && (teamNumber === undefined || value.teamNumber === teamNumber));
       if (leaving) leaving.isPresent = false;
     }
     match.events = [...match.events, storeEvent(match, envelope, now)];

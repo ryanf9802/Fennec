@@ -1,18 +1,23 @@
 import type { EncounterSummary, MatchState } from './types';
+import { normalizePlayerKey, playerIdentityKind, playerKeyFor, playerPrimaryId } from './playerIdentity';
 
 type Accumulator = EncounterSummary;
 
 export function calculateEncounters(matches: MatchState[], profilePrimaryId?: string): EncounterSummary[] {
-  if (!profilePrimaryId) return [];
+  const profileKey = normalizePlayerKey(profilePrimaryId);
+  if (!profileKey) return [];
   const values = new Map<string, Accumulator>();
   for (const match of [...matches].sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
-    const profile = match.participants.find((player) => player.primaryId === profilePrimaryId);
+    const profile = match.participants.find((player) => playerKeyFor(player) === profileKey);
     if (!profile) continue;
     const profileWon = match.lifecycle === 'completed' && match.winnerTeamNumber === profile.teamNumber;
     for (const player of match.participants) {
-      if (!player.primaryId || player.primaryId === profilePrimaryId) continue;
-      const current = values.get(player.primaryId) ?? {
-        primaryId: player.primaryId,
+      const playerKey = playerKeyFor(player);
+      if (!playerKey || playerKey === profileKey) continue;
+      const current = values.get(playerKey) ?? {
+        playerKey,
+        primaryId: playerPrimaryId(playerKey),
+        identityKind: playerIdentityKind(playerKey)!,
         latestName: player.name,
         gamesTogether: 0,
         winsTogether: 0,
@@ -38,7 +43,7 @@ export function calculateEncounters(matches: MatchState[], profilePrimaryId?: st
           else current.lossesAgainst++;
         }
       }
-      values.set(player.primaryId, current);
+      values.set(playerKey, current);
     }
   }
   return [...values.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen));

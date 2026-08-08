@@ -29,7 +29,7 @@ describe('version 2 database migration', () => {
   it('atomically builds normalized history and searchable relationships', async () => {
     await historyRepository.initialize();
     const migrated = await historyRepository.getMatch('legacy');
-    const playerHistory = await historyRepository.getPlayerHistory('Steam|migration-you|0', 'Epic|migration-other|0');
+    const playerHistory = await historyRepository.getPlayerHistory('id:Steam|migration-you|0', 'id:Epic|migration-other|0');
 
     expect(migrated?.participants).toHaveLength(2);
     expect(migrated?.events[0]?.payload.DebugOnly).toBeUndefined();

@@ -10,7 +10,7 @@ export const historyKeys = {
   session: (id?: string) => ['history', 'session', id] as const,
   match: (id?: string) => ['history', 'match', id] as const,
   players: (query = '') => ['history', 'players', query] as const,
-  playerHistory: (profileId?: string, playerId?: string, filters?: Omit<MatchHistoryQuery, 'profileId' | 'playerId' | 'cursor'>) => ['history', 'player', profileId, playerId, filters] as const,
+  playerHistory: (profileKey?: string, playerKey?: string, filters?: Omit<MatchHistoryQuery, 'profileKey' | 'playerKey' | 'cursor'>) => ['history', 'player', profileKey, playerKey, filters] as const,
   overview: ['history', 'overview'] as const,
   catalog: ['history', 'catalog'] as const,
   storage: ['history', 'storage'] as const,
@@ -44,13 +44,13 @@ export function useOverview() {
   } });
 }
 
-export function usePlayerHistory(profileId?: string, playerId?: string, filters: Omit<MatchHistoryQuery, 'profileId' | 'playerId' | 'cursor'> = {}) {
+export function usePlayerHistory(profileKey?: string, playerKey?: string, filters: Omit<MatchHistoryQuery, 'profileKey' | 'playerKey' | 'cursor'> = {}) {
   return useInfiniteQuery({
-    queryKey: historyKeys.playerHistory(profileId, playerId, filters),
+    queryKey: historyKeys.playerHistory(profileKey, playerKey, filters),
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => historyRepository.getPlayerHistory(profileId!, playerId!, { ...filters, cursor: pageParam }),
+    queryFn: ({ pageParam }) => historyRepository.getPlayerHistory(profileKey!, playerKey!, { ...filters, cursor: pageParam }),
     getNextPageParam: (page) => page.matches.nextCursor,
-    enabled: !!profileId && !!playerId && profileId !== playerId,
+    enabled: !!profileKey && !!playerKey && profileKey !== playerKey,
   });
 }
 

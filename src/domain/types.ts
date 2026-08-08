@@ -106,7 +106,9 @@ export interface SessionGroup {
 }
 
 export interface EncounterSummary {
-  primaryId: string;
+  playerKey: string;
+  primaryId?: string;
+  identityKind: 'platform' | 'name';
   latestName: string;
   gamesTogether: number;
   winsTogether: number;

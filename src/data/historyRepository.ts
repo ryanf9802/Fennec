@@ -1,11 +1,12 @@
+import type { PlayerIdentityKind } from '../domain/playerIdentity';
 import type { EncounterSummary, FennecProfile, FennecSettings, MatchState, SessionGroup } from '../domain/types';
 
 export type MatchResultFilter = 'win' | 'loss' | 'incomplete';
 export type RelationshipFilter = 'together' | 'against';
 
 export interface MatchHistoryQuery {
-  playerId?: string;
-  profileId?: string;
+  playerKey?: string;
+  profileKey?: string;
   from?: string;
   to?: string;
   playlistId?: number;
@@ -22,7 +23,9 @@ export interface HistoryPage<T> {
 }
 
 export interface PlayerRecord {
-  primaryId: string;
+  playerKey: string;
+  primaryId?: string;
+  identityKind: PlayerIdentityKind;
   latestName: string;
   normalizedName: string;
   firstSeen: string;
@@ -56,7 +59,7 @@ export interface HistoryRepository {
   getMatch(id: string): Promise<MatchState | undefined>;
   loadLiveMatches(): Promise<MatchState[]>;
   searchPlayers(query?: string, limit?: number): Promise<PlayerRecord[]>;
-  getPlayerHistory(profileId: string, playerId: string, query?: Omit<MatchHistoryQuery, 'profileId' | 'playerId'>): Promise<PlayerHistoryResult>;
+  getPlayerHistory(profileKey: string, playerKey: string, query?: Omit<MatchHistoryQuery, 'profileKey' | 'playerKey'>): Promise<PlayerHistoryResult>;
   getTimelineCatalog(): Promise<Record<string, string[]>>;
   iterateMatches(pageSize?: number): AsyncIterable<MatchState>;
   saveMatch(match: MatchState, sessionGapMinutes: number): Promise<void>;

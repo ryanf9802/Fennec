@@ -23,12 +23,12 @@ describe('25,000-match local archive', () => {
     await historyRepository.initialize();
     expect(await historyRepository.countMatches()).toBe(25_000);
 
-    const first = await historyRepository.getPlayerHistory('Steam|scale-you|0', 'Epic|scale-rival|0', { limit: 50 });
+    const first = await historyRepository.getPlayerHistory('id:Steam|scale-you|0', 'id:Epic|scale-rival|0', { limit: 50 });
     expect(first.summary).toMatchObject({ gamesOpposed: 25_000, winsAgainst: 12_500, lossesAgainst: 12_500 });
     expect(first.matches.items).toHaveLength(50);
     expect(first.matches.nextCursor).toBeTruthy();
 
-    const second = await historyRepository.getPlayerHistory('Steam|scale-you|0', 'Epic|scale-rival|0', { limit: 50, cursor: first.matches.nextCursor });
+    const second = await historyRepository.getPlayerHistory('id:Steam|scale-you|0', 'id:Epic|scale-rival|0', { limit: 50, cursor: first.matches.nextCursor });
     expect(second.matches.items).toHaveLength(50);
     expect(new Set([...first.matches.items, ...second.matches.items].map((item) => item.id)).size).toBe(100);
   }, 30_000);
