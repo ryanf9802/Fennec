@@ -134,6 +134,8 @@ describe('Stats API domain', () => {
       event(value.id, 4, 'GoalScored', { Scorer: { Name: 'Samara' }, Assister: { Name: 'Caveman' }, GoalSpeed: 49.7 }),
       event(value.id, 5, 'StatfeedEvent', { Type: 'Goal', MainTarget: { Name: 'Samara' } }),
       event(value.id, 6, 'PlayerLeft', { PlayerName: 'Saltie' }, 65),
+      event(value.id, 7, 'GoalReplayStart', {}, 65),
+      event(value.id, 8, 'GoalReplayEnd', {}, 65),
     ];
 
     const items = timelineDisplayItems(value, defaultSettings);
@@ -144,6 +146,7 @@ describe('Stats API domain', () => {
       'Saltie joined',
     ]);
     expect(items[0]?.parts[0]?.player?.teamNumber).toBe(1);
+    expect(timelineDisplayItems(value, { ...defaultSettings, timelinePreset: 'everything' }).slice(0, 2).map((item) => item.parts[0]?.text)).toEqual(['Goal Replay End', 'Goal Replay Start']);
   });
 
   it('hides kickoff noise only from curated timelines and preserves technical details elsewhere', () => {

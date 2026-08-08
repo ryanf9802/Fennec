@@ -1,4 +1,4 @@
-import { ArrowLeft, Radio, Trophy } from 'lucide-react';
+import { ArrowLeft, History, Radio, Trophy } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { PlayerName } from '../components/PlayerName';
@@ -24,7 +24,7 @@ function PlayerRow({ player, profileId, onInspect }: { player: ParticipantState;
   return <tr className="border-t border-ui text-center text-sm">
     <th scope="row" className="scoreboard-player-cell px-3 py-3 text-left">
       {inspectable
-        ? <button className="hover:text-fennec-cyan max-w-full cursor-pointer text-left" onClick={() => onInspect(player)}><PlayerName name={player.name} teamNumber={player.teamNumber} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</button>
+        ? <button aria-label={`View history with ${player.name}`} title={`View history with ${player.name}`} className="hover-surface group/player -mx-2 inline-flex w-[calc(100%+1rem)] cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 text-left hover:text-fennec-cyan" onClick={() => onInspect(player)}><span className="min-w-0"><PlayerName name={player.name} teamNumber={player.teamNumber} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</span><History aria-hidden="true" className="text-muted size-3.5 shrink-0 group-hover/player:text-fennec-cyan" /></button>
         : <><PlayerName name={player.name} teamNumber={player.teamNumber} you={player.primaryId === profileId} />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</>}
     </th>
     {stats.map(({ key }) => <td key={key} className={`px-2 py-3 ${key === 'score' ? 'font-bold' : ''}`}>{player[key] ?? 0}</td>)}
@@ -49,7 +49,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
     </header>
     <div className="grid min-w-0 gap-6 xl:min-h-0 xl:grid-cols-[minmax(0,3fr)_minmax(22rem,2fr)]">
       <section className="scoreboard-container min-w-0 xl:min-h-0 xl:overflow-y-auto">
-        <h2 className="mb-4 text-xl font-extrabold">Scoreboard</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-extrabold">Scoreboard</h2>{profile ? <span className="text-muted inline-flex items-center gap-1.5 text-xs font-bold"><History className="size-3.5" />Select another player for history</span> : <Link to="/profile" className="text-fennec-cyan text-xs font-bold hover:underline">Choose your profile to compare players</Link>}</div>
         <div className="overflow-x-auto rounded-2xl"><table className="scoreboard-table surface-flat w-full min-w-[50rem] overflow-hidden rounded-2xl">
           <colgroup><col className="w-[28%]" />{stats.map(({ key }) => <col key={key} className="w-[9%]" />)}</colgroup>
           <thead className="eyebrow"><tr><th scope="col" className="scoreboard-player-cell px-3 py-3 text-left">Player</th>{stats.map(({ key, full, short }) => <th key={key} scope="col" className="px-2 py-3 text-center"><span className="stat-label-full">{full}</span><abbr title={full} className="stat-label-short no-underline">{short}</abbr></th>)}</tr></thead>
