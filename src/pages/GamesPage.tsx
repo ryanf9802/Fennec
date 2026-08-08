@@ -197,6 +197,7 @@ export function GamesPage() {
                   focusedSession.matches,
                   profile?.primaryId,
                 )}
+                abbreviateGoalsForAgainst
               />
             </div>
             <div className="space-y-2">
@@ -262,7 +263,11 @@ export function GamesPage() {
                     <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                   </div>
                   <div className="mt-4">
-                    <MetricsGrid metrics={metrics} compact />
+                    <MetricsGrid
+                      metrics={metrics}
+                      compact
+                      abbreviateGoalsForAgainst
+                    />
                   </div>
                 </Link>
               );

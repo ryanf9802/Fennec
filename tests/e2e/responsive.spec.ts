@@ -247,6 +247,26 @@ test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
   await expect(page.getByText(/Select your profile/)).toHaveCount(0);
 });
 
+test('dashboard abbreviates GFA while session detail uses the full label', async ({
+  page,
+}) => {
+  await page.goto('/?demo=1');
+  const history = page.locator('section').filter({
+    has: page.getByRole('heading', { name: 'Past sessions' }),
+  });
+  await expect(history.getByText('GFA', { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText('Goals for / against', { exact: true }),
+  ).toHaveCount(0);
+
+  await history.locator('a[href^="/sessions/"]').first().click();
+
+  await expect(
+    page.getByText('Goals for / against', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('GFA', { exact: true })).toHaveCount(0);
+});
+
 test('primary pages use the same full content width', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?demo=1');

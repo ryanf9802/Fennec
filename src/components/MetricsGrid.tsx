@@ -3,9 +3,11 @@ import type { SessionMetrics } from '../domain/types';
 export function MetricsGrid({
   metrics,
   compact = false,
+  abbreviateGoalsForAgainst = false,
 }: {
   metrics: SessionMetrics;
   compact?: boolean;
+  abbreviateGoalsForAgainst?: boolean;
 }) {
   const values = [
     ['Record', metrics.record],
@@ -18,7 +20,10 @@ export function MetricsGrid({
         ? `+${metrics.goalDifference}`
         : metrics.goalDifference,
     ],
-    ['Goals for / against', `${metrics.goalsFor}–${metrics.goalsAgainst}`],
+    [
+      abbreviateGoalsForAgainst ? 'GFA' : 'Goals for / against',
+      `${metrics.goalsFor}–${metrics.goalsAgainst}`,
+    ],
     ['Goals', metrics.goals],
     ['Assists', metrics.assists],
     ['Saves', metrics.saves],
