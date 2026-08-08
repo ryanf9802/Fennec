@@ -14,11 +14,13 @@ public sealed partial class GamesPage : UserControl
     private IReadOnlyList<SessionGroup> _sessions = [];
     private readonly DispatcherTimer _sessionTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _refreshing;
+    private bool _initialized;
 
     public GamesPage(AppRuntime runtime, Action<MatchState> openMatch, Action<SessionGroup> openSession)
     {
         _runtime = runtime; _openMatch = openMatch; _openSession = openSession;
         InitializeComponent();
+        _initialized = true;
         _runtime.Changed += Runtime_Changed;
         _sessionTimer.Tick += (_, _) => Refresh();
         _sessionTimer.Start();
@@ -108,8 +110,8 @@ public sealed partial class GamesPage : UserControl
             match.Participants.Any(item => item.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
     }
 
-    private void HistorySearch_TextChanged(object sender, TextChangedEventArgs e) => Refresh();
-    private void HistoryFilter_Changed(object sender, SelectionChangedEventArgs e) => Refresh();
+    private void HistorySearch_TextChanged(object sender, TextChangedEventArgs e) { if (_initialized) Refresh(); }
+    private void HistoryFilter_Changed(object sender, SelectionChangedEventArgs e) { if (_initialized) Refresh(); }
 
     private void LiveButton_Click(object sender, RoutedEventArgs e)
     {

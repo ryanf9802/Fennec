@@ -112,7 +112,8 @@ public sealed class TrayIconService : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct Point { public int X; public int Y; }
     private delegate nint SubclassProcedure(nint window, uint message, nuint wParam, nint lParam, nuint id, nuint data);
 
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern bool ShellNotifyIcon(uint message, ref NotifyIconData data);
+    [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconW", CharSet = CharSet.Unicode)]
+    private static extern bool ShellNotifyIcon(uint message, ref NotifyIconData data);
     [DllImport("user32.dll")] private static extern nint LoadIcon(nint instance, nint iconName);
     [DllImport("comctl32.dll")] private static extern bool SetWindowSubclass(nint window, SubclassProcedure procedure, nuint id, nuint data);
     [DllImport("comctl32.dll")] private static extern bool RemoveWindowSubclass(nint window, SubclassProcedure procedure, nuint id);

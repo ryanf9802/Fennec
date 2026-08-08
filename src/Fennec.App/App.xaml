@@ -5,6 +5,9 @@
     RequestedTheme="Dark">
     <Application.Resources>
         <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
             <Color x:Key="FennecNavy">#0B111D</Color>
             <Color x:Key="FennecSurface">#131C2A</Color>
             <Color x:Key="FennecCyan">#65D9EE</Color>

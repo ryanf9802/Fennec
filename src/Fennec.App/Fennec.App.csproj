@@ -31,4 +31,13 @@
     <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\scripts\Run-Fennec-Dev.cmd" Link="Run-Fennec-Dev.cmd" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="CopyCompiledXamlToPublishDirectory" AfterTargets="Publish">
+    <ItemGroup>
+      <_CompiledXaml Include="$(TargetDir)**\*.xbf" />
+    </ItemGroup>
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).pri" DestinationFolder="$(PublishDir)"
+          Condition="Exists('$(TargetDir)$(AssemblyName).pri')" />
+    <Copy SourceFiles="@(_CompiledXaml)"
+          DestinationFiles="@(_CompiledXaml->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
 </Project>

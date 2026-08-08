@@ -2,6 +2,7 @@
 setlocal
 title Fennec Developer Console
 cd /d "%~dp0"
+set "FENNEC_DEV_MODE=1"
 
 echo Starting Fennec in developer mode...
 echo Keep this window open while Fennec is running.

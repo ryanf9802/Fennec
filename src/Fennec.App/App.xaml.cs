@@ -22,7 +22,10 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        var options = AppLaunchOptions.Parse(args.Arguments, Environment.GetEnvironmentVariable("FENNEC_DEV_MODE"));
+        var processArguments = string.Join(' ', Environment.GetCommandLineArgs().Skip(1));
+        var options = AppLaunchOptions.Parse(
+            $"{args.Arguments} {processArguments}",
+            Environment.GetEnvironmentVariable("FENNEC_DEV_MODE"));
 #if DEBUG
         Console.WriteLine($"[Fennec] Launching; developerMode={options.DeveloperMode}, startHidden={options.StartHidden}");
 #endif
