@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { MatchPage } from '../src/pages/MatchPage';
-import { PlayerHistoryPage } from '../src/pages/PlayerHistoryPage';
 import { ProfilePage } from '../src/pages/ProfilePage';
 import { defaultSettings, type MatchState } from '../src/domain/types';
 
@@ -45,28 +44,37 @@ function LocationProbe() {
   return <div data-testid="location">{useLocation().pathname}</div>;
 }
 
-describe('bot player history UI', () => {
-  it('labels bots on the scoreboard and opens their name-based history', () => {
-    render(<MemoryRouter initialEntries={['/matches/bots']}><Routes>
-      <Route path="/matches/:matchId" element={<><MatchPage match={botMatch} /><LocationProbe /></>} />
-      <Route path="/players/:playerId" element={<LocationProbe />} />
-    </Routes></MemoryRouter>);
+describe('player profile UI', () => {
+  it('opens a player profile over the match without changing location', () => {
+    render(<MemoryRouter initialEntries={['/matches/bots']}><MatchPage match={botMatch} /><LocationProbe /></MemoryRouter>);
 
     expect(screen.getByText('BOT')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'View history with Boomer' }));
-    expect(screen.getByTestId('location')).toHaveTextContent('/players/name%3Aboomer');
-  });
-
-  it('describes a bot history as name-based instead of showing a fake ID', () => {
-    render(<MemoryRouter initialEntries={['/players/name%3Aboomer']}><Routes>
-      <Route path="/players/:playerId" element={<PlayerHistoryPage />} />
-    </Routes></MemoryRouter>);
-
+    fireEvent.click(screen.getByRole('button', { name: 'View profile for Boomer' }));
+    expect(screen.getByRole('dialog', { name: 'Boomer' })).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/matches/bots');
     expect(screen.getByRole('heading', { name: 'Boomer' })).toBeInTheDocument();
     expect(screen.queryByText('All-time player history')).not.toBeInTheDocument();
     expect(screen.getByText('Name-based identity')).toBeInTheDocument();
-    expect(screen.getByText('BOT')).toBeInTheDocument();
     expect(screen.queryByText('Unknown|0|0')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close player profile' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/matches/bots');
+  });
+
+  it('keeps match filters collapsed until requested', () => {
+    render(<MemoryRouter><MatchPage match={botMatch} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'View profile for Boomer' }));
+
+    const filters = screen.getByRole('button', { name: 'Filters' });
+    expect(filters).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByLabelText('Relationship')).not.toBeInTheDocument();
+    fireEvent.click(filters);
+    expect(filters).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Relationship')).toBeInTheDocument();
+    fireEvent.click(filters);
+    expect(filters).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByLabelText('Relationship')).not.toBeInTheDocument();
   });
 
   it('does not offer bots as the selected user profile', () => {

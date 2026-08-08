@@ -21,12 +21,12 @@ function Roster({ match, profileId }: { match: MatchState; profileId?: string })
   })}</div>;
 }
 
-export function MatchRow({ match, profileId }: { match: MatchState; profileId?: string }) {
+export function MatchRow({ match, profileId, onNavigate }: { match: MatchState; profileId?: string; onNavigate?(): void }) {
   const profile = match.participants.find((item) => item.primaryId === profileId);
   const teams = [...match.teams].sort((a, b) => a.teamNumber - b.teamNumber);
   const score = teams.length >= 2 ? `${teams[0]!.score} – ${teams.at(-1)!.score}` : '—';
   const result = match.lifecycle === 'live' ? 'LIVE' : match.lifecycle === 'incomplete' ? 'INCOMPLETE' : !profile ? '—' : isWin(match, profileId) ? 'WIN' : 'LOSS';
-  return <Link to={match.lifecycle === 'live' ? '/live' : `/matches/${match.id}`} className="surface-flat hover-surface group grid min-w-0 gap-3 rounded-2xl p-4 transition sm:grid-cols-[7rem_1fr_auto] sm:items-center">
+  return <Link to={match.lifecycle === 'live' ? '/live' : `/matches/${match.id}`} onClick={onNavigate} className="surface-flat hover-surface group grid min-w-0 gap-3 rounded-2xl p-4 transition sm:grid-cols-[7rem_1fr_auto] sm:items-center">
     <div className="flex items-center gap-3">
       <span className={`rounded-full px-2.5 py-1 text-[0.68rem] font-black tracking-wider ${result === 'WIN' || result === 'LIVE' ? 'bg-cyan-400/15 text-fennec-cyan' : result === 'LOSS' ? 'bg-orange-400/15 text-fennec-orange' : 'surface-strong text-muted'}`}>
         {result === 'LIVE' && <Radio className="mr-1 inline size-3" />}{result}

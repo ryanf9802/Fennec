@@ -7,7 +7,6 @@ import { OnboardingPage } from '../pages/OnboardingPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { SessionPage } from '../pages/SessionPage';
 import { SettingsPage } from '../pages/SettingsPage';
-import { PlayerHistoryPage } from '../pages/PlayerHistoryPage';
 import { useFennec } from './FennecContext';
 
 export function App() {
@@ -29,7 +28,6 @@ export function App() {
       <Route path="/live" element={activeMatch ? <MatchPage match={activeMatch} /> : <Navigate to="/" replace />} />
       <Route path="/matches/:matchId" element={<MatchPage />} />
       <Route path="/sessions/:sessionId" element={<SessionPage />} />
-      <Route path="/players/:playerId" element={<PlayerHistoryPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
