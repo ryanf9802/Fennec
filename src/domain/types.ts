@@ -68,6 +68,7 @@ export interface TimelineEvent {
   eventName: string;
   receivedAt: string;
   matchClockSeconds?: number;
+  elapsedSeconds?: number;
   payload: Record<string, unknown>;
   rawPayloadAvailable?: boolean;
 }
@@ -84,6 +85,8 @@ export interface MatchState {
   playlistCategory: PlaylistCategory;
   arena: string;
   timeSeconds: number;
+  regulationDurationSeconds?: number;
+  elapsedSeconds?: number;
   isOvertime: boolean;
   isReplay: boolean;
   roundActive?: boolean;

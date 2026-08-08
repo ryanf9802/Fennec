@@ -5,6 +5,7 @@ import { useFennec } from '../app/FennecContext';
 import { PlayerName } from '../components/PlayerName';
 import { PlayerProfileDialog } from '../components/PlayerProfileDialog';
 import { Timeline } from '../components/Timeline';
+import { formatClock, matchElapsedSeconds } from '../domain/timeline';
 import { MatchAnalytics } from '../components/MatchAnalytics';
 import {
   playerIdentityKind,
@@ -197,9 +198,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
             {formatTeamScore(match.teams, preferredTeamNumber)}
           </div>
           <div className="text-fennec-orange mt-1 font-bold">
-            {match.isOvertime ? 'OVERTIME · ' : ''}
-            {Math.floor(match.timeSeconds / 60)}:
-            {String(match.timeSeconds % 60).padStart(2, '0')}
+            {formatClock(matchElapsedSeconds(match))}
           </div>
         </div>
       </header>

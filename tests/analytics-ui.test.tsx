@@ -13,6 +13,8 @@ const match: MatchState = {
   playlistCategory: 'ranked',
   arena: 'Stadium_P',
   timeSeconds: 0,
+  regulationDurationSeconds: 300,
+  elapsedSeconds: 300,
   isOvertime: false,
   isReplay: false,
   teams: [],
@@ -52,6 +54,7 @@ const match: MatchState = {
       eventName: 'BallHit',
       receivedAt: '2026-08-08T00:01:00Z',
       matchClockSeconds: 240,
+      elapsedSeconds: 60,
       payload: {
         Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
         Ball: {
@@ -68,6 +71,7 @@ const match: MatchState = {
       eventName: 'BallHit',
       receivedAt: '2026-08-08T00:02:00Z',
       matchClockSeconds: 180,
+      elapsedSeconds: 120,
       payload: {
         Players: [{ Name: 'Them', Shortcut: 2, TeamNum: 1 }],
         Ball: {
@@ -96,6 +100,7 @@ describe('ball touch map', () => {
     ).toBeInTheDocument();
 
     const selectedTouch = screen.getByRole('button', { name: /Me, touch/ });
+    expect(selectedTouch).toHaveAccessibleName(/touch at 1:00/);
     const marker = selectedTouch.querySelector('circle');
     expect(Number(marker?.getAttribute('cx'))).toBeCloseTo(301.09, 1);
     expect(Number(marker?.getAttribute('cy'))).toBeCloseTo(149.66, 1);
@@ -107,5 +112,8 @@ describe('ball touch map', () => {
     expect(
       screen.getByRole('button', { name: /Them, touch/ }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Them, touch/ }),
+    ).toHaveAccessibleName(/touch at 2:00/);
   });
 });

@@ -49,6 +49,7 @@ function event(
     eventName: 'GoalScored',
     receivedAt,
     matchClockSeconds: 180,
+    elapsedSeconds: 120,
     payload: { Scorer: { Name: scorer }, GoalSpeed: 98.6 + sequence },
   };
 }
@@ -75,6 +76,8 @@ function demoMatch(
     playlistCategory: 'ranked',
     arena: 'DFH Stadium',
     timeSeconds: 0,
+    regulationDurationSeconds: 300,
+    elapsedSeconds: 300,
     isOvertime: false,
     isReplay: false,
     winnerTeamNumber: won ? youTeam : 1,
@@ -115,6 +118,7 @@ function demoMatch(
         eventName: 'BallHit',
         receivedAt: new Date(startedAt.getTime() + 60_000).toISOString(),
         matchClockSeconds: 240,
+        elapsedSeconds: 60,
         payload: {
           Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }],
           Ball: {
@@ -137,6 +141,7 @@ function demoMatch(
         eventName: 'MatchEnded',
         receivedAt: endedAt,
         matchClockSeconds: 0,
+        elapsedSeconds: 300,
         payload: { WinnerTeamNum: won ? 0 : 1 },
       },
     ],

@@ -47,6 +47,7 @@ function createMatch(guid: string | undefined, now: string): MatchState {
     playlistCategory: 'unknown',
     arena: '',
     timeSeconds: 0,
+    elapsedSeconds: 0,
     isOvertime: false,
     isReplay: false,
     roundActive: false,
@@ -192,8 +193,40 @@ function storeEvent(
     eventName: envelope.event,
     receivedAt: now,
     matchClockSeconds: match.timeSeconds,
+    elapsedSeconds: match.elapsedSeconds ?? 0,
     payload: structuredClone(envelope.data),
   };
+}
+
+/**
+ * Converts the exported game clock into continuous time played. Regulation
+ * length is inferred from the highest observed countdown so private-match time
+ * mutators do not need playlist-specific defaults.
+ */
+function updateMatchClock(
+  match: MatchState,
+  timeSeconds: number,
+  isOvertime: boolean,
+): void {
+  const clock = Math.max(0, Math.trunc(timeSeconds));
+  match.timeSeconds = clock;
+  match.isOvertime = isOvertime;
+  if (isOvertime) {
+    match.elapsedSeconds =
+      match.regulationDurationSeconds === undefined
+        ? clock
+        : match.regulationDurationSeconds + clock;
+    return;
+  }
+  if (clock > 0)
+    match.regulationDurationSeconds = Math.max(
+      match.regulationDurationSeconds ?? 0,
+      clock,
+    );
+  match.elapsedSeconds = Math.max(
+    0,
+    (match.regulationDurationSeconds ?? clock) - clock,
+  );
 }
 
 /**
@@ -248,8 +281,9 @@ export function reduceStatsEnvelope(
       const playlist = resolvePlaylist(match.playlistId);
       match.playlistName = playlist.name;
       match.playlistCategory = playlist.category;
-      match.timeSeconds = numberValue(gameRecord.TimeSeconds);
-      match.isOvertime = gameRecord.bOvertime === true;
+      const timeSeconds = optionalNumber(gameRecord.TimeSeconds);
+      if (timeSeconds !== undefined)
+        updateMatchClock(match, timeSeconds, gameRecord.bOvertime === true);
       match.isReplay = gameRecord.bReplay === true;
       match.hasWinner = gameRecord.bHasWinner === true;
       match.winnerName = stringValue(gameRecord.Winner);
@@ -271,8 +305,11 @@ export function reduceStatsEnvelope(
     if (!match.roundPhaseObserved && !match.isReplay) match.roundActive = true;
     accumulateSnapshot(match);
   } else if (envelope.event === 'ClockUpdatedSeconds') {
-    match.timeSeconds = numberValue(envelope.data.TimeSeconds);
-    match.isOvertime = envelope.data.bOvertime === true;
+    updateMatchClock(
+      match,
+      numberValue(envelope.data.TimeSeconds),
+      envelope.data.bOvertime === true,
+    );
     match.events = [...match.events, storeEvent(match, envelope, now)];
   } else if (envelope.event === 'MatchEnded') {
     const winner = envelope.data.WinnerTeamNum;

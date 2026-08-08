@@ -16,7 +16,7 @@ export interface SpatialEventPoint {
   x: number;
   y: number;
   z: number;
-  matchClockSeconds?: number;
+  elapsedSeconds?: number;
   actors: SpatialActor[];
   preHitSpeed?: number;
   postHitSpeed?: number;
@@ -116,7 +116,7 @@ function eventPoint(
       id: event.id,
       kind: 'touch',
       ...location,
-      matchClockSeconds: event.matchClockSeconds,
+      elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
       actors: players
         .map((value) => actor(match, value))
         .filter((value): value is SpatialActor => !!value),
@@ -132,7 +132,7 @@ function eventPoint(
       id: event.id,
       kind: 'goal',
       ...location,
-      matchClockSeconds: event.matchClockSeconds,
+      elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
       actors: scorer ? [scorer] : [],
       speed: finite(event.payload.GoalSpeed),
     };
@@ -146,7 +146,7 @@ function eventPoint(
       id: event.id,
       kind: 'crossbar',
       ...location,
-      matchClockSeconds: event.matchClockSeconds,
+      elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
       actors: player ? [player] : [],
       speed: finite(event.payload.BallSpeed),
     };

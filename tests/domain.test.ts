@@ -6,7 +6,11 @@ import {
 } from '../src/domain/playerHistory';
 import { reduceStatsEnvelope, recoverActiveMatch } from '../src/domain/reducer';
 import { groupSessions } from '../src/domain/sessions';
-import { timelineCatalog, timelineDisplayItems } from '../src/domain/timeline';
+import {
+  formatClock,
+  timelineCatalog,
+  timelineDisplayItems,
+} from '../src/domain/timeline';
 import {
   observedBallSpeed,
   playerTouchAnalytics,
@@ -144,6 +148,118 @@ describe('Stats API domain', () => {
       '2026-08-08T00:00:01Z',
     ).current;
     expect(goal.events[0]?.payload.GoalSpeed).toBe(123.4);
+  });
+
+  it('captures continuous elapsed event times across regulation and overtime', () => {
+    let value = reduceStatsEnvelope(undefined, {
+      event: 'PlayerJoined',
+      data: { MatchGuid: 'clock', PlayerName: 'Early' },
+    }).current;
+    expect(value.events[0]?.elapsedSeconds).toBe(0);
+
+    value = reduceStatsEnvelope(value, {
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'clock',
+        Game: { PlaylistId: 6, TimeSeconds: 600, bOvertime: false },
+      },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'ClockUpdatedSeconds',
+      data: { MatchGuid: 'clock', TimeSeconds: 519, bOvertime: false },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'StatfeedEvent',
+      data: {
+        MatchGuid: 'clock',
+        Type: 'Save',
+        MainTarget: { Name: 'Early' },
+      },
+    }).current;
+    expect(value.regulationDurationSeconds).toBe(600);
+    expect(value.elapsedSeconds).toBe(81);
+    expect(value.events.at(-1)?.elapsedSeconds).toBe(81);
+
+    value = reduceStatsEnvelope(value, {
+      event: 'ClockUpdatedSeconds',
+      data: { MatchGuid: 'clock', TimeSeconds: 0, bOvertime: false },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'ClockUpdatedSeconds',
+      data: { MatchGuid: 'clock', TimeSeconds: 135, bOvertime: true },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'MatchEnded',
+      data: { MatchGuid: 'clock', WinnerTeamNum: 0 },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'PlayerLeft',
+      data: { MatchGuid: 'clock', PlayerName: 'Early' },
+    }).current;
+
+    expect(value.elapsedSeconds).toBe(735);
+    expect(value.events.at(-2)?.elapsedSeconds).toBe(735);
+    expect(value.events.at(-1)?.elapsedSeconds).toBe(735);
+    expect(formatClock(value.elapsedSeconds)).toBe('12:15');
+  });
+
+  it('converts the regulation countdown to time played', () => {
+    let value = reduceStatsEnvelope(undefined, {
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'standard',
+        Game: { TimeSeconds: 300, bOvertime: false },
+      },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'ClockUpdatedSeconds',
+      data: { MatchGuid: 'standard', TimeSeconds: 99, bOvertime: false },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'GoalScored',
+      data: {
+        MatchGuid: 'standard',
+        Scorer: { Name: 'Me' },
+        GoalSpeed: 100,
+      },
+    }).current;
+    expect(formatClock(value.events.at(-1)?.elapsedSeconds)).toBe('3:21');
+
+    value = reduceStatsEnvelope(value, {
+      event: 'ClockUpdatedSeconds',
+      data: { MatchGuid: 'standard', TimeSeconds: 0, bOvertime: false },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'MatchEnded',
+      data: { MatchGuid: 'standard', WinnerTeamNum: 0 },
+    }).current;
+    expect(value.elapsedSeconds).toBe(300);
+    expect(value.events.at(-1)?.elapsedSeconds).toBe(300);
+  });
+
+  it('freezes an early-ended match at its actual elapsed duration', () => {
+    let value = reduceStatsEnvelope(undefined, {
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'forfeit',
+        Game: { TimeSeconds: 300, bOvertime: false },
+      },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'ClockUpdatedSeconds',
+      data: { MatchGuid: 'forfeit', TimeSeconds: 120, bOvertime: false },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'MatchEnded',
+      data: { MatchGuid: 'forfeit', WinnerTeamNum: 0 },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'PlayerLeft',
+      data: { MatchGuid: 'forfeit', PlayerName: 'Me' },
+    }).current;
+    expect(value.elapsedSeconds).toBe(180);
+    expect(value.events.at(-2)?.elapsedSeconds).toBe(180);
+    expect(value.events.at(-1)?.elapsedSeconds).toBe(180);
   });
 
   it('captures complete normal-play snapshots and active ball aggregates', () => {

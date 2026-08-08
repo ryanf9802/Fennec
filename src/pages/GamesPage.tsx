@@ -7,6 +7,7 @@ import { ConnectionStatus } from '../components/ConnectionStatus';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
 import { sessionMetrics } from '../domain/metrics';
+import { formatClock, matchElapsedSeconds } from '../domain/timeline';
 import { formatTeamScore, profileTeamNumber } from '../domain/teamPresentation';
 import { useSessions } from '../data/historyQueries';
 
@@ -109,8 +110,7 @@ export function GamesPage() {
                   )}
                 </div>
                 <div className="text-fennec-orange text-sm font-bold">
-                  {Math.floor(activeMatch.timeSeconds / 60)}:
-                  {String(activeMatch.timeSeconds % 60).padStart(2, '0')}
+                  {formatClock(matchElapsedSeconds(activeMatch))}
                 </div>
               </div>
               <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

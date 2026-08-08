@@ -114,6 +114,20 @@ test('demo feed opens a live match and settings remain usable', async ({
   await expect(page.getByLabel('WebSocket port')).toHaveValue('49124');
 });
 
+test('completed matches show continuous elapsed time', async ({ page }) => {
+  await page.goto('/matches/demo-current-2?demo=1');
+  await expect(
+    page.getByRole('heading', { name: 'Ranked Doubles' }),
+  ).toBeVisible();
+  await expect(page.locator('header .text-fennec-orange')).toHaveText('5:00');
+  await expect(
+    page.getByRole('heading', { name: 'Event timeline' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('.timeline-scroller').getByText('5:00'),
+  ).toBeVisible();
+});
+
 test('a historical match can be permanently deleted', async ({ page }) => {
   await page.goto('/matches/demo-history-1?demo=1');
   await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();

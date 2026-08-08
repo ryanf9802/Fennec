@@ -152,8 +152,8 @@ function pointLabel(point: SpatialEventPoint): string {
   const actors =
     point.actors.map((actor) => actor.name).join(', ') || 'Unknown player';
   if (point.kind === 'touch')
-    return `${actors}, touch at ${formatClock(point.matchClockSeconds)}, ${formatSpeed(point.postHitSpeed)}`;
-  return `${actors}, ${point.kind} at ${formatClock(point.matchClockSeconds)}, ${formatSpeed(point.speed)}`;
+    return `${actors}, touch at ${formatClock(point.elapsedSeconds)}, ${formatSpeed(point.postHitSpeed)}`;
+  return `${actors}, ${point.kind} at ${formatClock(point.elapsedSeconds)}, ${formatSpeed(point.speed)}`;
 }
 
 export function BallTouchMap({
@@ -344,7 +344,7 @@ export function BallTouchMap({
                   · {point.kind}
                 </div>
                 <div className="text-muted mt-1">
-                  {formatClock(point.matchClockSeconds)} · XYZ{' '}
+                  {formatClock(point.elapsedSeconds)} · XYZ{' '}
                   {Math.round(point.x)}, {Math.round(point.y)},{' '}
                   {Math.round(point.z)}
                   {point.kind === 'touch'

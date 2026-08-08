@@ -102,7 +102,16 @@ export function eventDetails(
 
 export function formatClock(seconds?: number): string {
   if (seconds === undefined) return '—';
-  return `${Math.floor(seconds / 60)}:${String(Math.max(0, seconds % 60)).padStart(2, '0')}`;
+  const wholeSeconds = Math.max(0, Math.trunc(seconds));
+  return `${Math.floor(wholeSeconds / 60)}:${String(wholeSeconds % 60).padStart(2, '0')}`;
+}
+
+export function matchElapsedSeconds(match: MatchState): number {
+  return match.elapsedSeconds ?? match.timeSeconds;
+}
+
+export function eventElapsedSeconds(event: TimelineEvent): number | undefined {
+  return event.elapsedSeconds ?? event.matchClockSeconds;
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -285,7 +294,7 @@ export function timelineDisplayItems(
       {
         id: event.id,
         sequence: event.sequence,
-        clockSeconds: event.matchClockSeconds,
+        clockSeconds: eventElapsedSeconds(event),
         parts,
         details,
         technicalDetails:

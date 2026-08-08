@@ -113,6 +113,7 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
     this.timers.push(window.setTimeout(() => handlers.onState('waiting'), 250));
     emit(500, { event: 'MatchCreated', data: { MatchGuid: guid } });
     emit(650, { event: 'RoundStarted', data: { MatchGuid: guid } });
+    emit(700, update(300, 1, 1));
     emit(750, update(238, 1, 1));
     emit(1_350, {
       event: 'BallHit',
