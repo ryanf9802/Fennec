@@ -12,23 +12,19 @@ Stats API. It records games in the browser, creates automatic sessions, presents
 a dedicated live-match monitor, and recognizes recurring teammates and
 opponents.
 
-## Run locally on Windows
+## Run locally in WSL
 
-Install [Node.js 24 or newer](https://nodejs.org/) and
-[pnpm](https://pnpm.io/installation), then double-click
-`Run-Fennec-Web-Dev.cmd`. The console remains visible while Vite is running and
-opens <http://localhost:5173> in your browser.
+Install [Node.js 24 or newer](https://nodejs.org/) in WSL, then run:
 
-The equivalent commands are:
-
-```powershell
+```bash
 corepack enable
-pnpm install
+corepack install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Use `pnpm dev:demo` to exercise a simulated live game without opening Rocket
-League. Fennec officially targets current Chrome and Edge on Windows.
+Open <http://localhost:5173> in Chrome or Edge. Use `pnpm dev:demo` instead of
+`pnpm dev` to exercise a simulated live game without opening Rocket League.
 
 ## Rocket League setup
 
@@ -43,9 +39,8 @@ WebPort=49124
 ```
 
 Restart Rocket League after saving the file. Keep the Fennec browser tab open
-while playing. A browser cannot edit protected game files, elevate to
-administrator, launch at Windows startup, or continue recording after the tab
-closes.
+while playing. Fennec cannot edit protected game files or continue recording
+after the tab closes.
 
 ## Local data
 
@@ -55,8 +50,7 @@ encounter summaries are derived from that history.
 
 `http://localhost:5173` and `https://app.fennec.gg` have separate storage. Use
 Settings to export a versioned JSON backup from one origin and restore it on the
-other. CSV match-summary export is also available. The former native SQLite
-database is not migrated.
+other. CSV match-summary export is also available.
 
 ## Development
 
