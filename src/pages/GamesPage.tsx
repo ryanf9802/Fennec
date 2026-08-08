@@ -2,6 +2,7 @@ import { ArrowUpRight, CalendarDays, Radio } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { EmptyState } from '../components/EmptyState';
+import { ConnectionStatus } from '../components/ConnectionStatus';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
 import { sessionMetrics } from '../domain/metrics';
@@ -27,7 +28,7 @@ export function GamesPage() {
         <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">Game timeline</h1>
         <p className="text-muted mt-2">Every match, automatically grouped into sessions.</p>
       </div>
-      <div className="surface-flat flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold capitalize"><span className={`size-2 rounded-full ${connection === 'live' ? 'bg-fennec-cyan' : 'bg-slate-400'}`} />{connection}</div>
+      <ConnectionStatus connection={connection} className="surface-flat rounded-xl px-3 py-2 text-sm" />
     </header>
 
     {sessionsQuery.isError && <div className="surface-flat text-fennec-orange rounded-2xl p-5">Match history could not be loaded.</div>}

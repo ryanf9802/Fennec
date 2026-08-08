@@ -66,6 +66,20 @@ test('primary pages use the same full content width', async ({ page }) => {
   }
 });
 
+test('desktop sidebar connection status fits without clipping', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 620 });
+  await page.goto('/?demo=1');
+  const sidebar = page.locator('aside');
+  const status = sidebar.getByRole('status');
+  await expect(status).toBeVisible();
+  await expect(status).toHaveAttribute('aria-label', /^Connection status: Demo · /);
+  const [sidebarBox, statusBox] = await Promise.all([sidebar.boundingBox(), status.boundingBox()]);
+  expect(statusBox!.x).toBeGreaterThanOrEqual(sidebarBox!.x);
+  expect(statusBox!.x + statusBox!.width).toBeLessThanOrEqual(sidebarBox!.x + sidebarBox!.width);
+  const labelDimensions = await status.locator('span').last().evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth }));
+  expect(labelDimensions.scroll).toBeLessThanOrEqual(labelDimensions.client);
+});
+
 test('scoreboard columns align and the desktop timeline scrolls independently', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 780 });
   await page.goto('/?demo=1');

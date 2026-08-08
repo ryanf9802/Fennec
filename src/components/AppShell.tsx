@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Gamepad2, Radio, Settings, UserRound } from 
 import type { ReactNode } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
+import { ConnectionStatus } from './ConnectionStatus';
 
 const navigation = [
   { to: '/', label: 'Games', icon: Gamepad2 },
@@ -9,18 +10,8 @@ const navigation = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
-function ConnectionBadge() {
-  const { connection, demoMode } = useFennec();
-  const live = connection === 'live';
-  const label = demoMode ? `Demo · ${connection}` : connection === 'unavailable' ? 'Rocket League offline' : connection === 'waiting' ? 'Connected · waiting for game' : connection;
-  return <div className="surface-flat flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold capitalize">
-    <span className={`size-2 shrink-0 rounded-full ${live ? 'live-pulse bg-fennec-cyan' : connection === 'unavailable' ? 'bg-fennec-orange' : 'bg-slate-400'}`} />
-    <span className="truncate">{label}</span>
-  </div>;
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
-  const { activeMatch, settings, updateSettings } = useFennec();
+  const { activeMatch, connection, demoMode, settings, updateSettings } = useFennec();
   const collapsed = settings.sidebarCollapsed;
   return <div className="app-backdrop flex min-h-screen min-w-0">
     <aside className={`surface-flat sticky top-0 hidden h-screen shrink-0 flex-col border-y-0 border-l-0 transition-[width] duration-200 md:flex ${collapsed ? 'w-[4.75rem]' : 'w-[4.75rem] lg:w-[14.5rem]'}`}>
@@ -42,13 +33,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Radio className="live-pulse size-5 shrink-0 rounded-full" />{!collapsed && <span className="hidden lg:inline">Live match</span>}
         </NavLink>}
       </nav>
-      <div className="p-3">{collapsed ? <div className="mx-auto size-2 rounded-full bg-fennec-cyan" title="Fennec is running" /> : <><div className="mx-auto size-2 rounded-full bg-fennec-cyan lg:hidden" title="Fennec is running" /><div className="hidden lg:block"><ConnectionBadge /></div></>}</div>
+      <div className="shrink-0 p-3">{collapsed ? <div className="mx-auto size-2 rounded-full bg-fennec-cyan" title="Fennec is running" /> : <><div className="mx-auto size-2 rounded-full bg-fennec-cyan lg:hidden" title="Fennec is running" /><ConnectionStatus connection={connection} demoMode={demoMode} className="surface-flat hidden w-full justify-center rounded-full px-3 py-1.5 text-xs lg:flex" /></>}</div>
     </aside>
 
     <div className="min-w-0 flex-1 pb-20 md:pb-0">
       <header className="surface-flat sticky top-0 z-20 flex h-16 items-center justify-between border-x-0 border-t-0 px-4 md:hidden">
         <Link to="/" className="flex items-center"><img src="/assets/brand/fennec-a-lockup-primary.svg" alt="Fennec" className="h-8 w-auto" /></Link>
-        <ConnectionBadge />
+        <ConnectionStatus connection={connection} demoMode={demoMode} className="surface-flat rounded-full px-3 py-1.5 text-xs" />
       </header>
       <main className="mx-auto min-w-0 max-w-[1600px] px-4 py-6 sm:px-6 md:px-8 md:py-8 xl:px-10">{children}</main>
     </div>

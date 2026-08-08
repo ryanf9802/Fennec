@@ -2,6 +2,7 @@ import { Check, Download, FileJson, Save, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useFennec } from '../app/FennecContext';
 import { StatsApiSetup } from '../components/StatsApiSetup';
+import { ConnectionStatus } from '../components/ConnectionStatus';
 import { createBackup, downloadText, matchesCsv, parseBackup, streamBackup } from '../data/backup';
 import { historyRepository, loadMatches } from '../data/database';
 import { useStorageStatistics, useTimelineCatalog } from '../data/historyQueries';
@@ -73,7 +74,7 @@ export function SettingsPage() {
   return <div className="space-y-7">
     <header><div className="eyebrow">Preferences and storage</div><h1 className="mt-1 text-3xl font-black sm:text-4xl">Settings</h1><p className="text-muted mt-2">Monitoring, automatic sessions, event detail, and browser-local data.</p></header>
 
-    <section className="surface rounded-3xl p-5 sm:p-7"><h2 className="text-xl font-extrabold">Monitoring</h2><div className="mt-5 grid gap-5 lg:grid-cols-2"><label className="block"><span className="eyebrow">WebSocket port</span><input className="control mt-2" type="number" min="1024" max="65535" value={draft.webSocketPort} onChange={(event) => patchDraft({ webSocketPort: Number(event.target.value) })} /></label><div><div className="eyebrow">Connection</div><div className="surface-strong mt-2 flex min-h-11 items-center gap-2 rounded-xl px-4 font-bold capitalize"><span className={`size-2 rounded-full ${connection === 'live' ? 'bg-fennec-cyan' : connection === 'unavailable' ? 'bg-fennec-orange' : 'bg-slate-400'}`} />{connection}</div></div></div>
+    <section className="surface rounded-3xl p-5 sm:p-7"><h2 className="text-xl font-extrabold">Monitoring</h2><div className="mt-5 grid gap-5 lg:grid-cols-2"><label className="block"><span className="eyebrow">WebSocket port</span><input className="control mt-2" type="number" min="1024" max="65535" value={draft.webSocketPort} onChange={(event) => patchDraft({ webSocketPort: Number(event.target.value) })} /></label><div><div className="eyebrow">Connection</div><ConnectionStatus connection={connection} className="surface-strong mt-2 min-h-11 rounded-xl px-4" /></div></div>
       <div className="mt-6"><div className="eyebrow">Rocket League configuration</div><p className="text-muted mt-1 text-sm">Update one Stats API setting from the game's installation directory.</p><StatsApiSetup /></div>
     </section>
 
