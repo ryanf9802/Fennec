@@ -1,0 +1,81 @@
+import { act, render, screen, waitFor } from '@testing-library/react';
+import type { StatsEnvelope } from '../src/domain/types';
+import type { StatsFeedHandlers } from '../src/feed/StatsFeedAdapter';
+
+const mocks = vi.hoisted(() => ({
+  handlers: undefined as StatsFeedHandlers | undefined,
+  pendingSaves: [] as Array<() => void>,
+}));
+
+vi.mock('../src/data/database', () => ({
+  clearHistory: vi.fn(),
+  loadMatches: vi.fn(async () => []),
+  loadProfile: vi.fn(async () => undefined),
+  loadSettings: vi.fn(async () => ({
+    webSocketPort: 49124,
+    sessionGapMinutes: 30,
+    autoOpenLiveMatch: false,
+    theme: 'dark',
+    timelinePreset: 'curated',
+    enabledTimelineEvents: [],
+    timelineAttributes: {},
+    sidebarCollapsed: false,
+    analytics: { playlistMode: 'ranked', groupByPlaylist: true },
+  })),
+  replaceAll: vi.fn(),
+  saveMatch: vi.fn(() => new Promise<void>((resolve) => mocks.pendingSaves.push(resolve))),
+  saveProfile: vi.fn(),
+  saveSettings: vi.fn(),
+}));
+
+vi.mock('../src/feed/WebSocketStatsFeed', () => ({
+  WebSocketStatsFeed: class {
+    start(handlers: StatsFeedHandlers) { mocks.handlers = handlers; }
+    stop() {}
+  },
+}));
+
+vi.mock('../src/feed/SimulatedStatsFeed', () => ({
+  SimulatedStatsFeed: class {
+    start(handlers: StatsFeedHandlers) { mocks.handlers = handlers; }
+    stop() {}
+  },
+}));
+
+import { FennecProvider, useFennec } from '../src/app/FennecContext';
+
+function ClockProbe() {
+  const { activeMatch } = useFennec();
+  return <div>{activeMatch?.timeSeconds ?? 'waiting'}</div>;
+}
+
+function clockUpdate(timeSeconds: number): StatsEnvelope {
+  return {
+    event: 'ClockUpdatedSeconds',
+    data: {
+      MatchGuid: 'live-match',
+      TimeSeconds: timeSeconds,
+      bOvertime: true,
+    },
+  };
+}
+
+describe('Fennec live state', () => {
+  afterEach(() => {
+    for (const resolve of mocks.pendingSaves.splice(0)) resolve();
+    mocks.handlers = undefined;
+  });
+
+  it('publishes clock packets without waiting for match persistence', async () => {
+    render(<FennecProvider><ClockProbe /></FennecProvider>);
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    act(() => {
+      void mocks.handlers!.onEnvelope(clockUpdate(12));
+      void mocks.handlers!.onEnvelope(clockUpdate(13));
+    });
+
+    expect(screen.getByText('13')).toBeInTheDocument();
+    expect(mocks.pendingSaves).toHaveLength(2);
+  });
+});

@@ -78,13 +78,16 @@ export function FennecProvider({ children }: { children: ReactNode }) {
         // Keep the reducer cursor after completion so trailing events such as
         // MatchDestroyed attach to the match that just ended.
         activeRef.current = result.current;
-        if (result.superseded) await saveMatch(result.superseded);
-        await saveMatch(result.current);
+        // Publish packets before persistence. Stats API handlers can overlap
+        // while IndexedDB is busy; waiting here used to let older saves finish
+        // after newer packets and made the visible match clock lag or regress.
         setMatches((current) => {
           const updates = [result.superseded, result.current].filter(Boolean) as MatchState[];
           const ids = new Set(updates.map((item) => item.id));
           return [...current.filter((item) => !ids.has(item.id)), ...updates].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
         });
+        if (result.superseded) await saveMatch(result.superseded);
+        await saveMatch(result.current);
         const selected = profileRef.current;
         const selectedPlayer = selected && result.current.participants.find((player) => player.primaryId === selected.primaryId);
         if (selected && selectedPlayer && selected.displayName !== selectedPlayer.name) {
