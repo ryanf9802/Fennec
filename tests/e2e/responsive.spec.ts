@@ -23,6 +23,9 @@ test('demo feed opens a live match and settings remain usable', async ({ page })
   await expect(page.getByRole('heading', { name: 'Event timeline' })).toBeVisible();
   await expect(page.getByText('Select another player to view their profile')).toBeVisible();
   await expect(page.getByRole('button', { name: 'View profile for Luna' })).toBeVisible();
+  const playerNameWeight = Number(await page.getByRole('button', { name: 'View profile for Luna' }).locator('strong').evaluate((element) => getComputedStyle(element).fontWeight));
+  const teamNameWeight = Number(await page.locator('.scoreboard-table tbody').first().locator('tr').first().locator('th').evaluate((element) => getComputedStyle(element).fontWeight));
+  expect(playerNameWeight).toBeLessThan(teamNameWeight);
   const matchUrl = page.url();
   await page.getByRole('button', { name: 'View profile for Luna' }).click();
   await expect(page).toHaveURL(matchUrl);

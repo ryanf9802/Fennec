@@ -49,6 +49,7 @@ describe('player profile UI', () => {
     render(<MemoryRouter initialEntries={['/matches/bots']}><MatchPage match={botMatch} /><LocationProbe /></MemoryRouter>);
 
     expect(screen.getByText('BOT')).toBeInTheDocument();
+    expect(screen.getByText('Boomer')).toHaveClass('font-medium');
     fireEvent.click(screen.getByRole('button', { name: 'View profile for Boomer' }));
     expect(screen.getByRole('dialog', { name: 'Boomer' })).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('/matches/bots');
