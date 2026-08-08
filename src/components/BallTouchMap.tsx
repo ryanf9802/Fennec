@@ -65,6 +65,23 @@ class SceneErrorBoundary extends Component<
   }
 }
 
+function TouchMapLegend({ showGoals }: { showGoals: boolean }) {
+  return (
+    <div className="text-muted flex flex-wrap gap-x-4 gap-y-1 text-xs">
+      <span className="text-fennec-cyan">● Blue touch</span>
+      <span className="text-fennec-orange">● Orange touch</span>
+      <span className="text-amber-400">● Goal event</span>
+      {showGoals && (
+        <>
+          <span className="text-fennec-cyan">■ Blue goal</span>
+          <span className="text-fennec-orange">■ Orange goal</span>
+        </>
+      )}
+      <span className="ml-auto">Drag to pan · scroll or pinch to zoom</span>
+    </div>
+  );
+}
+
 export function BallTouchMap({
   match,
   profileId,
@@ -329,12 +346,7 @@ export function BallTouchMap({
         )}
       </div>
 
-      <div className="text-muted flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        <span>● Blue touch</span>
-        <span className="text-fennec-orange">● Orange touch</span>
-        <span className="text-amber-400">● Goal</span>
-        <span className="ml-auto">Drag to pan · scroll or pinch to zoom</span>
-      </div>
+      <TouchMapLegend showGoals={arena.kind !== 'dropshot'} />
       <div className="sr-only" aria-label="Touch map points">
         {visible.map((point) => (
           <button

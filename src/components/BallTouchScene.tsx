@@ -19,6 +19,12 @@ import {
 } from '../domain/touchMapGeometry';
 
 const fieldColor = '#64748b';
+const blueTeamColor = '#22d3ee';
+const orangeTeamColor = '#fb923c';
+
+function teamColor(teamNumber: number): string {
+  return teamNumber === 1 ? orangeTeamColor : blueTeamColor;
+}
 
 function CameraRig({ state }: { state: TouchMapCameraState }) {
   const { camera, invalidate, size } = useThree();
@@ -114,11 +120,17 @@ function GoalTunnels({ profile }: { profile: ArenaProfile }) {
         const wallY = side < 0 ? profile.yMin : profile.yMax;
         const centerX = wallY + side * (depth / 2);
         const backX = wallY + side * depth;
+        const color = teamColor(side < 0 ? 0 : 1);
         return (
           <group key={side}>
             <mesh position={[centerX, -8, 0]}>
               <boxGeometry args={[depth, 16, halfWidth * 2]} />
-              <meshStandardMaterial color="#132338" roughness={0.9} />
+              <meshStandardMaterial
+                color={color}
+                emissive={color}
+                emissiveIntensity={0.08}
+                roughness={0.82}
+              />
             </mesh>
             {([-1, 1] as const).map((goalSide) => (
               <mesh
@@ -127,9 +139,11 @@ function GoalTunnels({ profile }: { profile: ArenaProfile }) {
               >
                 <boxGeometry args={[depth, height, 18]} />
                 <meshStandardMaterial
-                  color={fieldColor}
+                  color={color}
+                  emissive={color}
+                  emissiveIntensity={0.12}
                   transparent
-                  opacity={0.2}
+                  opacity={0.42}
                   depthWrite={false}
                 />
               </mesh>
@@ -137,18 +151,22 @@ function GoalTunnels({ profile }: { profile: ArenaProfile }) {
             <mesh position={[backX, height / 2, 0]}>
               <boxGeometry args={[18, height, halfWidth * 2]} />
               <meshStandardMaterial
-                color={fieldColor}
+                color={color}
+                emissive={color}
+                emissiveIntensity={0.12}
                 transparent
-                opacity={0.2}
+                opacity={0.42}
                 depthWrite={false}
               />
             </mesh>
             <mesh position={[centerX, height, 0]}>
               <boxGeometry args={[depth, 18, halfWidth * 2]} />
               <meshStandardMaterial
-                color={fieldColor}
+                color={color}
+                emissive={color}
+                emissiveIntensity={0.12}
                 transparent
-                opacity={0.2}
+                opacity={0.42}
                 depthWrite={false}
               />
             </mesh>
@@ -163,16 +181,23 @@ function Hoops({ profile }: { profile: ArenaProfile }) {
   if (profile.kind !== 'hoops') return null;
   return (
     <>
-      {([-1, 1] as const).map((side) => (
-        <mesh
-          key={side}
-          position={[side * (profile.yMax - 180), 650, 0]}
-          rotation={[Math.PI / 2, 0, 0]}
-        >
-          <torusGeometry args={[360, 24, 12, 48]} />
-          <meshStandardMaterial color={fieldColor} emissive="#172554" />
-        </mesh>
-      ))}
+      {([-1, 1] as const).map((side) => {
+        const color = teamColor(side < 0 ? 0 : 1);
+        return (
+          <mesh
+            key={side}
+            position={[side * (profile.yMax - 180), 650, 0]}
+            rotation={[Math.PI / 2, 0, 0]}
+          >
+            <torusGeometry args={[360, 24, 12, 48]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={0.25}
+            />
+          </mesh>
+        );
+      })}
     </>
   );
 }
@@ -231,8 +256,7 @@ function Marker({
 }) {
   const position = gameToScene(point);
   const team = point.actors[0]?.teamNumber;
-  const color =
-    point.kind === 'goal' ? '#facc15' : team === 1 ? '#fb923c' : '#22d3ee';
+  const color = point.kind === 'goal' ? '#facc15' : teamColor(team ?? 0);
   const activate = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
     onActivate(point.id);

@@ -136,6 +136,8 @@ test('3D touch map controls and preference persist across matches', async ({
   await expect(
     page.getByRole('img', { name: /3d ball touch map/i }),
   ).toBeVisible();
+  await expect(page.getByText('■ Blue goal')).toBeVisible();
+  await expect(page.getByText('■ Orange goal')).toBeVisible();
 
   const documentSize = await page.evaluate(() => ({
     clientHeight: document.documentElement.clientHeight,

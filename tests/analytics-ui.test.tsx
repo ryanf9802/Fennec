@@ -129,6 +129,8 @@ describe('ball touch map', () => {
       depth: 880,
     });
     expect(scene.props?.points.map((point) => point.kind)).toEqual(['touch']);
+    expect(screen.getByText('■ Blue goal')).toHaveClass('text-fennec-cyan');
+    expect(screen.getByText('■ Orange goal')).toHaveClass('text-fennec-orange');
 
     const selectedTouch = screen.getByRole('button', { name: /Me, touch/ });
     expect(selectedTouch).toHaveAccessibleName(/touch at 1:00/);
@@ -159,5 +161,18 @@ describe('ball touch map', () => {
       screen.getByRole('button', { name: /reset 3d touch map/i }),
     );
     expect(scene.props?.cameraState.pitch).toBe(0);
+  });
+
+  it('labels Hoops goals by team color', () => {
+    render(
+      <BallTouchMap
+        match={{ ...match, playlistId: 27, arena: 'Dunk House' }}
+        profileId="Steam|1|0"
+      />,
+    );
+
+    expect(scene.props?.profile.kind).toBe('hoops');
+    expect(screen.getByText('■ Blue goal')).toHaveClass('text-fennec-cyan');
+    expect(screen.getByText('■ Orange goal')).toHaveClass('text-fennec-orange');
   });
 });
