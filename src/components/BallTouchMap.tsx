@@ -170,7 +170,7 @@ export function BallTouchMap({
           ...current,
           distance: current.distance * (previous.distance / next.distance),
           targetX: current.targetX - (next.x - previous.x) * scale,
-          targetZ: current.targetZ + (next.y - previous.y) * scale,
+          targetZ: current.targetZ - (next.y - previous.y) * scale,
         }));
       }
       pinch.current = next;
@@ -184,7 +184,7 @@ export function BallTouchMap({
     updateCamera((current) => ({
       ...current,
       targetX: current.targetX - dx * scale,
-      targetZ: current.targetZ + dy * scale,
+      targetZ: current.targetZ - dy * scale,
     }));
   };
   const stopPan = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -205,7 +205,7 @@ export function BallTouchMap({
 
   const activePoint = visible.find((point) => point.id === active);
   return (
-    <div className="space-y-3">
+    <div className="relative space-y-3">
       <div className="flex flex-wrap gap-2" aria-label="Touch map filters">
         {(
           [
@@ -241,7 +241,7 @@ export function BallTouchMap({
       <div
         data-testid="ball-touch-map-viewport"
         data-camera-target={`${Math.round(camera.targetX)},${Math.round(camera.targetZ)}`}
-        className="surface-flat relative h-[clamp(22rem,56vw,38rem)] touch-none overflow-hidden rounded-2xl"
+        className="surface-flat relative h-[clamp(22rem,56vw,38rem)] cursor-grab touch-none overflow-hidden rounded-2xl active:cursor-grabbing"
         onPointerDown={startPan}
         onPointerMove={pan}
         onPointerUp={stopPan}

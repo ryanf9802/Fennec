@@ -118,6 +118,7 @@ test('demo feed opens a live match and settings remain usable', async ({
 test('3D touch map controls and preference persist across matches', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/matches/demo-current-2?demo=1');
   await expect(
     page.getByRole('heading', { name: 'Ball analytics' }),
@@ -127,6 +128,14 @@ test('3D touch map controls and preference persist across matches', async ({
     page.getByRole('img', { name: /3d ball touch map/i }),
   ).toBeVisible();
 
+  const documentSize = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(documentSize.scrollHeight).toBeLessThanOrEqual(
+    documentSize.clientHeight,
+  );
+
   const pitch = page.getByRole('slider', { name: 'Field pitch' });
   await expect(pitch).toHaveValue('0');
   await pitch.fill('45');
@@ -134,10 +143,21 @@ test('3D touch map controls and preference persist across matches', async ({
 
   const viewport = page.getByTestId('ball-touch-map-viewport');
   const box = (await viewport.boundingBox())!;
-  await page.mouse.move(box.x + 80, box.y + 80);
+  await page.mouse.move(box.x + box.width / 2, box.y + 80);
+  await expect(viewport).toHaveCSS('cursor', 'grab');
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width - 80, box.y + box.height - 80);
+  await expect(viewport).toHaveCSS('cursor', 'grabbing');
+  await page.mouse.move(box.x + box.width / 2, box.y + 180);
+  await expect
+    .poll(async () => {
+      const [, targetZ] = (await viewport.getAttribute('data-camera-target'))!
+        .split(',')
+        .map(Number);
+      return targetZ;
+    })
+    .toBeLessThan(0);
   await page.mouse.up();
+  await expect(viewport).toHaveCSS('cursor', 'grab');
   await expect(viewport).not.toHaveAttribute('data-camera-target', '0,0');
   await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
   await expect(pitch).toHaveValue('0');
