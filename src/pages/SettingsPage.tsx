@@ -1,11 +1,10 @@
-import { Check, Clipboard, Download, FileJson, Save, Trash2, Upload } from 'lucide-react';
+import { Check, Download, FileJson, Save, Trash2, Upload } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useFennec } from '../app/FennecContext';
+import { StatsApiSetup } from '../components/StatsApiSetup';
 import { createBackup, downloadText, matchesCsv, parseBackup } from '../data/backup';
 import { timelineCatalog } from '../domain/timeline';
 import type { FennecSettings } from '../domain/types';
-
-const ini = `[TAGame.MatchStatsExporter_TA]\nPacketSendRate=2\nPort=49123\nWebPort=49124`;
 
 export function SettingsPage() {
   const context = useFennec();
@@ -41,11 +40,11 @@ export function SettingsPage() {
     setMessage('Settings saved.');
   };
 
-  return <div className="mx-auto max-w-5xl space-y-7">
+  return <div className="space-y-7">
     <header><div className="eyebrow">Preferences and storage</div><h1 className="mt-1 text-3xl font-black sm:text-4xl">Settings</h1><p className="text-muted mt-2">Monitoring, automatic sessions, event detail, and browser-local data.</p></header>
 
     <section className="surface rounded-3xl p-5 sm:p-7"><h2 className="text-xl font-extrabold">Monitoring</h2><div className="mt-5 grid gap-5 lg:grid-cols-2"><label className="block"><span className="eyebrow">WebSocket port</span><input className="control mt-2" type="number" min="1024" max="65535" value={draft.webSocketPort} onChange={(event) => patchDraft({ webSocketPort: Number(event.target.value) })} /></label><div><div className="eyebrow">Connection</div><div className="surface-strong mt-2 flex min-h-11 items-center gap-2 rounded-xl px-4 font-bold capitalize"><span className={`size-2 rounded-full ${connection === 'live' ? 'bg-fennec-cyan' : connection === 'unavailable' ? 'bg-fennec-orange' : 'bg-slate-400'}`} />{connection}</div></div></div>
-      <div className="mt-5"><div className="flex items-center justify-between gap-3"><div><div className="eyebrow">Rocket League configuration</div><p className="text-muted mt-1 text-sm">Add this section to TAStatsAPI.ini before starting the game.</p></div><button className="button-secondary shrink-0" onClick={() => void navigator.clipboard.writeText(ini).then(() => setMessage('Configuration copied.'))}><Clipboard className="size-4" />Copy</button></div><pre className="surface-strong mt-3 overflow-x-auto rounded-xl p-4 text-sm"><code>{ini}</code></pre></div>
+      <div className="mt-6"><div className="eyebrow">Rocket League configuration</div><p className="text-muted mt-1 text-sm">Choose your launcher, edit TAStatsAPI.ini, then restart the game.</p><StatsApiSetup /></div>
     </section>
 
     <section className="surface-flat rounded-3xl p-5 sm:p-7"><h2 className="text-xl font-extrabold">Sessions and behavior</h2><div className="mt-5 grid gap-5 lg:grid-cols-2"><label><span className="eyebrow">New session after idle minutes</span><input className="control mt-2" type="number" min="1" max="240" value={draft.sessionGapMinutes} onChange={(event) => patchDraft({ sessionGapMinutes: Number(event.target.value) })} /></label><label><span className="eyebrow">Appearance</span><select className="control mt-2" value={draft.theme} onChange={(event) => patchDraft({ theme: event.target.value as FennecSettings['theme'] })}><option value="dark">Dark</option><option value="system">System</option><option value="light">Light</option></select></label></div><label className="mt-5 flex max-w-2xl cursor-pointer items-start gap-3"><input type="checkbox" className="mt-1 size-4 accent-cyan-400" checked={draft.autoOpenLiveMatch} onChange={(event) => patchDraft({ autoOpenLiveMatch: event.target.checked })} /><span><strong>Automatically open the live monitor</strong><span className="text-muted mt-1 block text-sm">Off by default. An active game is otherwise highlighted until you open it.</span></span></label></section>
