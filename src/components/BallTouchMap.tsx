@@ -28,10 +28,10 @@ function FieldLines({
           strokeWidth="3"
         />
         <line
-          x1="8"
-          y1="150"
-          x2="592"
-          y2="150"
+          x1="300"
+          y1="8"
+          x2="300"
+          y2="292"
           stroke="currentColor"
           strokeWidth="2"
         />
@@ -59,10 +59,10 @@ function FieldLines({
           strokeWidth="3"
         />
         <line
-          x1="8"
-          y1="150"
-          x2="592"
-          y2="150"
+          x1="300"
+          y1="8"
+          x2="300"
+          y2="292"
           stroke="currentColor"
           strokeWidth="2"
         />
@@ -75,19 +75,19 @@ function FieldLines({
           strokeWidth="2"
         />
         <ellipse
-          cx="300"
-          cy="32"
-          rx="38"
-          ry="12"
+          cx="32"
+          cy="150"
+          rx="12"
+          ry="38"
           fill="none"
           stroke="currentColor"
           strokeWidth="3"
         />
         <ellipse
-          cx="300"
-          cy="268"
-          rx="38"
-          ry="12"
+          cx="568"
+          cy="150"
+          rx="12"
+          ry="38"
           fill="none"
           stroke="currentColor"
           strokeWidth="3"
@@ -107,10 +107,10 @@ function FieldLines({
         strokeWidth="3"
       />
       <line
-        x1="8"
-        y1="150"
-        x2="592"
-        y2="150"
+        x1="300"
+        y1="8"
+        x2="300"
+        y2="292"
         stroke="currentColor"
         strokeWidth="2"
       />
@@ -125,19 +125,19 @@ function FieldLines({
       {kind === 'soccar' && (
         <>
           <rect
-            x="245"
-            y="8"
-            width="110"
-            height="28"
+            x="8"
+            y="95"
+            width="28"
+            height="110"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
           />
           <rect
-            x="245"
-            y="264"
-            width="110"
-            height="28"
+            x="564"
+            y="95"
+            width="28"
+            height="110"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
@@ -204,8 +204,8 @@ export function BallTouchMap({
     return point.actors.some((actor) => actor.primaryId === id);
   });
   const position = (point: SpatialEventPoint) => {
-    let x = (point.x - arena.xMin) / (arena.xMax - arena.xMin);
-    let y = (arena.yMax - point.y) / (arena.yMax - arena.yMin);
+    let x = (point.y - arena.yMin) / (arena.yMax - arena.yMin);
+    let y = (arena.xMax - point.x) / (arena.xMax - arena.xMin);
     if (rotate) {
       x = 1 - x;
       y = 1 - y;
@@ -261,19 +261,19 @@ export function BallTouchMap({
           <rect
             x="8"
             y="8"
-            width="584"
-            height="142"
+            width="292"
+            height="284"
             fill={
-              rotate ? 'rgb(34 211 238 / 0.035)' : 'rgb(251 146 60 / 0.035)'
+              rotate ? 'rgb(251 146 60 / 0.035)' : 'rgb(34 211 238 / 0.035)'
             }
           />
           <rect
-            x="8"
-            y="150"
-            width="584"
-            height="142"
+            x="300"
+            y="8"
+            width="292"
+            height="284"
             fill={
-              rotate ? 'rgb(251 146 60 / 0.035)' : 'rgb(34 211 238 / 0.035)'
+              rotate ? 'rgb(34 211 238 / 0.035)' : 'rgb(251 146 60 / 0.035)'
             }
           />
           <FieldLines kind={arena.kind} />

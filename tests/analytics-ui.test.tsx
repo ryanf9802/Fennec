@@ -83,12 +83,23 @@ const match: MatchState = {
 describe('ball touch map', () => {
   it('defaults to the selected player and supports all-touch filtering', () => {
     render(<BallTouchMap match={match} profileId="Steam|1|0" />);
+    const map = screen.getByRole('img', { name: /soccar ball touch map/i });
+    expect(map).toBeInTheDocument();
     expect(
-      screen.getByRole('img', { name: /soccar ball touch map/i }),
+      map.querySelector('line[x1="300"][y1="8"][x2="300"][y2="292"]'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /Me, touch/ }),
+      map.querySelector('rect[x="8"][y="95"][width="28"][height="110"]'),
     ).toBeInTheDocument();
+    expect(
+      map.querySelector('rect[x="564"][y="95"][width="28"][height="110"]'),
+    ).toBeInTheDocument();
+
+    const selectedTouch = screen.getByRole('button', { name: /Me, touch/ });
+    const marker = selectedTouch.querySelector('circle');
+    expect(Number(marker?.getAttribute('cx'))).toBeCloseTo(301.09, 1);
+    expect(Number(marker?.getAttribute('cy'))).toBeCloseTo(149.66, 1);
+    expect(selectedTouch).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Them, touch/ }),
     ).not.toBeInTheDocument();
