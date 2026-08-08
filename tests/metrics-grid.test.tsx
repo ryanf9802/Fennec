@@ -13,6 +13,7 @@ const metrics: SessionMetrics = {
   goals: 1,
   assists: 1,
   passes: 3,
+  fifties: 2,
   saves: 1,
   shots: 2,
   shootingPercentage: 50,
@@ -29,6 +30,7 @@ describe('MetricsGrid goal comparison label', () => {
     expect(screen.getByText('Passes').parentElement).toHaveTextContent(
       'Passes3',
     );
+    expect(screen.getByText('50s').parentElement).toHaveTextContent('50s2');
     expect(screen.queryByText('GFA')).not.toBeInTheDocument();
   });
 

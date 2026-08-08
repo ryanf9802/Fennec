@@ -55,6 +55,15 @@ test('demo feed opens a live match and settings remain usable', async ({
   await expect(
     page.getByRole('button', { name: 'View profile for Luna' }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('columnheader', { name: '50', exact: true }),
+  ).toBeVisible();
+  const lunaRow = page.getByRole('row').filter({
+    has: page.getByRole('button', { name: 'View profile for Luna' }),
+  });
+  await expect(lunaRow.locator('td').nth(4)).toHaveText('1', {
+    timeout: 5000,
+  });
   const playerNameWeight = Number(
     await page
       .getByRole('button', { name: 'View profile for Luna' })
@@ -414,6 +423,9 @@ test('scoreboard columns align and the desktop timeline scrolls independently', 
   ).toBeVisible();
   await expect(
     page.getByRole('columnheader', { name: 'Passes', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('columnheader', { name: '50s', exact: true }),
   ).toBeVisible();
   const timelineScroller = page.locator('.timeline-scroller');
   expect(

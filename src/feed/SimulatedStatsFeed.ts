@@ -139,6 +139,21 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
         },
       },
     });
+    emit(2_100, {
+      event: 'BallHit',
+      data: {
+        MatchGuid: guid,
+        Players: [
+          { Name: 'Luna', Shortcut: 2, TeamNum: 0 },
+          { Name: 'Drift', Shortcut: 3, TeamNum: 1 },
+        ],
+        Ball: {
+          PreHitSpeed: 1040,
+          PostHitSpeed: 930,
+          Location: { X: 700, Y: 1820, Z: 480 },
+        },
+      },
+    });
     emit(2_500, {
       event: 'GoalScored',
       data: {

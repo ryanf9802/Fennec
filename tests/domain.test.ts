@@ -43,6 +43,7 @@ const player = (
   goals: 0,
   assists: 0,
   passes: 0,
+  fifties: 0,
   saves: 0,
   shots: 0,
   touches: 0,
@@ -194,6 +195,9 @@ describe('Stats API domain', () => {
     hit(2, 0, 'Mate');
     hit(2, 0, 'Mate');
     hit(1, 0, 'Me');
+    expect(
+      value.participants.every((participant) => participant.fifties === 0),
+    ).toBe(true);
     hit(3, 1, 'Rival');
     hit(4, 1, 'Rival Mate');
 
@@ -248,7 +252,7 @@ describe('Stats API domain', () => {
     send('BallHit', {
       Players: [
         { Name: 'Mate', Shortcut: 2, TeamNum: 0 },
-        { Name: 'Rival', Shortcut: 3, TeamNum: 1 },
+        { Name: 'Unknown', Shortcut: 99, TeamNum: 1 },
       ],
     });
     send('BallHit', {
@@ -280,6 +284,98 @@ describe('Stats API domain', () => {
     expect(
       value.participants.find((player) => player.name === 'Me')?.passes,
     ).toBe(1);
+  });
+
+  it('derives globally deduplicated 50s from opposing touches', () => {
+    let value = reduceStatsEnvelope(undefined, {
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'fifties',
+        Players: [
+          { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+          { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+        ],
+        Game: {},
+      },
+    }).current;
+    const hit = (
+      receivedAt: string,
+      players: Array<{ Name: string; Shortcut: number; TeamNum: number }>,
+    ) => {
+      value = reduceStatsEnvelope(
+        value,
+        {
+          event: 'BallHit',
+          data: { MatchGuid: 'fifties', Players: players },
+        },
+        receivedAt,
+      ).current;
+    };
+    const totals = () =>
+      Object.fromEntries(
+        value.participants.map((participant) => [
+          participant.name,
+          participant.fifties,
+        ]),
+      );
+
+    hit('2026-08-08T00:00:00.000Z', [
+      { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+    ]);
+    hit('2026-08-08T00:00:00.250Z', [
+      { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+    ]);
+    hit('2026-08-08T00:00:00.400Z', [
+      { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+    ]);
+    hit('2026-08-08T00:00:00.749Z', [
+      { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+    ]);
+    hit('2026-08-08T00:00:00.750Z', [
+      { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+    ]);
+    expect(totals()).toEqual({ Blue: 2, Orange: 2 });
+
+    value = reduceStatsEnvelope(
+      value,
+      { event: 'GoalScored', data: { MatchGuid: 'fifties' } },
+      '2026-08-08T00:00:01.000Z',
+    ).current;
+    value = reduceStatsEnvelope(
+      value,
+      { event: 'RoundStarted', data: { MatchGuid: 'fifties' } },
+      '2026-08-08T00:00:01.100Z',
+    ).current;
+    hit('2026-08-08T00:00:01.200Z', [
+      { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+    ]);
+    hit('2026-08-08T00:00:01.451Z', [
+      { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+    ]);
+    expect(totals()).toEqual({ Blue: 2, Orange: 2 });
+
+    hit('not-a-timestamp', [
+      { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+      { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+      { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+    ]);
+    expect(totals()).toEqual({ Blue: 3, Orange: 3 });
+
+    value = reduceStatsEnvelope(
+      value,
+      { event: 'RoundStarted', data: { MatchGuid: 'fifties' } },
+      '2026-08-08T00:00:03.000Z',
+    ).current;
+    hit('2026-08-08T00:00:03.100Z', [
+      { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+    ]);
+    hit('2026-08-08T00:00:03.349Z', [
+      { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+    ]);
+    hit('2026-08-08T00:00:03.600Z', [
+      { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+    ]);
+    expect(totals()).toEqual({ Blue: 4, Orange: 4 });
   });
 
   it('captures continuous elapsed event times across regulation and overtime', () => {
@@ -909,6 +1005,7 @@ describe('Stats API domain', () => {
         score: 500,
         goals: 2,
         passes: 4,
+        fifties: 2,
       },
       { ...player('Friend', 'Epic|2|0', 0), score: 300, assists: 2 },
     ];
@@ -960,8 +1057,10 @@ describe('Stats API domain', () => {
     expect(history.against.lastSeen).toBe(against.startedAt);
     expect(history.together.you.score).toBe(500);
     expect(history.together.you.passes).toBe(4);
+    expect(history.together.you.fifties).toBe(2);
     expect(history.against.player.goals).toBe(3);
     expect(sessionMetrics([together], 'Steam|1|0').passes).toBe(4);
+    expect(sessionMetrics([together], 'Steam|1|0').fifties).toBe(2);
     expect(history.recent[0]?.result).toBe('incomplete');
     expect(isTrackablePrimaryId('Unknown|0|0')).toBe(false);
   });

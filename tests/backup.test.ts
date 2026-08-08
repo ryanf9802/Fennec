@@ -28,6 +28,7 @@ const value: MatchState = {
       goals: 2,
       assists: 0,
       passes: 1,
+      fifties: 0,
       saves: 1,
       shots: 3,
       touches: 30,
@@ -41,6 +42,7 @@ const value: MatchState = {
       goals: 0,
       assists: 1,
       passes: 0,
+      fifties: 0,
       saves: 0,
       shots: 1,
       touches: 20,
@@ -81,15 +83,17 @@ describe('portable data', () => {
       id: 'one',
       sessionEndedAfter: true,
     });
-    expect(backup.version).toBe(4);
+    expect(backup.version).toBe(5);
     expect(backup.matches[0]?.participants[0]?.passes).toBe(1);
+    expect(backup.matches[0]?.participants[0]?.fifties).toBe(0);
   });
   it('imports and normalizes version 1 backups', () => {
     const backup = createBackup([value], defaultSettings);
     const parsed = parseBackup(JSON.stringify({ ...backup, version: 1 }));
-    expect(parsed.version).toBe(4);
+    expect(parsed.version).toBe(5);
     expect(parsed.matches[0]?.participants[0]?.carTouches).toBe(0);
     expect(parsed.matches[0]?.participants[0]?.passes).toBe(1);
+    expect(parsed.matches[0]?.participants[0]?.fifties).toBe(0);
   });
   it('imports the streamable version 3 record format', () => {
     const header = {
@@ -139,7 +143,7 @@ describe('portable data', () => {
   it('exports profile match summaries as CSV', () => {
     const csv = matchesCsv([value], 'Steam|1|0');
     expect(csv).toContain('"win","2","1","2"');
-    expect(csv).toContain('"assists","passes","saves"');
+    expect(csv).toContain('"assists","passes","fifties","saves"');
     expect(csv).toContain('"car_touches","ball_hits"');
   });
 });

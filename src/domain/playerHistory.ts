@@ -8,6 +8,7 @@ export interface PlayerAverages {
   goals: number;
   assists: number;
   passes: number;
+  fifties: number;
   saves: number;
   shots: number;
   touches: number;
@@ -54,6 +55,7 @@ const emptyAverages = (): PlayerAverages => ({
   goals: 0,
   assists: 0,
   passes: 0,
+  fifties: 0,
   saves: 0,
   shots: 0,
   touches: 0,
@@ -68,6 +70,7 @@ function averages(players: ParticipantState[]): PlayerAverages {
       goals: sum.goals + player.goals,
       assists: sum.assists + player.assists,
       passes: sum.passes + player.passes,
+      fifties: sum.fifties + player.fifties,
       saves: sum.saves + player.saves,
       shots: sum.shots + player.shots,
       touches: sum.touches + player.touches,

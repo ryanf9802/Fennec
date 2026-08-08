@@ -43,6 +43,7 @@ const match: MatchState = {
       goals: 0,
       assists: 0,
       passes: 0,
+      fifties: 0,
       saves: 0,
       shots: 1,
       touches: 4,
@@ -56,6 +57,7 @@ const match: MatchState = {
       goals: 2,
       assists: 0,
       passes: 3,
+      fifties: 2,
       saves: 0,
       shots: 2,
       touches: 8,
@@ -87,6 +89,9 @@ describe('user-first team presentation', () => {
     expect(screen.getByText('2 – 0')).toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', { name: /^Passes/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: /^50s/ }),
     ).toBeInTheDocument();
     const teamSections = screen.getByRole('table').querySelectorAll('tbody');
     expect([...teamSections].map((section) => section.textContent)).toEqual([

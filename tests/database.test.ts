@@ -57,6 +57,7 @@ function player(
     goals: 0,
     assists: 0,
     passes: 0,
+    fifties: 0,
     saves: 0,
     shots: 1,
     touches: 10,

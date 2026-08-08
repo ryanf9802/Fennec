@@ -112,6 +112,14 @@ describe('version 4 player-key migration', () => {
         matchId: 'legacy-bot',
         sequence: 3,
         receivedAt: startedAt,
+        eventName: 'BallHit',
+        payload: { Players: [{ Name: 'Boomer', Shortcut: 2, TeamNum: 1 }] },
+      },
+      {
+        id: 'legacy-bot:4',
+        matchId: 'legacy-bot',
+        sequence: 4,
+        receivedAt: startedAt,
         eventName: 'GoalScored',
         payload: { Scorer: { Name: 'You' } },
       },
@@ -131,6 +139,12 @@ describe('version 4 player-key migration', () => {
       },
       {
         id: 'legacy-bot:3',
+        matchId: 'legacy-bot',
+        receivedAt: startedAt,
+        payload: { Players: [{ Name: 'Boomer', Shortcut: 2, TeamNum: 1 }] },
+      },
+      {
+        id: 'legacy-bot:4',
         matchId: 'legacy-bot',
         receivedAt: startedAt,
         payload: { Scorer: { Name: 'You' }, DebugOnly: 'preserved' },
@@ -155,7 +169,14 @@ describe('version 4 player-key migration', () => {
     expect(
       migrated?.participants.find((player) => player.name === 'You')?.passes,
     ).toBe(1);
-    expect((await db.metadata.get('normalized-v5'))?.value).toBe(true);
+    expect(
+      migrated?.participants.find((player) => player.name === 'Mate')?.fifties,
+    ).toBe(1);
+    expect(
+      migrated?.participants.find((player) => player.name === 'Boomer')
+        ?.fifties,
+    ).toBe(1);
+    expect((await db.metadata.get('normalized-v6'))?.value).toBe(true);
     expect(
       migrated?.events.find((event) => event.eventName === 'GoalScored')
         ?.payload.DebugOnly,

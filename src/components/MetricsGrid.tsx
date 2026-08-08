@@ -27,6 +27,7 @@ export function MetricsGrid({
     ['Goals', metrics.goals],
     ['Assists', metrics.assists],
     ['Passes', metrics.passes],
+    ['50s', metrics.fifties],
     ['Saves', metrics.saves],
     ['Shots', metrics.shots],
     [

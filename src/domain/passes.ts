@@ -65,63 +65,126 @@ interface TouchActor {
   teamNumber: number;
 }
 
-function touchActor(
+function touchActors(
   participants: ParticipantState[],
   event: TimelineEvent,
-): TouchActor | undefined {
+): TouchActor[] {
   if (event.eventName !== 'BallHit' || !Array.isArray(event.payload.Players))
-    return undefined;
-  if (event.payload.Players.length !== 1) return undefined;
-  const value = event.payload.Players[0];
-  const index = participantIndex(participants, value);
-  if (index === undefined) return undefined;
-  return {
-    participantIndex: index,
-    teamNumber:
-      finite(record(value)?.TeamNum) ?? participants[index]!.teamNumber,
-  };
+    return [];
+  const actors = new Map<number, TouchActor>();
+  for (const value of event.payload.Players) {
+    const index = participantIndex(participants, value);
+    if (index === undefined) continue;
+    actors.set(index, {
+      participantIndex: index,
+      teamNumber:
+        finite(record(value)?.TeamNum) ?? participants[index]!.teamNumber,
+    });
+  }
+  return [...actors.values()];
+}
+
+function receivedAt(event: TimelineEvent): number | undefined {
+  const value = Date.parse(event.receivedAt);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function opposing(actors: TouchActor[]): boolean {
+  return new Set(actors.map((actor) => actor.teamNumber)).size > 1;
+}
+
+function opposingAcross(
+  previous: TouchActor[],
+  current: TouchActor[],
+): boolean {
+  return previous.some((prior) =>
+    current.some((actor) => actor.teamNumber !== prior.teamNumber),
+  );
 }
 
 /**
- * Rebuilds per-player pass totals from chronological ball-hit telemetry. A pass
- * belongs to the prior toucher when the next unambiguous touch is by a distinct
- * teammate; dead-ball transitions and ambiguous touches break the sequence.
+ * Rebuilds passes and 50s from chronological ball-hit telemetry. Sequential
+ * opposing touches form a 50 within 250 ms, while a global 500 ms cooldown
+ * collapses rapid exchanges into one challenge.
  */
-export function recalculatePasses(match: MatchState): void {
+export function recalculateDerivedTouchStats(match: MatchState): void {
   const passes = match.participants.map(() => 0);
-  let pending: TouchActor | undefined;
+  const fifties = match.participants.map(() => 0);
+  let pendingPass: TouchActor | undefined;
+  let previousTouch: { actors: TouchActor[]; receivedAt?: number } | undefined;
+  let lastFiftyAt: number | undefined;
   let activePlay = true;
   for (const event of [...match.events].sort(
     (a, b) => a.sequence - b.sequence,
   )) {
     if (playStops.has(event.eventName)) {
-      pending = undefined;
+      pendingPass = undefined;
+      previousTouch = undefined;
+      lastFiftyAt = undefined;
       activePlay = false;
       continue;
     }
     if (playStarts.has(event.eventName)) {
-      pending = undefined;
+      pendingPass = undefined;
+      previousTouch = undefined;
+      lastFiftyAt = undefined;
       activePlay = true;
       continue;
     }
     if (event.eventName !== 'BallHit') continue;
-    const current = touchActor(match.participants, event);
-    if (!activePlay || current === undefined) {
-      pending = undefined;
+    const actors = touchActors(match.participants, event);
+    if (!activePlay || actors.length === 0) {
+      pendingPass = undefined;
+      previousTouch = undefined;
       continue;
     }
+    const currentPass =
+      Array.isArray(event.payload.Players) &&
+      event.payload.Players.length === 1 &&
+      actors.length === 1
+        ? actors[0]
+        : undefined;
     if (
-      pending !== undefined &&
-      pending.participantIndex !== current.participantIndex &&
-      pending.teamNumber === current.teamNumber
+      pendingPass !== undefined &&
+      currentPass !== undefined &&
+      pendingPass.participantIndex !== currentPass.participantIndex &&
+      pendingPass.teamNumber === currentPass.teamNumber
     ) {
-      passes[pending.participantIndex] =
-        (passes[pending.participantIndex] ?? 0) + 1;
+      passes[pendingPass.participantIndex] =
+        (passes[pendingPass.participantIndex] ?? 0) + 1;
     }
-    pending = current;
+    pendingPass = currentPass;
+
+    const timestamp = receivedAt(event);
+    let challengeActors: TouchActor[] | undefined;
+    if (opposing(actors)) challengeActors = actors;
+    else if (
+      timestamp !== undefined &&
+      previousTouch?.receivedAt !== undefined &&
+      timestamp >= previousTouch.receivedAt &&
+      timestamp - previousTouch.receivedAt <= 250 &&
+      opposingAcross(previousTouch.actors, actors)
+    ) {
+      challengeActors = [...previousTouch.actors, ...actors];
+    }
+    if (
+      challengeActors &&
+      (timestamp === undefined ||
+        lastFiftyAt === undefined ||
+        timestamp - lastFiftyAt >= 500)
+    ) {
+      for (const index of new Set(
+        challengeActors.map((actor) => actor.participantIndex),
+      )) {
+        fifties[index] = (fifties[index] ?? 0) + 1;
+      }
+      if (timestamp !== undefined) lastFiftyAt = timestamp;
+    }
+    previousTouch = { actors, receivedAt: timestamp };
   }
   match.participants = match.participants.map((participant, index) => ({
     ...participant,
     passes: passes[index] ?? 0,
+    fifties: fifties[index] ?? 0,
   }));
 }

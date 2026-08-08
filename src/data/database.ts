@@ -17,7 +17,7 @@ import {
   type SessionGroup,
   type TimelineEvent,
 } from '../domain/types';
-import { recalculatePasses } from '../domain/passes';
+import { recalculateDerivedTouchStats } from '../domain/passes';
 import type {
   EndSessionResult,
   HistoryPage,
@@ -29,7 +29,7 @@ import type {
 } from './historyRepository';
 
 const rawRetentionDays = 90;
-const schemaMarker = 'normalized-v5';
+const schemaMarker = 'normalized-v6';
 const stringMinKey = '';
 const stringMaxKey = '\uffff';
 
@@ -366,6 +366,7 @@ class FennecDatabase extends Dexie {
             match.participants = match.participants.map((player) => ({
               ...player,
               passes: player.passes ?? 0,
+              fifties: player.fifties ?? 0,
               carTouches: player.carTouches ?? 0,
               loadout: player.loadout ?? [],
               isPresent: player.isPresent ?? true,
@@ -468,7 +469,7 @@ async function normalizeExistingData(): Promise<void> {
             events: eventsByMatch.get(match.id) ?? [],
           }) as MatchState,
       );
-      for (const match of hydrated) recalculatePasses(match);
+      for (const match of hydrated) recalculateDerivedTouchStats(match);
       const grouped = groupSessionRecords(hydrated, settings.sessionGapMinutes);
       const appearances = hydrated.flatMap((match) =>
         match.participants.map((player) => appearance(match, player)),
@@ -604,6 +605,7 @@ async function hydrateMatches(records: StoredMatch[]): Promise<MatchState[]> {
         goals: item.goals,
         assists: item.assists,
         passes: item.passes ?? 0,
+        fifties: item.fifties ?? 0,
         saves: item.saves,
         shots: item.shots,
         touches: item.touches,
@@ -649,6 +651,7 @@ async function hydrateSummaries(records: StoredMatch[]): Promise<MatchState[]> {
         goals: item.goals,
         assists: item.assists,
         passes: item.passes ?? 0,
+        fifties: item.fifties ?? 0,
         saves: item.saves,
         shots: item.shots,
         touches: item.touches,

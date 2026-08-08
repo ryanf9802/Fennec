@@ -1,6 +1,6 @@
 import { resolvePlaylist } from './playlists';
 import { isTrackablePrimaryId, normalizePlayerName } from './playerIdentity';
-import { recalculatePasses } from './passes';
+import { recalculateDerivedTouchStats } from './passes';
 import type {
   MatchState,
   ParticipantState,
@@ -78,6 +78,7 @@ function participant(value: Record<string, unknown>): ParticipantState {
     goals: numberValue(value.Goals),
     assists: numberValue(value.Assists),
     passes: 0,
+    fifties: 0,
     saves: numberValue(value.Saves),
     shots: numberValue(value.Shots),
     touches: numberValue(value.Touches),
@@ -111,6 +112,10 @@ function playerReference(value: unknown) {
   };
 }
 
+/**
+ * Reconciles snapshots through stable IDs, shortcuts, and team-scoped names
+ * while retaining derived telemetry that snapshots do not provide.
+ */
 function mergeParticipants(
   previous: ParticipantState[],
   current: ParticipantState[],
@@ -137,7 +142,14 @@ function mergeParticipants(
     if (index < 0) merged.push(value);
     else {
       const passes = merged[index]?.passes ?? 0;
-      merged[index] = { ...merged[index], ...value, passes, isPresent: true };
+      const fifties = merged[index]?.fifties ?? 0;
+      merged[index] = {
+        ...merged[index],
+        ...value,
+        passes,
+        fifties,
+        isPresent: true,
+      };
     }
   }
   return merged;
@@ -363,7 +375,7 @@ export function reduceStatsEnvelope(
       if (leaving) leaving.isPresent = false;
     }
     match.events = [...match.events, storeEvent(match, envelope, now)];
-    if (envelope.event === 'BallHit') recalculatePasses(match);
+    if (envelope.event === 'BallHit') recalculateDerivedTouchStats(match);
   }
 
   return { current: match, superseded };

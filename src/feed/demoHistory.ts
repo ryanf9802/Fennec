@@ -27,6 +27,7 @@ function player(
     goals,
     assists: goals ? 0 : 1,
     passes: key === 'you' ? 1 : 0,
+    fifties: key === 'you' ? 2 : 1,
     saves: 1,
     shots: goals + 2,
     touches: 24 + goals * 5,
