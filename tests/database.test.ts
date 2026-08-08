@@ -116,6 +116,22 @@ describe('IndexedDB storage', () => {
     expect(loaded[0]?.events[0]?.payload.GoalSpeed).toBe(100);
   });
 
+  it('loads the latest match with participants and events', async () => {
+    await saveMatch(playedMatch('older', '2026-08-08T00:00:00Z', true, true));
+    await saveMatch(playedMatch('latest', '2026-08-08T00:10:00Z', false, false));
+
+    const latest = await historyRepository.loadLatestMatch();
+
+    expect(latest?.id).toBe('latest');
+    expect(
+      latest?.participants.map((participant) => participant.name).sort(),
+    ).toEqual(['Other', 'You']);
+    expect(latest?.events[0]).toMatchObject({
+      id: 'latest:1',
+      eventName: 'GoalScored',
+    });
+  });
+
   it('stores settings and profile independently', async () => {
     await saveSettings({ ...defaultSettings, sessionGapMinutes: 45 });
     await saveProfile({ primaryId: 'Steam|1|0', displayName: 'Me' });

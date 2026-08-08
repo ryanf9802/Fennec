@@ -66,6 +66,7 @@ export interface HistoryRepository {
   getSession(id: string): Promise<SessionGroup | undefined>;
   listMatches(query?: MatchHistoryQuery): Promise<HistoryPage<MatchState>>;
   getMatch(id: string): Promise<MatchState | undefined>;
+  loadLatestMatch(): Promise<MatchState | undefined>;
   loadLiveMatches(): Promise<MatchState[]>;
   searchPlayers(query?: string, limit?: number): Promise<PlayerRecord[]>;
   getPlayerHistory(

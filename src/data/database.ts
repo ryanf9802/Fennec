@@ -1476,6 +1476,10 @@ export const historyRepository: HistoryRepository = {
   async getMatch(id) {
     return (await hydrateByIds([id]))[0];
   },
+  async loadLatestMatch() {
+    const latest = await db.matches.orderBy('[startedAt+id]').last();
+    return latest ? (await hydrateByIds([latest.id]))[0] : undefined;
+  },
   async loadLiveMatches() {
     return hydrateMatches(
       await db.matches.where('lifecycle').equals('live').toArray(),

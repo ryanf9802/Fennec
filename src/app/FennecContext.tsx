@@ -97,8 +97,10 @@ export function FennecProvider({ children }: { children: ReactNode }) {
         (item) => liveIds.has(item.id) && item.lifecycle === 'incomplete',
       ))
         await saveMatch(match, storedSettings.sessionGapMinutes);
+      const reducerMatch =
+        recovered ?? (await historyRepository.loadLatestMatch());
       if (cancelled) return;
-      activeRef.current = recovered;
+      activeRef.current = reducerMatch;
       profileRef.current = storedProfile;
       setActiveMatch(recovered);
       setProfile(storedProfile);

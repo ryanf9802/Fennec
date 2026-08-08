@@ -1,11 +1,13 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { ConnectionStatus } from '../src/components/ConnectionStatus';
-import type { StatsEnvelope } from '../src/domain/types';
+import type { MatchState, StatsEnvelope } from '../src/domain/types';
 import type { StatsFeedHandlers } from '../src/feed/StatsFeedAdapter';
 
 const mocks = vi.hoisted(() => ({
   handlers: undefined as StatsFeedHandlers | undefined,
   pendingSaves: [] as Array<() => void>,
+  savedMatches: [] as MatchState[],
+  latestMatch: undefined as MatchState | undefined,
   endCurrentSession: vi.fn(async () => 'ended' as const),
 }));
 
@@ -16,6 +18,7 @@ vi.mock('../src/data/database', () => ({
   historyRepository: {
     initialize: vi.fn(async () => undefined),
     countMatches: vi.fn(async () => 0),
+    loadLatestMatch: vi.fn(async () => mocks.latestMatch),
     loadLiveMatches: vi.fn(async () => []),
   },
   loadProfile: vi.fn(async () => undefined),
@@ -32,7 +35,11 @@ vi.mock('../src/data/database', () => ({
   })),
   replaceAll: vi.fn(),
   saveMatch: vi.fn(
-    () => new Promise<void>((resolve) => mocks.pendingSaves.push(resolve)),
+    (match: MatchState) =>
+      new Promise<void>((resolve) => {
+        mocks.savedMatches.push(match);
+        mocks.pendingSaves.push(resolve);
+      }),
   ),
   saveProfile: vi.fn(),
   saveSettings: vi.fn(),
@@ -92,6 +99,8 @@ function clockUpdate(timeSeconds: number): StatsEnvelope {
 describe('Fennec live state', () => {
   afterEach(() => {
     for (const resolve of mocks.pendingSaves.splice(0)) resolve();
+    mocks.savedMatches.length = 0;
+    mocks.latestMatch = undefined;
     mocks.handlers = undefined;
     mocks.endCurrentSession.mockClear();
   });
@@ -142,6 +151,59 @@ describe('Fennec live state', () => {
       screen.getByRole('status', { name: 'Connection status: Connected' }),
     ).toBeInTheDocument();
     expect(screen.getByText('no active match')).toBeInTheDocument();
+  });
+
+  it('keeps post-game packets with the latest completed match after reload', async () => {
+    mocks.latestMatch = {
+      id: 'stored-match',
+      matchGuid: 'same-guid',
+      lifecycle: 'completed',
+      startedAt: '2026-08-08T00:00:00Z',
+      lastEventAt: '2026-08-08T00:05:00Z',
+      endedAt: '2026-08-08T00:05:00Z',
+      playlistId: 13,
+      playlistName: 'Ranked Standard',
+      playlistCategory: 'ranked',
+      arena: 'Neo Tokyo',
+      timeSeconds: 0,
+      isOvertime: false,
+      isReplay: false,
+      teams: [],
+      participants: [],
+      events: [],
+    };
+    render(
+      <FennecProvider>
+        <LiveStateProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    act(() => {
+      void mocks.handlers!.onEnvelope({
+        event: 'UpdateState',
+        data: { MatchGuid: 'same-guid', Game: { TimeSeconds: 0 } },
+      });
+      void mocks.handlers!.onEnvelope({
+        event: 'MatchDestroyed',
+        data: { MatchGuid: 'same-guid' },
+      });
+    });
+
+    expect(screen.getByText('no active match')).toBeInTheDocument();
+    expect(mocks.savedMatches.at(-1)).toMatchObject({
+      id: 'stored-match',
+      lifecycle: 'completed',
+    });
+
+    act(() => {
+      void mocks.handlers!.onEnvelope({
+        event: 'UpdateState',
+        data: { MatchGuid: 'new-guid', Game: { TimeSeconds: 300 } },
+      });
+    });
+
+    expect(screen.getByText('active match')).toBeInTheDocument();
   });
 
   it('splits before the active match when ending a live session', async () => {
