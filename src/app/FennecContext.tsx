@@ -104,6 +104,8 @@ export function FennecProvider({ children }: { children: ReactNode }) {
         const result = reduceStatsEnvelope(previous, envelope);
         activeRef.current = result.current;
         setActiveMatch(result.current.lifecycle === 'live' ? result.current : undefined);
+        const nextConnection = result.current.lifecycle === 'live' ? 'live' : 'waiting';
+        setConnection(nextConnection);
         const addedEvent = result.current.events.length > (previous?.events.length ?? 0);
         if (result.superseded) persist(result.superseded);
         schedule(result.current, addedEvent || result.current.lifecycle !== 'live');

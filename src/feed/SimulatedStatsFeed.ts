@@ -26,7 +26,6 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
     const emit = (delay: number, envelope: StatsEnvelope) => this.timers.push(window.setTimeout(async () => {
       if (this.stopped) return;
       await handlers.onEnvelope(envelope);
-      handlers.onState('live');
     }, delay));
     this.timers.push(window.setTimeout(() => handlers.onState('waiting'), 250));
     emit(500, { event: 'MatchCreated', data: { MatchGuid: guid } });

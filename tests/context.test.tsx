@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
+import { ConnectionStatus } from '../src/components/ConnectionStatus';
 import type { StatsEnvelope } from '../src/domain/types';
 import type { StatsFeedHandlers } from '../src/feed/StatsFeedAdapter';
 
@@ -53,6 +54,11 @@ function ClockProbe() {
   return <div>{activeMatch?.timeSeconds ?? 'waiting'}</div>;
 }
 
+function LiveStateProbe() {
+  const { activeMatch, connection } = useFennec();
+  return <><ConnectionStatus connection={connection} /><div>{activeMatch ? 'active match' : 'no active match'}</div></>;
+}
+
 function clockUpdate(timeSeconds: number): StatsEnvelope {
   return {
     event: 'ClockUpdatedSeconds',
@@ -81,5 +87,22 @@ describe('Fennec live state', () => {
 
     expect(screen.getByText('13')).toBeInTheDocument();
     expect(mocks.pendingSaves).toHaveLength(2);
+  });
+
+  it('returns to Connected as soon as the active match ends', async () => {
+    render(<FennecProvider><LiveStateProbe /></FennecProvider>);
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    act(() => {
+      void mocks.handlers!.onEnvelope({ event: 'MatchCreated', data: { MatchGuid: 'live-match' } });
+    });
+    expect(screen.getByRole('status', { name: 'Connection status: Live' })).toBeInTheDocument();
+    expect(screen.getByText('active match')).toBeInTheDocument();
+
+    act(() => {
+      void mocks.handlers!.onEnvelope({ event: 'MatchEnded', data: { MatchGuid: 'live-match', WinnerTeamNum: 0 } });
+    });
+    expect(screen.getByRole('status', { name: 'Connection status: Connected' })).toBeInTheDocument();
+    expect(screen.getByText('no active match')).toBeInTheDocument();
   });
 });

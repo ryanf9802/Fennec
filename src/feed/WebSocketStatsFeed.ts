@@ -86,7 +86,6 @@ export class WebSocketStatsFeed implements StatsFeedAdapter {
 
         try {
           await handlers.onEnvelope(envelope);
-          handlers.onState('live');
           if (!feedLive) {
             feedLive = true;
             this.telemetry('feed_live', { connection, firstEvent: envelope.event, frame: frames });

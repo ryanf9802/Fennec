@@ -32,7 +32,7 @@ describe('browser Stats API feed', () => {
     socket.emit('message', { data: '{"Event":"MatchCreated","Data":null}' });
     socket.emit('message', { data: '{"Event":"GoalScored","Data":{}}' });
     await Promise.resolve();
-    expect(states).toEqual(['connecting', 'waiting', 'live']);
+    expect(states).toEqual(['connecting', 'waiting']);
     expect(events).toEqual(['GoalScored']);
     expect(diagnostics[0]).toMatch(/malformed/);
     expect(telemetry).toEqual(expect.arrayContaining([
