@@ -20,9 +20,12 @@ public sealed partial class MainWindow : Window
 
     public MainWindow(bool startHidden = false, bool developerMode = false)
     {
+        WriteStartup("Creating application runtime");
         _runtime = new AppRuntime(developerMode);
         _startHidden = startHidden;
+        WriteStartup("Loading main window XAML");
         InitializeComponent();
+        WriteStartup("Resolving native window handle");
         var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
@@ -32,20 +35,37 @@ public sealed partial class MainWindow : Window
         _appWindow.Closing += AppWindow_Closing;
         _runtime.Changed += Runtime_Changed;
         Activated += MainWindow_Activated;
+        WriteStartup("Main window constructed");
     }
 
     private async void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
         Activated -= MainWindow_Activated;
-        _tray = new TrayIconService(this, _appWindow, ExitApplication);
-        await _runtime.InitializeAsync();
-        PageHost.Content = _runtime.IsFirstRun
-            ? new OnboardingPage(_runtime, () => PageHost.Content = new GamesPage(_runtime, OpenMatch, OpenSession))
-            : new GamesPage(_runtime, OpenMatch, OpenSession);
-        _lastActiveMatchId = null;
-        RefreshConnection();
-        if (_startHidden) _appWindow.Hide();
+        try
+        {
+            WriteStartup("Creating tray icon and native window hook");
+            _tray = new TrayIconService(this, _appWindow, ExitApplication);
+            WriteStartup("Initializing local data and Stats API monitor");
+            await _runtime.InitializeAsync();
+            WriteStartup("Loading initial page");
+            PageHost.Content = _runtime.IsFirstRun
+                ? new OnboardingPage(_runtime, () => PageHost.Content = new GamesPage(_runtime, OpenMatch, OpenSession))
+                : new GamesPage(_runtime, OpenMatch, OpenSession);
+            _lastActiveMatchId = null;
+            RefreshConnection();
+            if (_startHidden) _appWindow.Hide();
+            WriteStartup("Startup complete");
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine("[Fennec] Startup failed:");
+            Console.Error.WriteLine(exception);
+            throw;
+        }
     }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void WriteStartup(string message) => Console.WriteLine($"[Fennec] {message}");
 
     private void Runtime_Changed() => DispatcherQueue.TryEnqueue(RefreshConnection);
 

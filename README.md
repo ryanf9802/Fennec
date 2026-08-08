@@ -49,7 +49,9 @@ paths.
 Every push and pull request produces a self-contained `fennec-dev-win-x64`
 artifact in the workflow run. Download and extract it, then run
 `Run-Fennec-Dev.cmd`. The artifact includes the .NET runtime, Windows App SDK,
-and PDB symbols, so it does not require an installed SDK.
+and PDB symbols, so it does not require an installed SDK. The developer launcher
+keeps a console open, prints startup checkpoints and managed exceptions, and
+pauses with the process exit code if Fennec terminates.
 
 Developer artifacts are unsigned. Windows may show a SmartScreen warning until
 the project adopts code signing.
