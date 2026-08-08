@@ -131,12 +131,16 @@ test('completed matches show continuous elapsed time', async ({ page }) => {
 test('a historical match can be permanently deleted', async ({ page }) => {
   await page.goto('/matches/demo-history-1?demo=1');
   await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
-  page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('removed from history and stats');
-    await dialog.accept();
-  });
-
-  await page.getByRole('button', { name: 'Delete match' }).click();
+  const matchInfo = page.locator('header p');
+  await expect(matchInfo).toContainText('DFH Stadium');
+  await matchInfo.getByRole('button', { name: 'Delete match' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole('heading', { name: 'Delete this match?' }),
+  ).toBeVisible();
+  await expect(dialog).toContainText('removed from history and all stats');
+  await dialog.getByRole('button', { name: 'Delete match' }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/matches/demo-history-1?demo=1');
   await expect(

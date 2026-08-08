@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { MatchState } from '../src/domain/types';
 
@@ -75,8 +75,7 @@ describe('historical match deletion', () => {
     vi.restoreAllMocks();
   });
 
-  it('confirms, disables the action while deleting, and returns to history', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('opens a confirmation dialog, disables it while deleting, and returns to history', async () => {
     let finish!: (deleted: boolean) => void;
     mocks.deleteMatch.mockReturnValue(
       new Promise<boolean>((resolve) => {
@@ -85,11 +84,23 @@ describe('historical match deletion', () => {
     );
     renderHistoricalMatch();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete match' }));
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringMatching(/removed from history and stats/i),
+    const deleteTrigger = screen.getByRole('button', { name: 'Delete match' });
+    expect(deleteTrigger.closest('p')).toHaveTextContent('DFH Stadium ·');
+    fireEvent.click(deleteTrigger);
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('heading')).toHaveTextContent(
+      'Delete this match?',
     );
-    expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
+    expect(dialog).toHaveTextContent('removed from history and all stats');
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete match' }),
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Deleting…' }),
+    ).toBeDisabled();
+    expect(
+      within(dialog).getByRole('button', { name: 'Cancel' }),
+    ).toBeDisabled();
     await act(async () => finish(true));
 
     expect(
@@ -99,26 +110,36 @@ describe('historical match deletion', () => {
   });
 
   it('leaves the match in place when confirmation is cancelled', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderHistoricalMatch();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete match' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Cancel',
+      }),
+    );
     expect(mocks.deleteMatch).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Ranked Doubles' }),
     ).toBeInTheDocument();
   });
 
   it('reports a deletion failure without navigating away', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     mocks.deleteMatch.mockRejectedValue(new Error('storage unavailable'));
     renderHistoricalMatch();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete match' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete match' }),
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not delete match: storage unavailable',
     );
-    expect(screen.getByRole('button', { name: 'Delete match' })).toBeEnabled();
+    expect(
+      within(dialog).getByRole('button', { name: 'Delete match' }),
+    ).toBeEnabled();
   });
 
   it('does not expose deletion on the live monitor', () => {

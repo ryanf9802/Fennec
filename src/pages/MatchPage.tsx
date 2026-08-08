@@ -1,5 +1,5 @@
-import { ArrowLeft, History, Trash2, Trophy } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, History, Trophy } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { PlayerName } from '../components/PlayerName';
@@ -96,6 +96,82 @@ function PlayerRow({
   );
 }
 
+function DeleteMatchDialog({
+  match,
+  deleting,
+  error,
+  onClose,
+  onConfirm,
+}: {
+  match: MatchState;
+  deleting: boolean;
+  error?: string;
+  onClose(): void;
+  onConfirm(): void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="delete-match-title"
+      aria-describedby="delete-match-description"
+      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-3xl bg-transparent p-0 text-main backdrop:bg-black/65"
+      onCancel={(event) => {
+        if (deleting) event.preventDefault();
+      }}
+      onClose={() => {
+        if (!deleting) onClose();
+      }}
+      onClick={(event) => {
+        if (!deleting && event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="surface rounded-3xl p-5 sm:p-7">
+        <div className="eyebrow text-fennec-orange">Permanent deletion</div>
+        <h2 id="delete-match-title" className="mt-2 text-2xl font-black">
+          Delete this match?
+        </h2>
+        <p id="delete-match-description" className="text-muted mt-3">
+          {match.playlistName} from {new Date(match.startedAt).toLocaleString()}{' '}
+          will be removed from history and all stats. This cannot be undone.
+        </p>
+        {error && (
+          <div
+            role="alert"
+            className="surface-flat text-fennec-orange mt-4 rounded-2xl p-4"
+          >
+            {error}
+          </div>
+        )}
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            className="button-secondary"
+            disabled={deleting}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="button-danger"
+            disabled={deleting}
+            onClick={onConfirm}
+          >
+            {deleting ? 'Deleting…' : 'Delete match'}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
 /**
  * Resolves a supplied, live, or persisted match and presents its scoreboard,
  * analytics, event timeline, and profile-relative player history dialog.
@@ -108,6 +184,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
     key: string;
     name: string;
   }>();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
   const matchQuery = useMatch(supplied ? undefined : matchId);
@@ -133,12 +210,6 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
   const teams = orderedTeams(match.teams, preferredTeamNumber);
   const canDelete = !supplied && match.lifecycle !== 'live';
   const removeMatch = async () => {
-    if (
-      !confirm(
-        'Delete this match? This cannot be undone, and the match will be removed from history and stats.',
-      )
-    )
-      return;
     setDeleting(true);
     setDeleteError(undefined);
     try {
@@ -153,44 +224,36 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
   };
   return (
     <div className="space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-6 xl:space-y-0">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to="/"
-            className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"
-          >
-            <ArrowLeft className="size-4" />
-            Game timeline
-          </Link>
-          {canDelete && (
-            <button
-              type="button"
-              className="button-danger"
-              disabled={deleting}
-              onClick={() => void removeMatch()}
-            >
-              <Trash2 className="size-4" />
-              {deleting ? 'Deleting…' : 'Delete match'}
-            </button>
-          )}
-        </div>
-        {deleteError && (
-          <div
-            role="alert"
-            className="surface-flat text-fennec-orange rounded-2xl p-4"
-          >
-            {deleteError}
-          </div>
-        )}
-      </div>
+      <Link
+        to="/"
+        className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"
+      >
+        <ArrowLeft className="size-4" />
+        Game timeline
+      </Link>
       <header className="flex flex-wrap items-start justify-between gap-5">
         <div>
           <h1 className="text-3xl font-black sm:text-4xl">
             {match.playlistName}
           </h1>
-          <p className="text-muted mt-2">
+          <p className="text-muted mt-2 flex flex-wrap items-center gap-x-1.5">
             {match.arena || 'Arena unavailable'} ·{' '}
             {new Date(match.startedAt).toLocaleString()}
+            {canDelete && (
+              <>
+                <span aria-hidden="true">•</span>
+                <button
+                  type="button"
+                  className="decoration-fennec-orange/70 cursor-pointer underline-offset-4 hover:text-fennec-orange hover:underline"
+                  onClick={() => {
+                    setDeleteError(undefined);
+                    setDeleteOpen(true);
+                  }}
+                >
+                  Delete match
+                </button>
+              </>
+            )}
           </p>
         </div>
         <div className="text-right">
@@ -306,6 +369,19 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
           playerKey={profilePlayer.key}
           playerName={profilePlayer.name}
           onClose={() => setProfilePlayer(undefined)}
+        />
+      )}
+      {deleteOpen && (
+        <DeleteMatchDialog
+          match={match}
+          deleting={deleting}
+          error={deleteError}
+          onClose={() => {
+            if (deleting) return;
+            setDeleteOpen(false);
+            setDeleteError(undefined);
+          }}
+          onConfirm={() => void removeMatch()}
         />
       )}
     </div>
