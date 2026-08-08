@@ -26,11 +26,12 @@ function PlayerRow({ player, profileId, onInspect }: { player: ParticipantState;
   const playerKey = playerKeyFor(player);
   const inspectable = !!playerKey && playerKey !== playerKeyForPrimaryId(profileId);
   const bot = playerIdentityKind(playerKey) === 'name';
+  const profileLabel = `View profile for ${player.name}${player.isPresent === false ? ' (no longer in match)' : ''}`;
   return <tr className="border-t border-ui text-center text-sm">
     <th scope="row" className="scoreboard-player-cell px-3 py-3 text-left">
       {inspectable
-        ? <button aria-label={`View profile for ${player.name}`} title={`View profile for ${player.name}`} className="hover-surface group/player -mx-2 inline-flex w-[calc(100%+1rem)] cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 text-left hover:text-fennec-cyan" onClick={() => onInspect(playerKey, player.name)}><span className="min-w-0"><PlayerName name={player.name} teamNumber={player.teamNumber} bot={bot} nameWeight="medium" />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</span><History aria-hidden="true" className="text-muted size-3.5 shrink-0 group-hover/player:text-fennec-cyan" /></button>
-        : <><PlayerName name={player.name} teamNumber={player.teamNumber} you={player.primaryId === profileId} bot={bot} nameWeight="medium" />{player.isPresent === false && <span className="text-muted ml-2 text-[0.62rem] font-black tracking-wider">LEFT</span>}</>}
+        ? <button aria-label={profileLabel} title={profileLabel} className="hover-surface group/player -mx-2 inline-flex w-[calc(100%+1rem)] cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 text-left hover:text-fennec-cyan" onClick={() => onInspect(playerKey, player.name)}><span className="min-w-0"><PlayerName name={player.name} teamNumber={player.teamNumber} present={player.isPresent !== false} bot={bot} nameWeight="medium" /></span><History aria-hidden="true" className="text-muted size-3.5 shrink-0 group-hover/player:text-fennec-cyan" /></button>
+        : <PlayerName name={player.name} teamNumber={player.teamNumber} present={player.isPresent !== false} you={player.primaryId === profileId} bot={bot} nameWeight="medium" />}
     </th>
     {stats.map(({ key }) => <td key={key} className={`px-2 py-3 ${key === 'score' ? 'font-bold' : ''}`}>{player[key] ?? 0}</td>)}
   </tr>;

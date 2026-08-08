@@ -18,7 +18,7 @@ const botMatch: MatchState = {
   winnerTeamNumber: 0, teams: [{ teamNumber: 0, name: 'Blue', score: 1, colorPrimary: '' }, { teamNumber: 1, name: 'Orange', score: 0, colorPrimary: '' }],
   participants: [
     { name: 'You', primaryId: 'Steam|you|0', shortcut: 1, teamNumber: 0, score: 100, goals: 1, assists: 0, saves: 0, shots: 1, touches: 5, demos: 0 },
-    { name: 'Boomer', primaryId: 'Unknown|0|0', shortcut: 2, teamNumber: 1, score: 50, goals: 0, assists: 0, saves: 1, shots: 0, touches: 4, demos: 0 },
+    { name: 'Boomer', primaryId: 'Unknown|0|0', shortcut: 2, teamNumber: 1, score: 50, goals: 0, assists: 0, saves: 1, shots: 0, touches: 4, demos: 0, isPresent: false },
   ],
   events: [],
 };
@@ -50,7 +50,10 @@ describe('player profile UI', () => {
 
     expect(screen.getByText('BOT')).toBeInTheDocument();
     expect(screen.getByText('Boomer')).toHaveClass('font-medium');
-    fireEvent.click(screen.getByRole('button', { name: 'View profile for Boomer' }));
+    expect(screen.getByLabelText('Orange team, no longer in match')).toHaveClass('bg-slate-400');
+    expect(screen.queryByText('LEFT')).not.toBeInTheDocument();
+    expect(screen.getByText('YOU')).toHaveClass('inline-flex', 'h-4', 'items-center', 'leading-none');
+    fireEvent.click(screen.getByRole('button', { name: 'View profile for Boomer (no longer in match)' }));
     expect(screen.getByRole('dialog', { name: 'Boomer' })).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('/matches/bots');
     expect(screen.getByRole('heading', { name: 'Boomer' })).toBeInTheDocument();
@@ -65,7 +68,7 @@ describe('player profile UI', () => {
 
   it('keeps match filters collapsed until requested', () => {
     render(<MemoryRouter><MatchPage match={botMatch} /></MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: 'View profile for Boomer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View profile for Boomer (no longer in match)' }));
 
     const filters = screen.getByRole('button', { name: 'Filters' });
     expect(filters).toHaveAttribute('aria-expanded', 'false');

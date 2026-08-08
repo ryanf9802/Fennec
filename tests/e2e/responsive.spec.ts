@@ -26,6 +26,9 @@ test('demo feed opens a live match and settings remain usable', async ({ page })
   const playerNameWeight = Number(await page.getByRole('button', { name: 'View profile for Luna' }).locator('strong').evaluate((element) => getComputedStyle(element).fontWeight));
   const teamNameWeight = Number(await page.locator('.scoreboard-table tbody').first().locator('tr').first().locator('th').evaluate((element) => getComputedStyle(element).fontWeight));
   expect(playerNameWeight).toBeLessThan(teamNameWeight);
+  const yourRow = page.getByRole('row').filter({ has: page.getByText('YOU', { exact: true }) });
+  const [yourNameBox, youBadgeBox] = await Promise.all([yourRow.locator('strong').boundingBox(), yourRow.getByText('YOU', { exact: true }).boundingBox()]);
+  expect(Math.abs((yourNameBox!.y + yourNameBox!.height / 2) - (youBadgeBox!.y + youBadgeBox!.height / 2))).toBeLessThanOrEqual(1);
   const matchUrl = page.url();
   await page.getByRole('button', { name: 'View profile for Luna' }).click();
   await expect(page).toHaveURL(matchUrl);
