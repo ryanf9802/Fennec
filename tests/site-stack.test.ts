@@ -51,6 +51,13 @@ describe('Fennec site infrastructure', () => {
     });
     template.resourceCountIs('AWS::CloudFront::CachePolicy', 0);
     template.resourceCountIs('AWS::CloudFront::ResponseHeadersPolicy', 0);
+    expect(
+      Object.keys(template.findResources('AWS::CloudFront::Function')),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^SecurityHeadersFunction/),
+      ]),
+    );
     template.resourceCountIs('AWS::Route53::RecordSet', 4);
     template.hasOutput('SiteUrl', { Value: 'https://app.fennec.gg' });
   });

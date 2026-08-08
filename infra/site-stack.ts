@@ -105,7 +105,7 @@ function handler(event) {
 
     const securityHeadersFunction = new cloudfront.Function(
       this,
-      'SecurityHeaders',
+      'SecurityHeadersFunction',
       {
         comment: 'Apply Fennec browser security headers',
         runtime: cloudfront.FunctionRuntime.JS_2_0,
