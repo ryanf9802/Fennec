@@ -32,8 +32,15 @@ test('demo feed opens a live match and settings remain usable', async ({ page })
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.getByLabel('WebSocket port')).toHaveValue('49124');
-  await expect(page.getByText(String.raw`C:\Program Files (x86)\Steam\steamapps\common\rocketleague\TAGame\Config\TAStatsAPI.ini`)).toBeVisible();
-  await expect(page.getByText(String.raw`C:\Program Files\Epic Games\rocketleague\TAGame\Config\TAStatsAPI.ini`)).toBeVisible();
+});
+
+test('settings show installation-relative Stats API instructions', async ({ page }) => {
+  await page.goto('/settings?demo=1');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByText(String.raw`2. Open TAGame\Config\TAStatsAPI.ini.`)).toBeVisible();
+  await expect(page.getByText('3. Change PacketSendRate to 2, save the file, and restart Rocket League.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /copy/i })).toHaveCount(0);
+  await expect(page.getByText(/Program Files/)).toHaveCount(0);
 });
 
 test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
