@@ -77,6 +77,7 @@ export interface HistoryRepository {
   iterateMatches(pageSize?: number): AsyncIterable<MatchState>;
   saveMatch(match: MatchState, sessionGapMinutes: number): Promise<void>;
   deleteMatch(id: string): Promise<boolean>;
+  endCurrentSession(activeMatchId?: string): Promise<EndSessionResult>;
   clearHistory(): Promise<void>;
   replaceAll(
     matches: MatchState[],
@@ -86,3 +87,5 @@ export interface HistoryRepository {
   compactRawEvents(now?: Date): Promise<number>;
   storageStatistics(): Promise<StorageStatistics>;
 }
+
+export type EndSessionResult = 'ended' | 'split-live' | 'unchanged';

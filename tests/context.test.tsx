@@ -6,11 +6,13 @@ import type { StatsFeedHandlers } from '../src/feed/StatsFeedAdapter';
 const mocks = vi.hoisted(() => ({
   handlers: undefined as StatsFeedHandlers | undefined,
   pendingSaves: [] as Array<() => void>,
+  endCurrentSession: vi.fn(async () => 'ended' as const),
 }));
 
 vi.mock('../src/data/database', () => ({
   clearHistory: vi.fn(),
   deleteMatch: vi.fn(async () => true),
+  endCurrentSession: mocks.endCurrentSession,
   historyRepository: {
     initialize: vi.fn(async () => undefined),
     countMatches: vi.fn(async () => 0),
@@ -71,6 +73,11 @@ function LiveStateProbe() {
   );
 }
 
+function EndSessionProbe() {
+  const { endSession } = useFennec();
+  return <button onClick={() => void endSession()}>End session</button>;
+}
+
 function clockUpdate(timeSeconds: number): StatsEnvelope {
   return {
     event: 'ClockUpdatedSeconds',
@@ -86,6 +93,7 @@ describe('Fennec live state', () => {
   afterEach(() => {
     for (const resolve of mocks.pendingSaves.splice(0)) resolve();
     mocks.handlers = undefined;
+    mocks.endCurrentSession.mockClear();
   });
 
   it('publishes clock packets without waiting for match persistence', async () => {
@@ -134,5 +142,26 @@ describe('Fennec live state', () => {
       screen.getByRole('status', { name: 'Connection status: Connected' }),
     ).toBeInTheDocument();
     expect(screen.getByText('no active match')).toBeInTheDocument();
+  });
+
+  it('splits before the active match when ending a live session', async () => {
+    render(
+      <FennecProvider>
+        <EndSessionProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+    act(() => {
+      void mocks.handlers!.onEnvelope({
+        event: 'MatchCreated',
+        data: { MatchGuid: 'live-match' },
+      });
+    });
+
+    screen.getByRole('button', { name: 'End session' }).click();
+
+    await waitFor(() =>
+      expect(mocks.endCurrentSession).toHaveBeenCalledWith('live-match'),
+    );
   });
 });

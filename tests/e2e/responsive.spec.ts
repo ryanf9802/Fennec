@@ -130,6 +130,28 @@ test('a historical match can be permanently deleted', async ({ page }) => {
   ).toBeVisible();
 });
 
+test('ending a session moves the live game into a new session', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 760 });
+  await page.goto('/?demo=1');
+  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
+
+  await page.getByRole('button', { name: 'End session' }).click();
+
+  await expect(
+    page.getByRole('status').filter({
+      hasText: 'New session started for the live game.',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Live now')).toBeVisible();
+  const dimensions = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client);
+});
+
 test('settings show installation-relative Stats API instructions', async ({
   page,
 }) => {

@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
+import { startsNewSession } from '../domain/sessions';
 import { flattenPayload } from '../domain/timeline';
 import {
   normalizePlayerName,
@@ -17,6 +18,7 @@ import {
   type TimelineEvent,
 } from '../domain/types';
 import type {
+  EndSessionResult,
   HistoryPage,
   HistoryRepository,
   MatchHistoryQuery,
@@ -277,7 +279,10 @@ function sessionIdFor(match: Pick<MatchState, 'id' | 'startedAt'>): string {
 
 function groupSessionRecords(
   matches: Array<
-    Pick<MatchState, 'id' | 'startedAt' | 'endedAt' | 'lastEventAt'>
+    Pick<
+      MatchState,
+      'id' | 'startedAt' | 'endedAt' | 'lastEventAt' | 'sessionEndedAfter'
+    >
   >,
   idleMinutes: number,
 ): { records: SessionRecord[]; byMatch: Map<string, string> } {
@@ -291,11 +296,7 @@ function groupSessionRecords(
   for (const match of ordered) {
     const current = records.at(-1);
     const beginsSession =
-      !current ||
-      !prior ||
-      new Date(match.startedAt).getTime() -
-        new Date(prior.endedAt ?? prior.lastEventAt).getTime() >=
-        idleMinutes * 60_000;
+      !current || !prior || startsNewSession(prior, match, idleMinutes);
     if (beginsSession)
       records.push({
         id: sessionIdFor(match),
@@ -831,12 +832,7 @@ async function resolveSessionId(
     .where('[startedAt+id]')
     .below([match.startedAt, match.id])
     .last();
-  if (
-    prior &&
-    new Date(match.startedAt).getTime() -
-      new Date(prior.endedAt ?? prior.lastEventAt).getTime() <
-      idleMinutes * 60_000
-  )
+  if (prior && !startsNewSession(prior, match, idleMinutes))
     return prior.sessionId;
   return sessionIdFor(match);
 }
@@ -1128,6 +1124,16 @@ export async function deleteMatch(id: string): Promise<boolean> {
             session.matchIds.filter((matchId) => matchId !== id),
           )
         ).filter((item): item is StoredMatch => !!item);
+        if (match.sessionEndedAfter && remainingMatches.length) {
+          const latestRemaining = [...remainingMatches]
+            .sort(
+              (left, right) =>
+                left.startedAt.localeCompare(right.startedAt) ||
+                left.id.localeCompare(right.id),
+            )
+            .at(-1)!;
+          latestRemaining.sessionEndedAfter = true;
+        }
         const grouped = groupSessionRecords(
           remainingMatches,
           settings.sessionGapMinutes,
@@ -1150,6 +1156,71 @@ export async function deleteMatch(id: string): Promise<boolean> {
       return true;
     },
   );
+}
+
+export async function endCurrentSession(
+  activeMatchId?: string,
+): Promise<EndSessionResult> {
+  await normalizeExistingData();
+  await settleMatchWrites();
+  return db.transaction('rw', [db.matches, db.sessions], async () => {
+    const ordered = await db.matches.orderBy('[startedAt+id]').toArray();
+    if (!ordered.length) return 'unchanged';
+
+    if (!activeMatchId) {
+      const latest = ordered.at(-1)!;
+      if (latest.sessionEndedAfter) return 'unchanged';
+      await db.matches.put({ ...latest, sessionEndedAfter: true });
+      return 'ended';
+    }
+
+    const activeIndex = ordered.findIndex(
+      (match) => match.id === activeMatchId,
+    );
+    if (activeIndex <= 0) return 'unchanged';
+    const active = ordered[activeIndex]!;
+    const prior = ordered[activeIndex - 1]!;
+    if (active.sessionId !== prior.sessionId) return 'unchanged';
+
+    const session = await db.sessions.get(active.sessionId);
+    if (!session) return 'unchanged';
+    const sessionMatches = (await db.matches.bulkGet(session.matchIds))
+      .filter((match): match is StoredMatch => !!match)
+      .sort(
+        (left, right) =>
+          left.startedAt.localeCompare(right.startedAt) ||
+          left.id.localeCompare(right.id),
+      );
+    const splitIndex = sessionMatches.findIndex(
+      (match) => match.id === activeMatchId,
+    );
+    if (splitIndex <= 0) return 'unchanged';
+
+    const before = sessionMatches.slice(0, splitIndex);
+    const after = sessionMatches.slice(splitIndex);
+    const boundary = before.at(-1)!;
+    const firstMoved = after[0]!;
+    const newSessionId = sessionIdFor(firstMoved);
+    await db.matches.bulkPut([
+      { ...boundary, sessionEndedAfter: true },
+      ...after.map((match) => ({ ...match, sessionId: newSessionId })),
+    ]);
+    await db.sessions.bulkPut([
+      {
+        id: session.id,
+        startedAt: before[0]!.startedAt,
+        endedAt: boundary.endedAt ?? boundary.lastEventAt,
+        matchIds: before.map((match) => match.id),
+      },
+      {
+        id: newSessionId,
+        startedAt: firstMoved.startedAt,
+        endedAt: after.at(-1)!.endedAt ?? after.at(-1)!.lastEventAt,
+        matchIds: after.map((match) => match.id),
+      },
+    ]);
+    return 'split-live';
+  });
 }
 
 export async function loadMatches(): Promise<MatchState[]> {
@@ -1368,12 +1439,16 @@ export const historyRepository: HistoryRepository = {
     const records = await collection.limit(pageSize + 1).toArray();
     const page = records.slice(0, pageSize);
     const groups = await Promise.all(
-      page.map(async (record): Promise<SessionGroup> => ({
-        id: record.id,
-        startedAt: record.startedAt,
-        endedAt: record.endedAt,
-        matches: await hydrateSummariesByIds(record.matchIds),
-      })),
+      page.map(async (record): Promise<SessionGroup> => {
+        const matches = await hydrateSummariesByIds(record.matchIds);
+        return {
+          id: record.id,
+          startedAt: record.startedAt,
+          endedAt: record.endedAt,
+          matches,
+          endedManually: matches.at(-1)?.sessionEndedAfter === true,
+        };
+      }),
     );
     return {
       items: groups,
@@ -1385,14 +1460,15 @@ export const historyRepository: HistoryRepository = {
   },
   async getSession(id) {
     const record = await db.sessions.get(id);
-    return record
-      ? {
-          id: record.id,
-          startedAt: record.startedAt,
-          endedAt: record.endedAt,
-          matches: await hydrateSummariesByIds(record.matchIds),
-        }
-      : undefined;
+    if (!record) return undefined;
+    const matches = await hydrateSummariesByIds(record.matchIds);
+    return {
+      id: record.id,
+      startedAt: record.startedAt,
+      endedAt: record.endedAt,
+      matches,
+      endedManually: matches.at(-1)?.sessionEndedAfter === true,
+    };
   },
   listMatches(query = {}) {
     return query.playerKey ? listPlayerMatches(query) : listPlainMatches(query);
@@ -1405,6 +1481,7 @@ export const historyRepository: HistoryRepository = {
       await db.matches.where('lifecycle').equals('live').toArray(),
     );
   },
+  endCurrentSession,
   async searchPlayers(query = '', limit = 100) {
     const normalized = normalizePlayerName(query) ?? '';
     const records = !normalized

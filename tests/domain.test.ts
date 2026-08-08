@@ -445,6 +445,20 @@ describe('Stats API domain', () => {
     ).toHaveLength(2);
   });
 
+  it('preserves manual session boundaries inside the idle threshold', () => {
+    const first = match('one', '2026-08-08T00:00:00Z', '2026-08-08T00:05:00Z');
+    first.sessionEndedAfter = true;
+    const groups = groupSessions(
+      [first, match('two', '2026-08-08T00:06:00Z', '2026-08-08T00:11:00Z')],
+      30,
+    );
+
+    expect(groups.map((group) => group.matches.map((item) => item.id))).toEqual(
+      [['one'], ['two']],
+    );
+    expect(groups.map((group) => group.endedManually)).toEqual([true, false]);
+  });
+
   it('separates teammate and opponent records', () => {
     const first = match('one', '2026-08-08T00:00:00Z', '2026-08-08T00:05:00Z');
     first.participants = [

@@ -19,6 +19,7 @@ import {
 import {
   clearHistory,
   deleteMatch as deleteStoredMatch,
+  endCurrentSession,
   historyRepository,
   loadProfile,
   loadSettings,
@@ -27,6 +28,7 @@ import {
   saveProfile,
   saveSettings,
 } from '../data/database';
+import type { EndSessionResult } from '../data/historyRepository';
 import { historyKeys, queryClient } from '../data/historyQueries';
 import type { FennecBackup } from '../data/backup';
 import { SimulatedStatsFeed } from '../feed/SimulatedStatsFeed';
@@ -44,6 +46,7 @@ interface FennecContextValue {
   updateSettings(next: FennecSettings): Promise<void>;
   selectProfile(next: FennecProfile): Promise<void>;
   deleteMatch(id: string): Promise<boolean>;
+  endSession(): Promise<EndSessionResult>;
   deleteHistory(): Promise<void>;
   restoreBackup(backup: FennecBackup): Promise<void>;
 }
@@ -252,6 +255,15 @@ export function FennecProvider({ children }: { children: ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
     return deleted;
   }, []);
+  const endSession = useCallback(async () => {
+    const activeMatchId =
+      activeRef.current?.lifecycle === 'live'
+        ? activeRef.current.id
+        : undefined;
+    const result = await endCurrentSession(activeMatchId);
+    await queryClient.invalidateQueries({ queryKey: historyKeys.all });
+    return result;
+  }, []);
   const deleteHistory = useCallback(async () => {
     historyGenerationRef.current++;
     try {
@@ -291,6 +303,7 @@ export function FennecProvider({ children }: { children: ReactNode }) {
       updateSettings,
       selectProfile,
       deleteMatch,
+      endSession,
       deleteHistory,
       restoreBackup,
     }),
@@ -305,6 +318,7 @@ export function FennecProvider({ children }: { children: ReactNode }) {
       updateSettings,
       selectProfile,
       deleteMatch,
+      endSession,
       deleteHistory,
       restoreBackup,
     ],

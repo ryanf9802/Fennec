@@ -56,6 +56,7 @@ export function SessionPage() {
             hour: 'numeric',
             minute: '2-digit',
           })}
+          {session.endedManually ? ' · Ended manually' : ''}
         </p>
       </header>
       <div className="surface rounded-3xl p-5 sm:p-6">

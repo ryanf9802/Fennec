@@ -98,6 +98,7 @@ export interface MatchState {
   teams: TeamState[];
   participants: ParticipantState[];
   events: TimelineEvent[];
+  sessionEndedAfter?: true;
 }
 
 export interface SessionGroup {
@@ -105,6 +106,7 @@ export interface SessionGroup {
   startedAt: string;
   endedAt: string;
   matches: MatchState[];
+  endedManually: boolean;
 }
 
 export interface EncounterSummary {

@@ -123,6 +123,59 @@ describe('IndexedDB storage', () => {
     expect((await loadProfile())?.displayName).toBe('Me');
   });
 
+  it('ends an idle session and preserves the boundary when settings rebuild', async () => {
+    await saveMatch(playedMatch('one', '2026-08-08T00:00:00Z', true, true));
+    await saveMatch(playedMatch('two', '2026-08-08T00:05:00Z', true, true));
+
+    expect(await historyRepository.endCurrentSession()).toBe('ended');
+    expect(await historyRepository.endCurrentSession()).toBe('unchanged');
+    await saveMatch(playedMatch('three', '2026-08-08T00:10:00Z', true, true));
+    await saveSettings({ ...defaultSettings, sessionGapMinutes: 60 });
+
+    const sessions = (await historyRepository.listSessions()).items;
+    expect(
+      sessions.map((session) => session.matches.map((item) => item.id)),
+    ).toEqual([['three'], ['one', 'two']]);
+    expect(sessions.map((session) => session.endedManually)).toEqual([
+      false,
+      true,
+    ]);
+
+    expect(await deleteMatch('two')).toBe(true);
+    await saveSettings({ ...defaultSettings, sessionGapMinutes: 90 });
+    const rebuilt = (await historyRepository.listSessions()).items;
+    expect(
+      rebuilt.map((session) => session.matches.map((item) => item.id)),
+    ).toEqual([['three'], ['one']]);
+    expect(rebuilt.map((session) => session.endedManually)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
+  it('moves a live game into a new session immediately', async () => {
+    await saveMatch(playedMatch('one', '2026-08-08T00:00:00Z', true, true));
+    const live = playedMatch('live', '2026-08-08T00:05:00Z', true, true);
+    live.lifecycle = 'live';
+    delete live.endedAt;
+    await saveMatch(live);
+
+    expect(await historyRepository.endCurrentSession(live.id)).toBe(
+      'split-live',
+    );
+    expect(await historyRepository.endCurrentSession(live.id)).toBe(
+      'unchanged',
+    );
+    await saveMatch({ ...live, lastEventAt: '2026-08-08T00:06:00Z' });
+    await saveMatch(playedMatch('three', '2026-08-08T00:07:00Z', false, false));
+
+    const sessions = (await historyRepository.listSessions()).items;
+    expect(
+      sessions.map((session) => session.matches.map((item) => item.id)),
+    ).toEqual([['live', 'three'], ['one']]);
+    expect(sessions[1]?.endedManually).toBe(true);
+  });
+
   it('restores and deletes history transactionally', async () => {
     await replaceAll([match], defaultSettings, {
       primaryId: 'Steam|1|0',

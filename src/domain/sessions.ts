@@ -1,5 +1,18 @@
 import type { MatchState, SessionGroup } from './types';
 
+export function startsNewSession(
+  prior: Pick<MatchState, 'endedAt' | 'lastEventAt' | 'sessionEndedAfter'>,
+  match: Pick<MatchState, 'startedAt'>,
+  idleMinutes: number,
+): boolean {
+  return (
+    prior.sessionEndedAfter === true ||
+    new Date(match.startedAt).getTime() -
+      new Date(prior.endedAt ?? prior.lastEventAt).getTime() >=
+      idleMinutes * 60_000
+  );
+}
+
 export function groupSessions(
   source: MatchState[],
   idleMinutes: number,
@@ -14,9 +27,7 @@ export function groupSessions(
   for (const match of matches.slice(1)) {
     const current = groups.at(-1)!;
     const prior = current.at(-1)!;
-    const priorEnd = new Date(prior.endedAt ?? prior.lastEventAt).getTime();
-    if (new Date(match.startedAt).getTime() - priorEnd >= idleMinutes * 60_000)
-      groups.push([]);
+    if (startsNewSession(prior, match, idleMinutes)) groups.push([]);
     groups.at(-1)!.push(match);
   }
   return groups.map((items) => ({
@@ -24,5 +35,6 @@ export function groupSessions(
     startedAt: items[0]!.startedAt,
     endedAt: items.at(-1)!.endedAt ?? items.at(-1)!.lastEventAt,
     matches: items,
+    endedManually: items.at(-1)!.sessionEndedAfter === true,
   }));
 }

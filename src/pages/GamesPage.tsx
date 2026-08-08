@@ -1,4 +1,5 @@
-import { ArrowUpRight, CalendarDays, Radio } from 'lucide-react';
+import { ArrowUpRight, CalendarDays, Radio, Square } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { EmptyState } from '../components/EmptyState';
@@ -26,11 +27,35 @@ function sessionTitle(startedAt: string, current: boolean): string {
  * coordinating loading, pagination, and empty-history states.
  */
 export function GamesPage() {
-  const { activeMatch, profile, connection } = useFennec();
+  const { activeMatch, profile, connection, endSession } = useFennec();
+  const [endingSession, setEndingSession] = useState(false);
+  const [sessionMessage, setSessionMessage] = useState<string>();
   const sessionsQuery = useSessions();
   const orderedSessions =
     sessionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const current = orderedSessions[0];
+  const handleEndSession = async () => {
+    setEndingSession(true);
+    setSessionMessage(undefined);
+    try {
+      const result = await endSession();
+      setSessionMessage(
+        result === 'split-live'
+          ? 'New session started for the live game.'
+          : result === 'ended'
+            ? 'Session ended. The next game will start a new session.'
+            : activeMatch
+              ? 'This live game already starts a new session.'
+              : 'Session is already ended.',
+      );
+    } catch (error) {
+      setSessionMessage(
+        `Could not end the session: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setEndingSession(false);
+    }
+  };
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -99,20 +124,47 @@ export function GamesPage() {
       ) : (
         current && (
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="eyebrow text-fennec-cyan">In focus</div>
                 <h2 className="mt-1 text-2xl font-extrabold">
-                  Current session
+                  {current.endedManually && !activeMatch
+                    ? 'Latest session'
+                    : 'Current session'}
                 </h2>
               </div>
-              <Link
-                className="text-fennec-cyan flex items-center gap-1 text-sm font-bold"
-                to={`/sessions/${current.id}`}
-              >
-                Full session <ArrowUpRight className="size-4" />
-              </Link>
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                {current.endedManually && !activeMatch ? (
+                  <span className="text-muted text-sm font-bold">
+                    Session ended
+                  </span>
+                ) : (
+                  <button
+                    className="button-secondary"
+                    disabled={endingSession}
+                    onClick={() => void handleEndSession()}
+                  >
+                    <Square className="size-3.5 fill-current" />
+                    {endingSession ? 'Ending…' : 'End session'}
+                  </button>
+                )}
+                <Link
+                  className="text-fennec-cyan flex items-center gap-1 text-sm font-bold"
+                  to={`/sessions/${current.id}`}
+                >
+                  Full session <ArrowUpRight className="size-4" />
+                </Link>
+              </div>
             </div>
+            {sessionMessage && (
+              <p
+                className="text-muted text-sm"
+                role="status"
+                aria-live="polite"
+              >
+                {sessionMessage}
+              </p>
+            )}
             <div className="surface rounded-3xl p-5 sm:p-6">
               <MetricsGrid
                 metrics={sessionMetrics(current.matches, profile?.primaryId)}

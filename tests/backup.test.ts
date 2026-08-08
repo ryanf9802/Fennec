@@ -38,11 +38,18 @@ const value: MatchState = {
 
 describe('portable data', () => {
   it('round-trips the versioned backup', () => {
-    const backup = createBackup([value], defaultSettings, {
-      primaryId: 'Steam|1|0',
-      displayName: 'Me',
+    const backup = createBackup(
+      [{ ...value, sessionEndedAfter: true }],
+      defaultSettings,
+      {
+        primaryId: 'Steam|1|0',
+        displayName: 'Me',
+      },
+    );
+    expect(parseBackup(JSON.stringify(backup)).matches[0]).toMatchObject({
+      id: 'one',
+      sessionEndedAfter: true,
     });
-    expect(parseBackup(JSON.stringify(backup)).matches[0]?.id).toBe('one');
     expect(backup.version).toBe(3);
   });
   it('imports and normalizes version 1 backups', () => {
