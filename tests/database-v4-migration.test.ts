@@ -54,6 +54,7 @@ describe('version 4 player-key migration', () => {
       score: 100,
       goals: 0,
       assists: 0,
+      passes: 0,
       saves: 0,
       shots: 1,
       touches: 5,
@@ -71,6 +72,15 @@ describe('version 4 player-key migration', () => {
       },
       {
         ...base,
+        id: 'legacy-bot\u0000id:Epic|mate|0',
+        playerKey: 'id:Epic|mate|0',
+        name: 'Mate',
+        primaryId: 'Epic|mate|0',
+        shortcut: 3,
+        teamNumber: 0,
+      },
+      {
+        ...base,
         id: 'legacy-bot\u0000id:Unknown|0|0',
         playerKey: 'id:Unknown|0|0',
         name: 'Boomer',
@@ -80,21 +90,53 @@ describe('version 4 player-key migration', () => {
         result: 'loss',
       },
     ]);
-    await legacy.table('events').put({
-      id: 'legacy-bot:1',
-      matchId: 'legacy-bot',
-      sequence: 1,
-      receivedAt: startedAt,
-      eventName: 'GoalScored',
-      payload: { Scorer: { Name: 'You' } },
-    });
-    await legacy.table('rawEvents').put({
-      id: 'legacy-bot:1',
-      matchId: 'legacy-bot',
-      receivedAt: startedAt,
-      payload: { Scorer: { Name: 'You' }, DebugOnly: 'preserved' },
-    });
-    await legacy.table('metadata').put({ key: 'normalized-v3', value: true });
+    await legacy.table('events').bulkPut([
+      {
+        id: 'legacy-bot:1',
+        matchId: 'legacy-bot',
+        sequence: 1,
+        receivedAt: startedAt,
+        eventName: 'BallHit',
+        payload: { Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }] },
+      },
+      {
+        id: 'legacy-bot:2',
+        matchId: 'legacy-bot',
+        sequence: 2,
+        receivedAt: startedAt,
+        eventName: 'BallHit',
+        payload: { Players: [{ Name: 'Mate', Shortcut: 3, TeamNum: 0 }] },
+      },
+      {
+        id: 'legacy-bot:3',
+        matchId: 'legacy-bot',
+        sequence: 3,
+        receivedAt: startedAt,
+        eventName: 'GoalScored',
+        payload: { Scorer: { Name: 'You' } },
+      },
+    ]);
+    await legacy.table('rawEvents').bulkPut([
+      {
+        id: 'legacy-bot:1',
+        matchId: 'legacy-bot',
+        receivedAt: startedAt,
+        payload: { Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }] },
+      },
+      {
+        id: 'legacy-bot:2',
+        matchId: 'legacy-bot',
+        receivedAt: startedAt,
+        payload: { Players: [{ Name: 'Mate', Shortcut: 3, TeamNum: 0 }] },
+      },
+      {
+        id: 'legacy-bot:3',
+        matchId: 'legacy-bot',
+        receivedAt: startedAt,
+        payload: { Scorer: { Name: 'You' }, DebugOnly: 'preserved' },
+      },
+    ]);
+    await legacy.table('metadata').put({ key: 'normalized-v4', value: true });
     legacy.close();
   });
 
@@ -106,11 +148,18 @@ describe('version 4 player-key migration', () => {
     await historyRepository.initialize();
 
     const migrated = await historyRepository.getMatch('legacy-bot');
-    expect(migrated?.participants.map((player) => player.name)).toEqual([
-      'You',
-      'Boomer',
-    ]);
-    expect(migrated?.events[0]?.payload.DebugOnly).toBe('preserved');
+    expect(migrated?.participants.map((player) => player.name)).toEqual(
+      expect.arrayContaining(['You', 'Mate', 'Boomer']),
+    );
+    expect(migrated?.participants).toHaveLength(3);
+    expect(
+      migrated?.participants.find((player) => player.name === 'You')?.passes,
+    ).toBe(1);
+    expect((await db.metadata.get('normalized-v5'))?.value).toBe(true);
+    expect(
+      migrated?.events.find((event) => event.eventName === 'GoalScored')
+        ?.payload.DebugOnly,
+    ).toBe('preserved');
     expect(
       await historyRepository.getPlayerHistory('id:Steam|you|0', 'name:boomer'),
     ).toMatchObject({

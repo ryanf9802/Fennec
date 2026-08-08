@@ -28,6 +28,7 @@ const stats: Array<{
   { key: 'score', full: 'Score', short: 'Score' },
   { key: 'goals', full: 'Goals', short: 'G' },
   { key: 'assists', full: 'Assists', short: 'A' },
+  { key: 'passes', full: 'Passes', short: 'P' },
   { key: 'saves', full: 'Saves', short: 'SV' },
   { key: 'shots', full: 'Shots', short: 'SH' },
   { key: 'touches', full: 'Touches', short: 'T' },
@@ -284,11 +285,11 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
             )}
           </div>
           <div className="overflow-x-auto rounded-2xl">
-            <table className="scoreboard-table surface-flat w-full min-w-[50rem] overflow-hidden rounded-2xl">
+            <table className="scoreboard-table surface-flat w-full min-w-[56rem] overflow-hidden rounded-2xl">
               <colgroup>
-                <col className="w-[28%]" />
+                <col className="w-1/4" />
                 {stats.map(({ key }) => (
-                  <col key={key} className="w-[9%]" />
+                  <col key={key} />
                 ))}
               </colgroup>
               <thead className="eyebrow">

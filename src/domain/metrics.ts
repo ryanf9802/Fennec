@@ -64,6 +64,7 @@ export function sessionMetrics(
     goalsAgainst,
     goals,
     assists: profiles.reduce((total, item) => total + item.player!.assists, 0),
+    passes: profiles.reduce((total, item) => total + item.player!.passes, 0),
     saves: profiles.reduce((total, item) => total + item.player!.saves, 0),
     shots,
     shootingPercentage: shots ? Math.round((goals * 100) / shots) : undefined,

@@ -18,6 +18,7 @@ export interface ParticipantState {
   score: number;
   goals: number;
   assists: number;
+  passes: number;
   saves: number;
   shots: number;
   touches: number;
@@ -224,6 +225,7 @@ export interface SessionMetrics {
   goalsAgainst: number;
   goals: number;
   assists: number;
+  passes: number;
   saves: number;
   shots: number;
   shootingPercentage?: number;

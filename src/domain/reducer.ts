@@ -1,5 +1,6 @@
 import { resolvePlaylist } from './playlists';
 import { isTrackablePrimaryId, normalizePlayerName } from './playerIdentity';
+import { recalculatePasses } from './passes';
 import type {
   MatchState,
   ParticipantState,
@@ -76,6 +77,7 @@ function participant(value: Record<string, unknown>): ParticipantState {
     score: numberValue(value.Score),
     goals: numberValue(value.Goals),
     assists: numberValue(value.Assists),
+    passes: 0,
     saves: numberValue(value.Saves),
     shots: numberValue(value.Shots),
     touches: numberValue(value.Touches),
@@ -133,7 +135,10 @@ function mergeParticipants(
           normalizePlayerName(candidate.name) === normalizedName,
       );
     if (index < 0) merged.push(value);
-    else merged[index] = { ...merged[index], ...value, isPresent: true };
+    else {
+      const passes = merged[index]?.passes ?? 0;
+      merged[index] = { ...merged[index], ...value, passes, isPresent: true };
+    }
   }
   return merged;
 }
@@ -358,6 +363,7 @@ export function reduceStatsEnvelope(
       if (leaving) leaving.isPresent = false;
     }
     match.events = [...match.events, storeEvent(match, envelope, now)];
+    if (envelope.event === 'BallHit') recalculatePasses(match);
   }
 
   return { current: match, superseded };

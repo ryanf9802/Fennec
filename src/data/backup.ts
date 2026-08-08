@@ -5,10 +5,11 @@ import {
   type MatchState,
 } from '../domain/types';
 import { playerTouchAnalytics } from '../domain/analytics';
+import { recalculatePasses } from '../domain/passes';
 
 export interface FennecBackup {
   format: 'fennec-backup';
-  version: 3;
+  version: 4;
   exportedAt: string;
   settings: FennecSettings;
   profile?: FennecProfile;
@@ -17,7 +18,7 @@ export interface FennecBackup {
 
 interface StreamBackupHeader {
   format: 'fennec-backup';
-  version: 3;
+  version: 3 | 4;
   encoding: 'ndjson';
   exportedAt: string;
   settings: FennecSettings;
@@ -43,19 +44,20 @@ export function createBackup(
 ): FennecBackup {
   return {
     format: 'fennec-backup',
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     settings,
     profile,
-    matches,
+    matches: matches.map(normalizeMatch),
   };
 }
 
 function normalizeMatch(match: MatchState): MatchState {
-  return {
+  const normalized = {
     ...match,
     participants: match.participants.map((player) => ({
       ...player,
+      passes: player.passes ?? 0,
       carTouches: player.carTouches ?? 0,
       loadout: player.loadout ?? [],
       isPresent: player.isPresent ?? true,
@@ -66,6 +68,8 @@ function normalizeMatch(match: MatchState): MatchState {
     })),
     events: [...match.events].sort((a, b) => a.sequence - b.sequence),
   };
+  recalculatePasses(normalized);
+  return normalized;
 }
 
 /**
@@ -84,7 +88,7 @@ export function parseBackup(text: string): FennecBackup {
     const header = lines[0] as Partial<StreamBackupHeader> | undefined;
     if (
       header?.format !== 'fennec-backup' ||
-      header.version !== 3 ||
+      ![3, 4].includes(header.version ?? 0) ||
       header.encoding !== 'ndjson'
     )
       throw new Error('This is not a supported Fennec backup.');
@@ -107,7 +111,7 @@ export function parseBackup(text: string): FennecBackup {
   const backup = value as Partial<FennecBackup> & { version?: number };
   if (
     backup.format !== 'fennec-backup' ||
-    ![1, 2, 3].includes(backup.version ?? 0) ||
+    ![1, 2, 3, 4].includes(backup.version ?? 0) ||
     !Array.isArray(backup.matches)
   ) {
     throw new Error('This is not a supported Fennec backup.');
@@ -124,7 +128,7 @@ export function parseBackup(text: string): FennecBackup {
   }
   return {
     format: 'fennec-backup',
-    version: 3,
+    version: 4,
     exportedAt:
       typeof backup.exportedAt === 'string'
         ? backup.exportedAt
@@ -156,7 +160,7 @@ export async function streamBackup(
   const writer = await handle.createWritable();
   const header: StreamBackupHeader = {
     format: 'fennec-backup',
-    version: 3,
+    version: 4,
     encoding: 'ndjson',
     exportedAt: new Date().toISOString(),
     settings,
@@ -166,7 +170,7 @@ export async function streamBackup(
     await writer.write(`${JSON.stringify(header)}\n`);
     for await (const match of matches)
       await writer.write(
-        `${JSON.stringify({ type: 'match', value: match })}\n`,
+        `${JSON.stringify({ type: 'match', value: normalizeMatch(match) })}\n`,
       );
   } finally {
     await writer.close();
@@ -192,6 +196,7 @@ export function matchesCsv(matches: MatchState[], profileId?: string): string {
       'opponent_score',
       'goals',
       'assists',
+      'passes',
       'saves',
       'shots',
       'car_touches',
@@ -232,6 +237,7 @@ export function matchesCsv(matches: MatchState[], profileId?: string): string {
         opponentScore,
         player?.goals ?? '',
         player?.assists ?? '',
+        player?.passes ?? '',
         player?.saves ?? '',
         player?.shots ?? '',
         player?.carTouches ?? '',

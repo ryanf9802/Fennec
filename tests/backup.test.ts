@@ -27,13 +27,44 @@ const value: MatchState = {
       score: 500,
       goals: 2,
       assists: 0,
+      passes: 1,
       saves: 1,
       shots: 3,
       touches: 30,
       demos: 0,
     },
+    {
+      name: 'Mate',
+      primaryId: 'Epic|2|0',
+      teamNumber: 0,
+      score: 250,
+      goals: 0,
+      assists: 1,
+      passes: 0,
+      saves: 0,
+      shots: 1,
+      touches: 20,
+      demos: 0,
+    },
   ],
-  events: [],
+  events: [
+    {
+      id: 'one:1',
+      matchId: 'one',
+      sequence: 1,
+      eventName: 'BallHit',
+      receivedAt: '2026-08-08T00:01:00Z',
+      payload: { Players: [{ Name: 'Me', TeamNum: 0 }] },
+    },
+    {
+      id: 'one:2',
+      matchId: 'one',
+      sequence: 2,
+      eventName: 'BallHit',
+      receivedAt: '2026-08-08T00:01:01Z',
+      payload: { Players: [{ Name: 'Mate', TeamNum: 0 }] },
+    },
+  ],
 };
 
 describe('portable data', () => {
@@ -50,13 +81,15 @@ describe('portable data', () => {
       id: 'one',
       sessionEndedAfter: true,
     });
-    expect(backup.version).toBe(3);
+    expect(backup.version).toBe(4);
+    expect(backup.matches[0]?.participants[0]?.passes).toBe(1);
   });
   it('imports and normalizes version 1 backups', () => {
     const backup = createBackup([value], defaultSettings);
     const parsed = parseBackup(JSON.stringify({ ...backup, version: 1 }));
-    expect(parsed.version).toBe(3);
+    expect(parsed.version).toBe(4);
     expect(parsed.matches[0]?.participants[0]?.carTouches).toBe(0);
+    expect(parsed.matches[0]?.participants[0]?.passes).toBe(1);
   });
   it('imports the streamable version 3 record format', () => {
     const header = {
@@ -106,6 +139,7 @@ describe('portable data', () => {
   it('exports profile match summaries as CSV', () => {
     const csv = matchesCsv([value], 'Steam|1|0');
     expect(csv).toContain('"win","2","1","2"');
+    expect(csv).toContain('"assists","passes","saves"');
     expect(csv).toContain('"car_touches","ball_hits"');
   });
 });

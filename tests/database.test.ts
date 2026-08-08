@@ -56,6 +56,7 @@ function player(
     score: 100,
     goals: 0,
     assists: 0,
+    passes: 0,
     saves: 0,
     shots: 1,
     touches: 10,
@@ -118,7 +119,9 @@ describe('IndexedDB storage', () => {
 
   it('loads the latest match with participants and events', async () => {
     await saveMatch(playedMatch('older', '2026-08-08T00:00:00Z', true, true));
-    await saveMatch(playedMatch('latest', '2026-08-08T00:10:00Z', false, false));
+    await saveMatch(
+      playedMatch('latest', '2026-08-08T00:10:00Z', false, false),
+    );
 
     const latest = await historyRepository.loadLatestMatch();
 

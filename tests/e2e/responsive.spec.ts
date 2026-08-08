@@ -398,6 +398,9 @@ test('scoreboard columns align and the desktop timeline scrolls independently', 
   await expect(
     page.getByRole('columnheader', { name: 'Goals', exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('columnheader', { name: 'Passes', exact: true }),
+  ).toBeVisible();
   const timelineScroller = page.locator('.timeline-scroller');
   expect(
     await timelineScroller.evaluate(

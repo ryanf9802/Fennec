@@ -28,6 +28,7 @@ const legacyMatch: Omit<MatchState, 'events'> = {
       score: 100,
       goals: 1,
       assists: 0,
+      passes: 0,
       saves: 0,
       shots: 1,
       touches: 10,
@@ -40,6 +41,7 @@ const legacyMatch: Omit<MatchState, 'events'> = {
       score: 50,
       goals: 0,
       assists: 0,
+      passes: 0,
       saves: 0,
       shots: 1,
       touches: 8,
@@ -88,6 +90,9 @@ describe('version 2 database migration', () => {
     );
 
     expect(migrated?.participants).toHaveLength(2);
+    expect(migrated?.participants.every((player) => player.passes === 0)).toBe(
+      true,
+    );
     expect(migrated?.events[0]?.payload.DebugOnly).toBeUndefined();
     expect(playerHistory.summary).toMatchObject({
       gamesOpposed: 1,

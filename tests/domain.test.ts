@@ -23,6 +23,7 @@ import {
   gameToScene,
 } from '../src/domain/touchMapGeometry';
 import { normalizePlayerKey, playerKeyFor } from '../src/domain/playerIdentity';
+import { sessionMetrics } from '../src/domain/metrics';
 import {
   defaultSettings,
   type MatchState,
@@ -41,6 +42,7 @@ const player = (
   score: 0,
   goals: 0,
   assists: 0,
+  passes: 0,
   saves: 0,
   shots: 0,
   touches: 0,
@@ -153,6 +155,131 @@ describe('Stats API domain', () => {
       '2026-08-08T00:00:01Z',
     ).current;
     expect(goal.events[0]?.payload.GoalSpeed).toBe(123.4);
+  });
+
+  it('credits the prior toucher when the next valid touch is by a teammate', () => {
+    let value = reduceStatsEnvelope(undefined, {
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'passes',
+        Players: [
+          { Name: 'Me', PrimaryId: 'Steam|1|0', Shortcut: 1, TeamNum: 0 },
+          { Name: 'Mate', PrimaryId: 'Epic|2|0', Shortcut: 2, TeamNum: 0 },
+          { Name: 'Rival', PrimaryId: 'Steam|3|0', Shortcut: 3, TeamNum: 1 },
+          {
+            Name: 'Rival Mate',
+            PrimaryId: 'Epic|4|0',
+            Shortcut: 4,
+            TeamNum: 1,
+          },
+        ],
+        Game: {},
+      },
+    }).current;
+    const hit = (shortcut: number, teamNumber: number, name: string) => {
+      value = reduceStatsEnvelope(value, {
+        event: 'BallHit',
+        data: {
+          MatchGuid: 'passes',
+          Players: [{ Name: name, Shortcut: shortcut, TeamNum: teamNumber }],
+        },
+      }).current;
+    };
+
+    hit(1, 0, 'Me');
+    value = reduceStatsEnvelope(value, {
+      event: 'StatfeedEvent',
+      data: { MatchGuid: 'passes', Type: 'Demolish' },
+    }).current;
+    hit(2, 0, 'Mate');
+    hit(2, 0, 'Mate');
+    hit(1, 0, 'Me');
+    hit(3, 1, 'Rival');
+    hit(4, 1, 'Rival Mate');
+
+    expect(
+      Object.fromEntries(
+        value.participants.map((participant) => [
+          participant.name,
+          participant.passes,
+        ]),
+      ),
+    ).toEqual({ Me: 1, Mate: 1, Rival: 1, 'Rival Mate': 0 });
+
+    value = reduceStatsEnvelope(value, {
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'passes',
+        Players: [
+          { Name: 'Me', PrimaryId: 'Steam|1|0', Shortcut: 1, TeamNum: 0 },
+          { Name: 'Mate', PrimaryId: 'Epic|2|0', Shortcut: 2, TeamNum: 0 },
+        ],
+        Game: {},
+      },
+    }).current;
+    expect(
+      value.participants.find((player) => player.name === 'Me')?.passes,
+    ).toBe(1);
+  });
+
+  it('breaks pass sequences at ambiguous touches and dead-ball transitions', () => {
+    let value = reduceStatsEnvelope(undefined, {
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'pass-breaks',
+        Players: [
+          { Name: 'Me', Shortcut: 1, TeamNum: 0 },
+          { Name: 'Mate', Shortcut: 2, TeamNum: 0 },
+          { Name: 'Rival', Shortcut: 3, TeamNum: 1 },
+        ],
+        Game: {},
+      },
+    }).current;
+    const send = (event: string, data: Record<string, unknown> = {}) => {
+      value = reduceStatsEnvelope(value, {
+        event,
+        data: { MatchGuid: 'pass-breaks', ...data },
+      }).current;
+    };
+
+    send('BallHit', {
+      Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+    });
+    send('BallHit', {
+      Players: [
+        { Name: 'Mate', Shortcut: 2, TeamNum: 0 },
+        { Name: 'Rival', Shortcut: 3, TeamNum: 1 },
+      ],
+    });
+    send('BallHit', {
+      Players: [{ Name: 'Mate', Shortcut: 2, TeamNum: 0 }],
+    });
+    send('GoalScored');
+    send('BallHit', {
+      Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+    });
+    send('BallHit', {
+      Players: [{ Name: 'Mate', Shortcut: 2, TeamNum: 0 }],
+    });
+    send('RoundStarted');
+    send('BallHit', {
+      Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+    });
+    send('BallHit', {
+      Players: [{ Name: 'Mate', Shortcut: 2, TeamNum: 0 }],
+    });
+    send('MatchPaused');
+    send('BallHit', {
+      Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+    });
+    send('MatchUnpaused');
+    send('BallHit', {
+      Players: [{ Name: 'Mate', Shortcut: 2, TeamNum: 0 }],
+    });
+
+    expect(
+      value.participants.find((player) => player.name === 'Me')?.passes,
+    ).toBe(1);
   });
 
   it('captures continuous elapsed event times across regulation and overtime', () => {
@@ -777,7 +904,12 @@ describe('Stats API domain', () => {
       { teamNumber: 1, name: 'Orange', score: 1, colorPrimary: '' },
     ];
     together.participants = [
-      { ...player('Me', 'Steam|1|0', 0), score: 500, goals: 2 },
+      {
+        ...player('Me', 'Steam|1|0', 0),
+        score: 500,
+        goals: 2,
+        passes: 4,
+      },
       { ...player('Friend', 'Epic|2|0', 0), score: 300, assists: 2 },
     ];
     together.winnerTeamNumber = 0;
@@ -827,7 +959,9 @@ describe('Stats API domain', () => {
     });
     expect(history.against.lastSeen).toBe(against.startedAt);
     expect(history.together.you.score).toBe(500);
+    expect(history.together.you.passes).toBe(4);
     expect(history.against.player.goals).toBe(3);
+    expect(sessionMetrics([together], 'Steam|1|0').passes).toBe(4);
     expect(history.recent[0]?.result).toBe('incomplete');
     expect(isTrackablePrimaryId('Unknown|0|0')).toBe(false);
   });

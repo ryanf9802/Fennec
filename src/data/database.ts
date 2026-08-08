@@ -17,6 +17,7 @@ import {
   type SessionGroup,
   type TimelineEvent,
 } from '../domain/types';
+import { recalculatePasses } from '../domain/passes';
 import type {
   EndSessionResult,
   HistoryPage,
@@ -28,7 +29,7 @@ import type {
 } from './historyRepository';
 
 const rawRetentionDays = 90;
-const schemaMarker = 'normalized-v4';
+const schemaMarker = 'normalized-v5';
 const stringMinKey = '';
 const stringMaxKey = '\uffff';
 
@@ -364,6 +365,7 @@ class FennecDatabase extends Dexie {
           .modify((match) => {
             match.participants = match.participants.map((player) => ({
               ...player,
+              passes: player.passes ?? 0,
               carTouches: player.carTouches ?? 0,
               loadout: player.loadout ?? [],
               isPresent: player.isPresent ?? true,
@@ -466,6 +468,7 @@ async function normalizeExistingData(): Promise<void> {
             events: eventsByMatch.get(match.id) ?? [],
           }) as MatchState,
       );
+      for (const match of hydrated) recalculatePasses(match);
       const grouped = groupSessionRecords(hydrated, settings.sessionGapMinutes);
       const appearances = hydrated.flatMap((match) =>
         match.participants.map((player) => appearance(match, player)),
@@ -600,6 +603,7 @@ async function hydrateMatches(records: StoredMatch[]): Promise<MatchState[]> {
         score: item.score,
         goals: item.goals,
         assists: item.assists,
+        passes: item.passes ?? 0,
         saves: item.saves,
         shots: item.shots,
         touches: item.touches,
@@ -644,6 +648,7 @@ async function hydrateSummaries(records: StoredMatch[]): Promise<MatchState[]> {
         score: item.score,
         goals: item.goals,
         assists: item.assists,
+        passes: item.passes ?? 0,
         saves: item.saves,
         shots: item.shots,
         touches: item.touches,
