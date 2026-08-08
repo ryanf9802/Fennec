@@ -1,18 +1,21 @@
 import { Check, Download, FileJson, Save, Trash2, Upload } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useFennec } from '../app/FennecContext';
 import { StatsApiSetup } from '../components/StatsApiSetup';
-import { createBackup, downloadText, matchesCsv, parseBackup } from '../data/backup';
-import { timelineCatalog } from '../domain/timeline';
+import { createBackup, downloadText, matchesCsv, parseBackup, streamBackup } from '../data/backup';
+import { historyRepository, loadMatches } from '../data/database';
+import { useStorageStatistics, useTimelineCatalog } from '../data/historyQueries';
 import type { FennecSettings } from '../domain/types';
 
 export function SettingsPage() {
   const context = useFennec();
-  const { matches, profile, settings, connection, diagnostic, updateSettings, deleteHistory, restoreBackup } = context;
+  const { profile, settings, connection, diagnostic, updateSettings, deleteHistory, restoreBackup } = context;
   const [draft, setDraft] = useState(settings);
   const [message, setMessage] = useState<string>();
   const fileInput = useRef<HTMLInputElement>(null);
-  const catalog = useMemo(() => timelineCatalog(matches), [matches]);
+  const catalog = useTimelineCatalog().data ?? {};
+  const storageQuery = useStorageStatistics();
+  const storage = storageQuery.data;
   const patchDraft = (patch: Partial<FennecSettings>) => setDraft((current) => ({ ...current, ...patch }));
 
   const restore = async (file?: File) => {
@@ -36,8 +39,35 @@ export function SettingsPage() {
       setMessage('Session idle time must be a whole number from 1 to 240.');
       return;
     }
-    await updateSettings(draft);
-    setMessage('Settings saved.');
+    try {
+      await updateSettings(draft);
+      setMessage('Settings saved.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
+  };
+
+  const exportJson = async () => {
+    const filename = `fennec-backup-${new Date().toISOString().slice(0, 10)}`;
+    try {
+      if (await streamBackup(`${filename}.ndjson`, historyRepository.iterateMatches(), draft, profile)) return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setMessage(error instanceof Error ? error.message : String(error));
+      return;
+    }
+    const matches = await loadMatches();
+    downloadText(`${filename}.json`, JSON.stringify(createBackup(matches, draft, profile), null, 2), 'application/json');
+  };
+
+  const exportCsv = async () => {
+    const matches = await loadMatches();
+    downloadText(`fennec-matches-${new Date().toISOString().slice(0, 10)}.csv`, matchesCsv(matches, profile?.primaryId), 'text/csv');
+  };
+
+  const protectStorage = async () => {
+    if (!navigator.storage?.persist) return;
+    const granted = await navigator.storage.persist();
+    await storageQuery.refetch();
+    setMessage(granted ? 'Persistent browser storage granted.' : 'The browser kept this origin in best-effort storage.');
   };
 
   return <div className="space-y-7">
@@ -56,9 +86,9 @@ export function SettingsPage() {
       })}</div>}
     </section>
 
-    <section className="surface-flat rounded-3xl p-5 sm:p-7"><h2 className="text-xl font-extrabold">Local data</h2><p className="text-muted mt-2">History stays in this browser. Export a backup before moving between localhost and app.fennec.gg.</p><div className="mt-5 flex flex-wrap gap-3"><button className="button-secondary" onClick={() => downloadText(`fennec-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(createBackup(matches, draft, profile), null, 2), 'application/json')}><FileJson className="size-4" />Export JSON</button><button className="button-secondary" onClick={() => downloadText(`fennec-matches-${new Date().toISOString().slice(0, 10)}.csv`, matchesCsv(matches, profile?.primaryId), 'text/csv')}><Download className="size-4" />Export CSV</button><button className="button-secondary" onClick={() => fileInput.current?.click()}><Upload className="size-4" />Restore backup</button><input ref={fileInput} className="hidden" type="file" accept="application/json,.json" onChange={(event) => void restore(event.target.files?.[0])} /><button className="button-danger" onClick={() => { if (confirm(`Delete ${matches.length} locally stored matches? This cannot be undone.`)) void deleteHistory().then(() => setMessage('Match history deleted.')); }}><Trash2 className="size-4" />Delete history</button></div></section>
+    <section className="surface-flat rounded-3xl p-5 sm:p-7"><h2 className="text-xl font-extrabold">Local data</h2><p className="text-muted mt-2">Match history and compact analytics stay in this browser. Full technical payloads are retained for {storage?.rawRetentionDays ?? 90} days.</p>{storage?.usage !== undefined && <p className="text-muted mt-2 text-sm">Using {(storage.usage / 1_048_576).toFixed(1)} MB{storage.quota ? ` of ${(storage.quota / 1_073_741_824).toFixed(1)} GB available` : ''} · {storage.persisted ? 'persistent storage granted' : 'best-effort browser storage'}</p>}<div className="mt-5 flex flex-wrap gap-3">{storage && !storage.persisted && <button className="button-secondary" onClick={() => void protectStorage()}>Protect local history</button>}<button className="button-secondary" onClick={() => void exportJson()}><FileJson className="size-4" />Export backup</button><button className="button-secondary" onClick={() => void exportCsv()}><Download className="size-4" />Export CSV</button><button className="button-secondary" onClick={() => fileInput.current?.click()}><Upload className="size-4" />Restore backup</button><input ref={fileInput} className="hidden" type="file" accept="application/json,application/x-ndjson,.json,.ndjson" onChange={(event) => void restore(event.target.files?.[0])} /><button className="button-danger" onClick={() => { if (confirm(`Delete ${storage?.matches ?? 0} locally stored matches? This cannot be undone.`)) void deleteHistory().then(() => setMessage('Match history deleted.')); }}><Trash2 className="size-4" />Delete history</button></div></section>
 
-    <section className="surface-flat rounded-2xl p-5"><div className="eyebrow">Developer diagnostics</div><div className="mt-3 grid gap-2 text-sm sm:grid-cols-2"><div><span className="text-muted">Endpoint:</span> <code>ws://127.0.0.1:{draft.webSocketPort}</code></div><div><span className="text-muted">Matches:</span> {matches.length}</div><div><span className="text-muted">Events:</span> {matches.reduce((sum, match) => sum + match.events.length, 0)}</div><div className="truncate"><span className="text-muted">Last warning:</span> {diagnostic ?? 'None'}</div></div></section>
+    <section className="surface-flat rounded-2xl p-5"><div className="eyebrow">Developer diagnostics</div><div className="mt-3 grid gap-2 text-sm sm:grid-cols-2"><div><span className="text-muted">Endpoint:</span> <code>ws://127.0.0.1:{draft.webSocketPort}</code></div><div><span className="text-muted">Matches:</span> {storage?.matches ?? '—'}</div><div><span className="text-muted">Semantic events:</span> {storage?.semanticEvents ?? '—'}</div><div><span className="text-muted">Raw events:</span> {storage?.rawEvents ?? '—'}</div><div className="truncate"><span className="text-muted">Last warning:</span> {diagnostic ?? 'None'}</div></div></section>
 
     <div className="flex flex-wrap items-center justify-end gap-3"><span className="text-muted mr-auto text-sm">{message}</span><button className="button-primary" onClick={() => void saveDraft()}><Save className="size-4" />Save settings</button>{message === 'Settings saved.' && <Check className="size-5 text-fennec-cyan" />}</div>
   </div>;

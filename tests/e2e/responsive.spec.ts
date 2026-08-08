@@ -22,11 +22,11 @@ test('demo feed opens a live match and settings remain usable', async ({ page })
   await expect(page.getByRole('heading', { name: 'Event timeline' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Luna/ })).toBeVisible();
   await page.getByRole('button', { name: /Luna/ }).click();
-  const dialog = page.getByRole('dialog', { name: /Luna/ });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('Played together')).toBeVisible();
-  await expect(dialog.getByText('Played against')).toBeVisible();
-  await dialog.getByRole('button', { name: 'Close player history' }).click();
+  await expect(page).toHaveURL(/\/players\//);
+  await expect(page.getByRole('heading', { name: 'Luna' })).toBeVisible();
+  await expect(page.getByText('Together', { exact: true })).toBeVisible();
+  await expect(page.getByText('Opposed', { exact: true })).toBeVisible();
+  await page.goBack();
   await expect(page.getByRole('heading', { name: 'Ball analytics' })).toBeVisible();
   await expect(page.getByRole('img', { name: /ball touch map/i })).toBeVisible();
   await page.goto('/settings?demo=1');

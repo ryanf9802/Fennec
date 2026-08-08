@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { recoverActiveMatch, reduceStatsEnvelope } from '../domain/reducer';
-import { groupSessions } from '../domain/sessions';
-import { defaultSettings, type FeedConnectionState, type FennecProfile, type FennecSettings, type MatchState, type SessionGroup } from '../domain/types';
-import { clearHistory, loadMatches, loadProfile, loadSettings, replaceAll, saveMatch, saveProfile, saveSettings } from '../data/database';
+import { defaultSettings, type FeedConnectionState, type FennecProfile, type FennecSettings, type MatchState } from '../domain/types';
+import { clearHistory, historyRepository, loadProfile, loadSettings, replaceAll, saveMatch, saveProfile, saveSettings } from '../data/database';
+import { historyKeys, queryClient } from '../data/historyQueries';
 import type { FennecBackup } from '../data/backup';
 import { SimulatedStatsFeed } from '../feed/SimulatedStatsFeed';
 import { WebSocketStatsFeed } from '../feed/WebSocketStatsFeed';
@@ -10,9 +10,7 @@ import { createDemoHistory } from '../feed/demoHistory';
 
 interface FennecContextValue {
   ready: boolean;
-  matches: MatchState[];
   activeMatch?: MatchState;
-  sessions: SessionGroup[];
   profile?: FennecProfile;
   settings: FennecSettings;
   connection: FeedConnectionState;
@@ -33,123 +31,131 @@ function applyTheme(theme: FennecSettings['theme']): void {
 
 export function FennecProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [matches, setMatches] = useState<MatchState[]>([]);
+  const [activeMatch, setActiveMatch] = useState<MatchState>();
   const [profile, setProfile] = useState<FennecProfile>();
   const [settings, setSettings] = useState<FennecSettings>(defaultSettings);
   const [connection, setConnection] = useState<FeedConnectionState>('stopped');
   const [diagnostic, setDiagnostic] = useState<string>();
   const activeRef = useRef<MatchState | undefined>(undefined);
   const profileRef = useRef<FennecProfile | undefined>(undefined);
+  const historyGenerationRef = useRef(0);
+  const [historyGeneration, setHistoryGeneration] = useState(0);
   const demoMode = import.meta.env.VITE_DEMO_FEED === 'true' || new URLSearchParams(location.search).get('demo') === '1';
 
   useEffect(() => {
-    void Promise.all([loadMatches(), loadProfile(), loadSettings()]).then(async ([storedMatches, storedProfile, storedSettings]) => {
-      if (demoMode && storedMatches.length === 0) {
-        storedMatches.push(...createDemoHistory());
-        await Promise.all(storedMatches.map(saveMatch));
+    let cancelled = false;
+    void (async () => {
+      await historyRepository.initialize();
+      const [storedProfile, storedSettings] = await Promise.all([loadProfile(), loadSettings()]);
+      if (demoMode && await historyRepository.countMatches() === 0) {
+        for (const match of createDemoHistory()) await saveMatch(match, storedSettings.sessionGapMinutes);
       }
-      const liveIds = new Set(storedMatches.filter((match) => match.lifecycle === 'live').map((match) => match.id));
-      const recovered = recoverActiveMatch(storedMatches);
-      await Promise.all(storedMatches.filter((match) => liveIds.has(match.id) && match.lifecycle === 'incomplete').map(saveMatch));
+      const liveMatches = await historyRepository.loadLiveMatches();
+      const liveIds = new Set(liveMatches.map((match) => match.id));
+      const recovered = recoverActiveMatch(liveMatches);
+      for (const match of liveMatches.filter((item) => liveIds.has(item.id) && item.lifecycle === 'incomplete')) await saveMatch(match, storedSettings.sessionGapMinutes);
+      if (cancelled) return;
       activeRef.current = recovered;
       profileRef.current = storedProfile;
-      setMatches(storedMatches);
+      setActiveMatch(recovered);
       setProfile(storedProfile);
       setSettings(storedSettings);
       applyTheme(storedSettings.theme);
       setReady(true);
-    });
+    })().catch((error) => setDiagnostic(`Could not initialize local history: ${error instanceof Error ? error.message : String(error)}`));
+    return () => { cancelled = true; };
   }, [demoMode]);
 
-  useEffect(() => {
-    profileRef.current = profile;
-  }, [profile]);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
 
   useEffect(() => {
     if (!ready) return;
     const feed = demoMode ? new SimulatedStatsFeed() : new WebSocketStatsFeed(`ws://127.0.0.1:${settings.webSocketPort}`);
+    const generation = historyGenerationRef.current;
+    let lastCheckpoint = 0;
+    let timer: number | undefined;
+    let pending: MatchState | undefined;
+    const persist = (match: MatchState) => {
+      if (generation !== historyGenerationRef.current) return;
+      lastCheckpoint = Date.now();
+      pending = undefined;
+      void saveMatch(match, settings.sessionGapMinutes).then(() => {
+        if (match.lifecycle !== 'live') void queryClient.invalidateQueries({ queryKey: historyKeys.all });
+      }).catch((error) => setDiagnostic(`Could not save match history: ${error instanceof Error ? error.message : String(error)}`));
+    };
+    const schedule = (match: MatchState, immediate: boolean) => {
+      pending = match;
+      if (immediate || Date.now() - lastCheckpoint >= 1_000) {
+        if (timer) window.clearTimeout(timer);
+        timer = undefined;
+        persist(match);
+      } else if (!timer) {
+        timer = window.setTimeout(() => { timer = undefined; if (pending) persist(pending); }, Math.max(0, 1_000 - (Date.now() - lastCheckpoint)));
+      }
+    };
+    const flush = () => { if (pending) persist(pending); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', flush);
     feed.start({
       onState: setConnection,
       onDiagnostic: setDiagnostic,
       onEnvelope: async (envelope) => {
-        const result = reduceStatsEnvelope(activeRef.current, envelope);
-        // Keep the reducer cursor after completion so trailing events such as
-        // MatchDestroyed attach to the match that just ended.
+        const previous = activeRef.current;
+        const result = reduceStatsEnvelope(previous, envelope);
         activeRef.current = result.current;
-        // Publish packets before persistence. Stats API handlers can overlap
-        // while IndexedDB is busy; waiting here used to let older saves finish
-        // after newer packets and made the visible match clock lag or regress.
-        setMatches((current) => {
-          const updates = [result.superseded, result.current].filter(Boolean) as MatchState[];
-          const ids = new Set(updates.map((item) => item.id));
-          return [...current.filter((item) => !ids.has(item.id)), ...updates].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-        });
-        if (result.superseded) await saveMatch(result.superseded);
-        await saveMatch(result.current);
+        setActiveMatch(result.current.lifecycle === 'live' ? result.current : undefined);
+        const addedEvent = result.current.events.length > (previous?.events.length ?? 0);
+        if (result.superseded) persist(result.superseded);
+        schedule(result.current, addedEvent || result.current.lifecycle !== 'live');
         const selected = profileRef.current;
         const selectedPlayer = selected && result.current.participants.find((player) => player.primaryId === selected.primaryId);
         if (selected && selectedPlayer && selected.displayName !== selectedPlayer.name) {
           const next = { primaryId: selected.primaryId, displayName: selectedPlayer.name };
-          profileRef.current = next;
-          setProfile(next);
-          await saveProfile(next);
+          profileRef.current = next; setProfile(next); await saveProfile(next);
         } else if (demoMode && !selected) {
           const demoPlayer = result.current.participants.find((player) => player.primaryId === 'Steam|demo-you|0');
           if (demoPlayer?.primaryId) {
             const next = { primaryId: demoPlayer.primaryId, displayName: demoPlayer.name };
-            profileRef.current = next;
-            setProfile(next);
-            await saveProfile(next);
+            profileRef.current = next; setProfile(next); await saveProfile(next);
           }
         }
       },
     });
     return () => {
-      feed.stop();
-      setConnection('stopped');
+      flush();
+      if (timer) window.clearTimeout(timer);
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', flush);
+      feed.stop(); setConnection('stopped');
     };
-  }, [demoMode, ready, settings.webSocketPort]);
+  }, [demoMode, historyGeneration, ready, settings.sessionGapMinutes, settings.webSocketPort]);
 
   const updateSettings = useCallback(async (next: FennecSettings) => {
-    setSettings(next);
-    applyTheme(next.theme);
-    await saveSettings(next);
+    await saveSettings(next); setSettings(next); applyTheme(next.theme); await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
-
-  const selectProfile = useCallback(async (next: FennecProfile) => {
-    profileRef.current = next;
-    setProfile(next);
-    await saveProfile(next);
-  }, []);
-
+  const selectProfile = useCallback(async (next: FennecProfile) => { profileRef.current = next; setProfile(next); await saveProfile(next); await queryClient.invalidateQueries({ queryKey: historyKeys.all }); }, []);
   const deleteHistory = useCallback(async () => {
-    await clearHistory();
-    activeRef.current = undefined;
-    setMatches([]);
+    historyGenerationRef.current++;
+    try {
+      await clearHistory();
+      activeRef.current = undefined; setActiveMatch(undefined);
+    } finally { setHistoryGeneration(historyGenerationRef.current); }
+    await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
-
   const restoreBackup = useCallback(async (backup: FennecBackup) => {
-    await replaceAll(backup.matches, backup.settings, backup.profile);
-    const active = recoverActiveMatch(backup.matches);
-    activeRef.current = active;
-    profileRef.current = backup.profile;
-    setMatches(backup.matches);
-    setSettings(backup.settings);
-    setProfile(backup.profile);
-    applyTheme(backup.settings.theme);
+    historyGenerationRef.current++;
+    try {
+      await replaceAll(backup.matches, backup.settings, backup.profile);
+      await historyRepository.compactRawEvents();
+      const active = recoverActiveMatch(backup.matches); activeRef.current = active; profileRef.current = backup.profile;
+      setActiveMatch(active); setSettings(backup.settings); setProfile(backup.profile); applyTheme(backup.settings.theme);
+    } finally { setHistoryGeneration(historyGenerationRef.current); }
+    await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
-
-  const activeMatch = matches.find((match) => match.lifecycle === 'live');
-  const sessions = useMemo(() => groupSessions(matches, settings.sessionGapMinutes), [matches, settings.sessionGapMinutes]);
-  const value = useMemo<FennecContextValue>(() => ({
-    ready, matches, activeMatch, sessions, profile, settings, connection, diagnostic, demoMode,
-    updateSettings, selectProfile, deleteHistory, restoreBackup,
-  }), [ready, matches, activeMatch, sessions, profile, settings, connection, diagnostic, demoMode, updateSettings, selectProfile, deleteHistory, restoreBackup]);
-
+  const value = useMemo<FennecContextValue>(() => ({ ready, activeMatch, profile, settings, connection, diagnostic, demoMode, updateSettings, selectProfile, deleteHistory, restoreBackup }), [ready, activeMatch, profile, settings, connection, diagnostic, demoMode, updateSettings, selectProfile, deleteHistory, restoreBackup]);
   return <FennecContext.Provider value={value}>{children}</FennecContext.Provider>;
 }
 
-// This hook intentionally shares the provider module so their private context cannot drift.
 // eslint-disable-next-line react-refresh/only-export-components
 export function useFennec(): FennecContextValue {
   const value = useContext(FennecContext);

@@ -4,11 +4,15 @@ import { useFennec } from '../app/FennecContext';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
 import { sessionMetrics } from '../domain/metrics';
+import { useSession } from '../data/historyQueries';
 
 export function SessionPage() {
   const { sessionId } = useParams();
-  const { sessions, profile } = useFennec();
-  const session = sessions.find((item) => item.id === sessionId);
+  const { profile } = useFennec();
+  const sessionQuery = useSession(sessionId);
+  const session = sessionQuery.data;
+  if (sessionQuery.isLoading) return <div className="surface rounded-3xl p-8">Loading session…</div>;
+  if (sessionQuery.isError) return <div className="surface rounded-3xl p-8">Session history could not be loaded.</div>;
   if (!session) return <div className="surface rounded-3xl p-8"><h1 className="text-2xl font-extrabold">Session not found</h1><Link className="button-secondary mt-5" to="/">Back to games</Link></div>;
   return <div className="space-y-6">
     <Link to="/" className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"><ArrowLeft className="size-4" />Game timeline</Link>

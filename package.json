@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-query": "^5.101.4",
     "aws-cdk-lib": "^2.263.0",
     "constructs": "^10.4.2",
     "dexie": "^4.4.4",

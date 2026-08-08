@@ -44,13 +44,21 @@ after the tab closes.
 
 ## Local data
 
-Matches, raw discrete event payloads, preferences, and profile selection are
-stored in versioned IndexedDB under the current browser origin. Sessions and
-encounter summaries are derived from that history.
+Fennec stores versioned match summaries, player appearances, searchable player
+relationships, compact semantic events, preferences, and profile selection in
+IndexedDB under the current browser origin. Full technical event payloads are
+kept for 90 days; compact timelines, player history, touch maps, and analytics
+remain available after those payloads expire.
+
+History pages use indexed cursor queries instead of loading the complete
+archive into memory. The IndexedDB implementation sits behind a storage-neutral
+repository contract so a future optional companion or remote service can use
+the same domain records and query behavior without changing the UI.
 
 `http://localhost:5173` and `https://app.fennec.gg` have separate storage. Use
-Settings to export a versioned JSON backup from one origin and restore it on the
-other. CSV match-summary export is also available.
+Settings to export a versioned backup from one origin and restore it on the
+other. Chrome and Edge stream large backups as NDJSON; JSON fallback and CSV
+match-summary export are also available.
 
 ## Development
 

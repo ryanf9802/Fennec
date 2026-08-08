@@ -5,6 +5,7 @@ import { EmptyState } from '../components/EmptyState';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
 import { sessionMetrics } from '../domain/metrics';
+import { useSessions } from '../data/historyQueries';
 
 function sessionTitle(startedAt: string, current: boolean): string {
   if (current) return 'Current session';
@@ -15,8 +16,9 @@ function sessionTitle(startedAt: string, current: boolean): string {
 }
 
 export function GamesPage() {
-  const { matches, activeMatch, sessions, profile, connection } = useFennec();
-  const orderedSessions = [...sessions].reverse();
+  const { activeMatch, profile, connection } = useFennec();
+  const sessionsQuery = useSessions();
+  const orderedSessions = sessionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const current = orderedSessions[0];
   return <div className="space-y-8">
     <header className="flex flex-wrap items-end justify-between gap-4">
@@ -27,6 +29,8 @@ export function GamesPage() {
       </div>
       <div className="surface-flat flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold capitalize"><span className={`size-2 rounded-full ${connection === 'live' ? 'bg-fennec-cyan' : 'bg-slate-400'}`} />{connection}</div>
     </header>
+
+    {sessionsQuery.isError && <div className="surface-flat text-fennec-orange rounded-2xl p-5">Match history could not be loaded.</div>}
 
     {activeMatch && <Link to="/live" className="surface group relative block overflow-hidden rounded-3xl border-cyan-300/30 p-5 sm:p-6">
       <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-fennec-cyan to-blue-500" />
@@ -42,7 +46,7 @@ export function GamesPage() {
       </div>
     </Link>}
 
-    {!matches.length ? <EmptyState /> : current && <section className="space-y-4">
+    {!sessionsQuery.isLoading && !orderedSessions.length && !activeMatch ? <EmptyState /> : current && <section className="space-y-4">
       <div className="flex items-center justify-between gap-3"><div><div className="eyebrow text-fennec-cyan">In focus</div><h2 className="mt-1 text-2xl font-extrabold">Current session</h2></div><Link className="text-fennec-cyan flex items-center gap-1 text-sm font-bold" to={`/sessions/${current.id}`}>Full session <ArrowUpRight className="size-4" /></Link></div>
       <div className="surface rounded-3xl p-5 sm:p-6"><MetricsGrid metrics={sessionMetrics(current.matches, profile?.primaryId)} /></div>
       <div className="space-y-2">{[...current.matches].reverse().map((match) => <MatchRow key={match.id} match={match} profileId={profile?.primaryId} />)}</div>
@@ -57,6 +61,7 @@ export function GamesPage() {
           <div className="mt-4"><MetricsGrid metrics={metrics} compact /></div>
         </Link>;
       })}</div>
+      {sessionsQuery.hasNextPage && <button className="button-secondary mx-auto" disabled={sessionsQuery.isFetchingNextPage} onClick={() => void sessionsQuery.fetchNextPage()}>{sessionsQuery.isFetchingNextPage ? 'Loading…' : 'Load older sessions'}</button>}
     </section>}
   </div>;
 }

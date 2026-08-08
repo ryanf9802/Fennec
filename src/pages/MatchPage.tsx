@@ -1,13 +1,12 @@
 import { ArrowLeft, Radio, Trophy } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
-import { PlayerHistoryDialog } from '../components/PlayerHistoryDialog';
 import { PlayerName } from '../components/PlayerName';
 import { Timeline } from '../components/Timeline';
 import { MatchAnalytics } from '../components/MatchAnalytics';
-import { calculatePlayerHistory, isTrackablePrimaryId } from '../domain/playerHistory';
+import { isTrackablePrimaryId } from '../domain/playerHistory';
 import type { MatchState, ParticipantState } from '../domain/types';
+import { useMatch } from '../data/historyQueries';
 
 const stats: Array<{ key: keyof ParticipantState; full: string; short: string }> = [
   { key: 'score', full: 'Score', short: 'Score' },
@@ -34,12 +33,13 @@ function PlayerRow({ player, profileId, onInspect }: { player: ParticipantState;
 
 export function MatchPage({ match: supplied }: { match?: MatchState }) {
   const { matchId } = useParams();
-  const { matches, settings, profile } = useFennec();
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string>();
-  const match = supplied ?? matches.find((item) => item.id === matchId);
+  const { settings, profile } = useFennec();
+  const navigate = useNavigate();
+  const matchQuery = useMatch(supplied ? undefined : matchId);
+  const match = supplied ?? matchQuery.data;
+  if (!supplied && matchQuery.isLoading) return <div className="surface rounded-3xl p-8">Loading match…</div>;
+  if (!supplied && matchQuery.isError) return <div className="surface rounded-3xl p-8">Match history could not be loaded.</div>;
   if (!match) return <div className="surface rounded-3xl p-8"><h1 className="text-2xl font-extrabold">Match not found</h1><Link className="button-secondary mt-5" to="/">Back to games</Link></div>;
-  const historyMatches = matches.some((item) => item.id === match.id) ? matches : [...matches, match];
-  const history = calculatePlayerHistory(historyMatches, profile?.primaryId, selectedPlayerId);
   const teams = [...match.teams].sort((a, b) => a.teamNumber - b.teamNumber);
   return <div className="space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-6 xl:space-y-0">
     <Link to="/" className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"><ArrowLeft className="size-4" />Game timeline</Link>
@@ -55,7 +55,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
           <thead className="eyebrow"><tr><th scope="col" className="scoreboard-player-cell px-3 py-3 text-left">Player</th>{stats.map(({ key, full, short }) => <th key={key} scope="col" className="px-2 py-3 text-center"><span className="stat-label-full">{full}</span><abbr title={full} className="stat-label-short no-underline">{short}</abbr></th>)}</tr></thead>
           {teams.map((team) => <tbody key={team.teamNumber}>
             <tr className="border-t border-ui"><th colSpan={stats.length + 1} className="px-3 py-2 text-left text-sm font-black uppercase tracking-wider"><span className={`mr-2 inline-block size-2.5 rounded-full ${team.teamNumber === 0 ? 'bg-fennec-cyan' : 'bg-fennec-orange'}`} />{team.name || `Team ${team.teamNumber + 1}`}{match.winnerTeamNumber === team.teamNumber && <Trophy className="ml-2 inline size-4 text-amber-400" />}</th></tr>
-            {match.participants.filter((player) => player.teamNumber === team.teamNumber).sort((a, b) => b.score - a.score).map((player, index) => <PlayerRow key={`${player.primaryId ?? player.name}:${index}`} player={player} profileId={profile?.primaryId} onInspect={(next) => setSelectedPlayerId(next.primaryId)} />)}
+            {match.participants.filter((player) => player.teamNumber === team.teamNumber).sort((a, b) => b.score - a.score).map((player, index) => <PlayerRow key={`${player.primaryId ?? player.name}:${index}`} player={player} profileId={profile?.primaryId} onInspect={(next) => { if (next.primaryId) navigate(`/players/${encodeURIComponent(next.primaryId)}`); }} />)}
           </tbody>)}
         </table></div>
         {!match.participants.length && <div className="surface-flat text-muted mt-3 rounded-2xl p-8 text-center">Waiting for player data…</div>}
@@ -63,6 +63,5 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
       </section>
       <section className="flex min-w-0 flex-col xl:min-h-0"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-extrabold">Event timeline</h2><span className="eyebrow">{settings.timelinePreset}</span></div><div className="timeline-scroller min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2"><Timeline match={match} settings={settings} /></div></section>
     </div>
-    {history && <PlayerHistoryDialog history={history} onClose={() => setSelectedPlayerId(undefined)} />}
   </div>;
 }

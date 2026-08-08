@@ -9,7 +9,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../src/data/database', () => ({
   clearHistory: vi.fn(),
-  loadMatches: vi.fn(async () => []),
+  historyRepository: {
+    initialize: vi.fn(async () => undefined),
+    countMatches: vi.fn(async () => 0),
+    loadLiveMatches: vi.fn(async () => []),
+  },
   loadProfile: vi.fn(async () => undefined),
   loadSettings: vi.fn(async () => ({
     webSocketPort: 49124,
