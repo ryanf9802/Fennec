@@ -129,7 +129,7 @@ function recordArray(value: unknown): Record<string, unknown>[] {
 }
 
 function storeEvent(match: MatchState, envelope: StatsEnvelope, now: string): TimelineEvent {
-  const sequence = Math.max(0, ...match.events.map((item) => item.sequence)) + 1;
+  const sequence = (match.events.at(-1)?.sequence ?? 0) + 1;
   return {
     id: `${match.id}:${sequence}`,
     matchId: match.id,
@@ -156,7 +156,8 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
     if (previous?.lifecycle === 'live') superseded = { ...previous, lifecycle: 'incomplete', endedAt: now };
     match = createMatch(guid, now);
   } else {
-    match = structuredClone(previous);
+    const { events, ...state } = previous;
+    match = { ...structuredClone(state), events };
   }
 
   match.lastEventAt = now;
@@ -192,19 +193,19 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
   } else if (envelope.event === 'ClockUpdatedSeconds') {
     match.timeSeconds = numberValue(envelope.data.TimeSeconds);
     match.isOvertime = envelope.data.bOvertime === true;
-    match.events.push(storeEvent(match, envelope, now));
+    match.events = [...match.events, storeEvent(match, envelope, now)];
   } else if (envelope.event === 'MatchEnded') {
     const winner = envelope.data.WinnerTeamNum;
     if (typeof winner === 'number') match.winnerTeamNumber = Math.trunc(winner);
     match.lifecycle = 'completed';
     match.roundActive = false;
     match.endedAt = now;
-    match.events.push(storeEvent(match, envelope, now));
+    match.events = [...match.events, storeEvent(match, envelope, now)];
   } else if (envelope.event === 'MatchDestroyed') {
     if (match.lifecycle === 'live') match.lifecycle = 'incomplete';
     match.endedAt ??= now;
     match.roundActive = false;
-    match.events.push(storeEvent(match, envelope, now));
+    match.events = [...match.events, storeEvent(match, envelope, now)];
   } else {
     if (envelope.event === 'CountdownBegin' || envelope.event === 'GoalScored' || envelope.event === 'GoalReplayStart') {
       match.roundActive = false;
@@ -221,7 +222,7 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
       const leaving = match.participants.find((value) => primaryId ? value.primaryId === primaryId : value.name === playerName);
       if (leaving) leaving.isPresent = false;
     }
-    match.events.push(storeEvent(match, envelope, now));
+    match.events = [...match.events, storeEvent(match, envelope, now)];
   }
 
   return { current: match, superseded };

@@ -67,6 +67,7 @@ export interface TimelineEvent {
   receivedAt: string;
   matchClockSeconds?: number;
   payload: Record<string, unknown>;
+  rawPayloadAvailable?: boolean;
 }
 
 export interface MatchState {

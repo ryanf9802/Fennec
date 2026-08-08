@@ -12,6 +12,7 @@ export function Timeline({ match, settings }: { match: MatchState; settings: Fen
         <p className="break-words text-sm leading-6">{event.parts.map((part, index) => part.player ? <PlayerName key={`${part.text}:${index}`} name={part.player.name} teamNumber={part.player.teamNumber} /> : <span key={`${part.text}:${index}`}>{part.text}</span>)}</p>
         {event.details && <div className="text-muted mt-1 break-words text-sm">{event.details}</div>}
         {event.technicalDetails && <details className="mt-2"><summary className="text-muted cursor-pointer text-xs font-bold">Technical details</summary><pre className="surface-strong mt-2 max-h-56 overflow-auto rounded-lg p-3 text-xs"><code>{event.technicalDetails}</code></pre></details>}
+        {event.technicalDetailsExpired && <p className="text-muted mt-2 text-xs">The full technical payload expired after 90 days; compact event facts remain available.</p>}
       </div>
     </article>)}
   </div>;

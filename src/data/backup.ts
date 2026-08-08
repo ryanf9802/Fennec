@@ -3,15 +3,28 @@ import { playerTouchAnalytics } from '../domain/analytics';
 
 export interface FennecBackup {
   format: 'fennec-backup';
-  version: 2;
+  version: 3;
   exportedAt: string;
   settings: FennecSettings;
   profile?: FennecProfile;
   matches: MatchState[];
 }
 
+interface StreamBackupHeader {
+  format: 'fennec-backup';
+  version: 3;
+  encoding: 'ndjson';
+  exportedAt: string;
+  settings: FennecSettings;
+  profile?: FennecProfile;
+}
+
+interface FileWriter { write(value: string): Promise<void>; close(): Promise<void> }
+interface SaveFileHandle { createWritable(): Promise<FileWriter> }
+type SaveFilePicker = (options: { suggestedName: string; types: Array<{ description: string; accept: Record<string, string[]> }> }) => Promise<SaveFileHandle>;
+
 export function createBackup(matches: MatchState[], settings: FennecSettings, profile?: FennecProfile): FennecBackup {
-  return { format: 'fennec-backup', version: 2, exportedAt: new Date().toISOString(), settings, profile, matches };
+  return { format: 'fennec-backup', version: 3, exportedAt: new Date().toISOString(), settings, profile, matches };
 }
 
 function normalizeMatch(match: MatchState): MatchState {
@@ -19,14 +32,24 @@ function normalizeMatch(match: MatchState): MatchState {
     ...match,
     participants: match.participants.map((player) => ({ ...player, carTouches: player.carTouches ?? 0, loadout: player.loadout ?? [], isPresent: player.isPresent ?? true })),
     teams: match.teams.map((team) => ({ ...team, colorSecondary: team.colorSecondary ?? '' })),
+    events: [...match.events].sort((a, b) => a.sequence - b.sequence),
   };
 }
 
 export function parseBackup(text: string): FennecBackup {
-  const value: unknown = JSON.parse(text);
+  let value: unknown;
+  try { value = JSON.parse(text); }
+  catch {
+    const lines = text.split(/\r?\n/).filter((line) => line.trim()).map((line) => JSON.parse(line) as unknown);
+    const header = lines[0] as Partial<StreamBackupHeader> | undefined;
+    if (header?.format !== 'fennec-backup' || header.version !== 3 || header.encoding !== 'ndjson') throw new Error('This is not a supported Fennec backup.');
+    const records = lines.slice(1).map((line) => line as { type?: string; value?: unknown });
+    if (records.some((record) => record.type !== 'match' || !record.value || typeof record.value !== 'object')) throw new Error('The backup contains an invalid record.');
+    value = { ...header, matches: records.map((record) => record.value) };
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup must be a JSON object.');
   const backup = value as Partial<FennecBackup> & { version?: number };
-  if (backup.format !== 'fennec-backup' || ![1, 2].includes(backup.version ?? 0) || !Array.isArray(backup.matches)) {
+  if (backup.format !== 'fennec-backup' || ![1, 2, 3].includes(backup.version ?? 0) || !Array.isArray(backup.matches)) {
     throw new Error('This is not a supported Fennec backup.');
   }
   for (const match of backup.matches) {
@@ -35,12 +58,25 @@ export function parseBackup(text: string): FennecBackup {
     }
   }
   return {
-    format: 'fennec-backup', version: 2,
+    format: 'fennec-backup', version: 3,
     exportedAt: typeof backup.exportedAt === 'string' ? backup.exportedAt : new Date().toISOString(),
     settings: normalizeSettings(backup.settings),
     profile: backup.profile,
     matches: backup.matches.map(normalizeMatch),
   };
+}
+
+export async function streamBackup(filename: string, matches: AsyncIterable<MatchState>, settings: FennecSettings, profile?: FennecProfile): Promise<boolean> {
+  const picker = (window as Window & { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
+  if (!picker) return false;
+  const handle = await picker.call(window, { suggestedName: filename, types: [{ description: 'Fennec backup', accept: { 'application/x-ndjson': ['.ndjson'] } }] });
+  const writer = await handle.createWritable();
+  const header: StreamBackupHeader = { format: 'fennec-backup', version: 3, encoding: 'ndjson', exportedAt: new Date().toISOString(), settings, profile };
+  try {
+    await writer.write(`${JSON.stringify(header)}\n`);
+    for await (const match of matches) await writer.write(`${JSON.stringify({ type: 'match', value: match })}\n`);
+  } finally { await writer.close(); }
+  return true;
 }
 
 export function matchesCsv(matches: MatchState[], profileId?: string): string {

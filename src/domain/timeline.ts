@@ -14,6 +14,7 @@ export interface TimelineDisplayItem {
   parts: TimelineMessagePart[];
   details?: string;
   technicalDetails?: string;
+  technicalDetailsExpired?: boolean;
 }
 
 export function flattenPayload(value: unknown, prefix = '', output: Record<string, string> = {}): Record<string, string> {
@@ -171,6 +172,7 @@ export function timelineDisplayItems(match: MatchState, settings: FennecSettings
       parts,
       details,
       technicalDetails: settings.timelinePreset === 'everything' ? JSON.stringify(event.payload, null, 2) : undefined,
+      technicalDetailsExpired: settings.timelinePreset === 'everything' && event.rawPayloadAvailable === false,
     }];
   });
 }

@@ -7,13 +7,18 @@ describe('portable data', () => {
   it('round-trips the versioned backup', () => {
     const backup = createBackup([value], defaultSettings, { primaryId: 'Steam|1|0', displayName: 'Me' });
     expect(parseBackup(JSON.stringify(backup)).matches[0]?.id).toBe('one');
-    expect(backup.version).toBe(2);
+    expect(backup.version).toBe(3);
   });
   it('imports and normalizes version 1 backups', () => {
     const backup = createBackup([value], defaultSettings);
     const parsed = parseBackup(JSON.stringify({ ...backup, version: 1 }));
-    expect(parsed.version).toBe(2);
+    expect(parsed.version).toBe(3);
     expect(parsed.matches[0]?.participants[0]?.carTouches).toBe(0);
+  });
+  it('imports the streamable version 3 record format', () => {
+    const header = { format: 'fennec-backup', version: 3, encoding: 'ndjson', exportedAt: '2026-08-08T00:00:00Z', settings: defaultSettings };
+    const parsed = parseBackup(`${JSON.stringify(header)}\n${JSON.stringify({ type: 'match', value })}\n`);
+    expect(parsed.matches.map((match) => match.id)).toEqual(['one']);
   });
   it('rejects unrelated JSON', () => expect(() => parseBackup('{"version":1}')).toThrow(/supported/));
   it('normalizes invalid settings from imported data', () => {
