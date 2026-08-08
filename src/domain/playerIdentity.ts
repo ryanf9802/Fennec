@@ -5,7 +5,9 @@ export type PlayerIdentityKind = 'platform' | 'name';
 export function isTrackablePrimaryId(primaryId?: string): primaryId is string {
   if (!primaryId) return false;
   const [platform, uid] = primaryId.split('|');
-  return !!platform && platform.toLowerCase() !== 'unknown' && !!uid && uid !== '0';
+  return (
+    !!platform && platform.toLowerCase() !== 'unknown' && !!uid && uid !== '0'
+  );
 }
 
 export function normalizePlayerName(name?: string): string | undefined {
@@ -14,8 +16,11 @@ export function normalizePlayerName(name?: string): string | undefined {
   return normalized && normalized !== 'unknown player' ? normalized : undefined;
 }
 
-export function playerKeyFor(participant: Pick<ParticipantState, 'name' | 'primaryId'>): string | undefined {
-  if (isTrackablePrimaryId(participant.primaryId)) return `id:${participant.primaryId}`;
+export function playerKeyFor(
+  participant: Pick<ParticipantState, 'name' | 'primaryId'>,
+): string | undefined {
+  if (isTrackablePrimaryId(participant.primaryId))
+    return `id:${participant.primaryId}`;
   const name = normalizePlayerName(participant.name);
   return name ? `name:${name}` : undefined;
 }
@@ -34,8 +39,14 @@ export function normalizePlayerKey(value?: string): string | undefined {
   return playerKeyForPrimaryId(value);
 }
 
-export function playerIdentityKind(playerKey?: string): PlayerIdentityKind | undefined {
-  return playerKey?.startsWith('id:') ? 'platform' : playerKey?.startsWith('name:') ? 'name' : undefined;
+export function playerIdentityKind(
+  playerKey?: string,
+): PlayerIdentityKind | undefined {
+  return playerKey?.startsWith('id:')
+    ? 'platform'
+    : playerKey?.startsWith('name:')
+      ? 'name'
+      : undefined;
 }
 
 export function playerPrimaryId(playerKey?: string): string | undefined {

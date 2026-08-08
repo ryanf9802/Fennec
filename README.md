@@ -65,6 +65,7 @@ match-summary export are also available.
 ```bash
 pnpm install --frozen-lockfile
 pnpm playwright:install
+pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm test:run
@@ -72,6 +73,12 @@ pnpm build
 pnpm cdk:synth
 pnpm test:e2e
 ```
+
+Run `pnpm format` to format repository-owned code, configuration, documentation,
+styles, and markup. ESLint also requires explanatory JSDoc on named functions
+whose classic cyclomatic complexity exceeds 10. Document the function's purpose,
+business rules, invariants, or side effects instead of repeating its TypeScript
+types; parameter and return tags are optional.
 
 All Playwright commands use a browser cache under the real `node_modules`
 directory. Muxpilot worktrees link that directory from the repository checkout,
@@ -113,13 +120,13 @@ When the personal AWS account and `fennec.gg` are ready:
 
 3. Add these GitHub repository variables:
 
-   | Variable | Value |
-   | --- | --- |
-   | `AWS_ACCOUNT_ID` | Personal 12-digit AWS account ID |
-   | `AWS_REGION` | `us-east-1` |
-   | `FENNEC_APP_DOMAIN` | `app.fennec.gg` |
-   | `FENNEC_ZONE_NAME` | `fennec.gg` |
-   | `FENNEC_HOSTED_ZONE_ID` | Route 53 public hosted-zone ID |
+   | Variable                | Value                            |
+   | ----------------------- | -------------------------------- |
+   | `AWS_ACCOUNT_ID`        | Personal 12-digit AWS account ID |
+   | `AWS_REGION`            | `us-east-1`                      |
+   | `FENNEC_APP_DOMAIN`     | `app.fennec.gg`                  |
+   | `FENNEC_ZONE_NAME`      | `fennec.gg`                      |
+   | `FENNEC_HOSTED_ZONE_ID` | Route 53 public hosted-zone ID   |
 
 4. Rerun the failed workflow or push to `main`. CI assumes
    `FennecGitHubDeployRole`, deploys `FennecSite`, publishes `dist`, invalidates

@@ -1,11 +1,16 @@
 import { parseEnvelope } from '../domain/envelope';
-import { reportDevFeedTelemetry, type FeedTelemetryReporter } from './devTelemetry';
+import {
+  reportDevFeedTelemetry,
+  type FeedTelemetryReporter,
+} from './devTelemetry';
 import type { StatsFeedAdapter, StatsFeedHandlers } from './StatsFeedAdapter';
 
 const previewLimit = 4_000;
 
 function preview(text: string): string {
-  return text.length <= previewLimit ? text : `${text.slice(0, previewLimit)}...[${text.length - previewLimit} more characters]`;
+  return text.length <= previewLimit
+    ? text
+    : `${text.slice(0, previewLimit)}...[${text.length - previewLimit} more characters]`;
 }
 
 function errorMessage(error: unknown): string {
@@ -34,7 +39,11 @@ export class WebSocketStatsFeed implements StatsFeedAdapter {
       let lastFrameAt: string | undefined;
       let feedLive = false;
       handlers.onState('connecting');
-      this.telemetry('connecting', { connection, endpoint: this.endpoint, retryMs: this.retryMs });
+      this.telemetry('connecting', {
+        connection,
+        endpoint: this.endpoint,
+        retryMs: this.retryMs,
+      });
       const socket = new WebSocket(this.endpoint);
       this.socket = socket;
       socket.addEventListener('open', () => {
@@ -45,10 +54,15 @@ export class WebSocketStatsFeed implements StatsFeedAdapter {
       socket.addEventListener('message', async (event) => {
         let text: string;
         try {
-          text = typeof event.data === 'string' ? event.data : await (event.data as Blob).text();
+          text =
+            typeof event.data === 'string'
+              ? event.data
+              : await (event.data as Blob).text();
         } catch (error) {
           const message = errorMessage(error);
-          handlers.onDiagnostic?.(`Could not read Stats API message: ${message}`);
+          handlers.onDiagnostic?.(
+            `Could not read Stats API message: ${message}`,
+          );
           this.telemetry('frame_read_failed', { connection, error: message });
           return;
         }
@@ -60,7 +74,9 @@ export class WebSocketStatsFeed implements StatsFeedAdapter {
           envelope = parseEnvelope(text);
         } catch (error) {
           const message = errorMessage(error);
-          handlers.onDiagnostic?.(`Ignored malformed Stats API message: ${message}`);
+          handlers.onDiagnostic?.(
+            `Ignored malformed Stats API message: ${message}`,
+          );
           this.telemetry('frame_rejected', {
             connection,
             frame: frames,
@@ -71,16 +87,23 @@ export class WebSocketStatsFeed implements StatsFeedAdapter {
           return;
         }
 
-        const shouldSample = frames <= 3 || frames % 150 === 0 || envelope.event !== 'UpdateState';
+        const shouldSample =
+          frames <= 3 || frames % 150 === 0 || envelope.event !== 'UpdateState';
         if (shouldSample) {
           this.telemetry('frame_received', {
             connection,
             frame: frames,
             bytes: text.length,
-            transport: typeof event.data === 'string' ? 'text' : event.data?.constructor?.name ?? typeof event.data,
+            transport:
+              typeof event.data === 'string'
+                ? 'text'
+                : (event.data?.constructor?.name ?? typeof event.data),
             statsEvent: envelope.event,
             dataKeys: Object.keys(envelope.data),
-            preview: frames <= 3 || envelope.event !== 'UpdateState' ? preview(text) : undefined,
+            preview:
+              frames <= 3 || envelope.event !== 'UpdateState'
+                ? preview(text)
+                : undefined,
           });
         }
 
@@ -88,11 +111,17 @@ export class WebSocketStatsFeed implements StatsFeedAdapter {
           await handlers.onEnvelope(envelope);
           if (!feedLive) {
             feedLive = true;
-            this.telemetry('feed_live', { connection, firstEvent: envelope.event, frame: frames });
+            this.telemetry('feed_live', {
+              connection,
+              firstEvent: envelope.event,
+              frame: frames,
+            });
           }
         } catch (error) {
           const message = errorMessage(error);
-          handlers.onDiagnostic?.(`Failed to process Stats API event ${envelope.event}: ${message}`);
+          handlers.onDiagnostic?.(
+            `Failed to process Stats API event ${envelope.event}: ${message}`,
+          );
           this.telemetry('frame_processing_failed', {
             connection,
             frame: frames,
@@ -128,7 +157,10 @@ export class WebSocketStatsFeed implements StatsFeedAdapter {
   stop(): void {
     this.stopped = true;
     if (this.retryTimer) window.clearTimeout(this.retryTimer);
-    this.telemetry('stopped', { endpoint: this.endpoint, connection: this.connectionSequence });
+    this.telemetry('stopped', {
+      endpoint: this.endpoint,
+      connection: this.connectionSequence,
+    });
     this.socket?.close();
     this.socket = undefined;
   }

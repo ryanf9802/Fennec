@@ -22,7 +22,12 @@ const playlists: Record<number, [string, PlaylistCategory]> = {
   40: ['Rumble', 'casual'],
 };
 
-export function resolvePlaylist(id: number): { name: string; category: PlaylistCategory } {
+export function resolvePlaylist(id: number): {
+  name: string;
+  category: PlaylistCategory;
+} {
   const found = playlists[id];
-  return found ? { name: found[0], category: found[1] } : { name: `Playlist ${id}`, category: 'unknown' };
+  return found
+    ? { name: found[0], category: found[1] }
+    : { name: `Playlist ${id}`, category: 'unknown' };
 }

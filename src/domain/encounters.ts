@@ -1,16 +1,34 @@
 import type { EncounterSummary, MatchState } from './types';
-import { normalizePlayerKey, playerIdentityKind, playerKeyFor, playerPrimaryId } from './playerIdentity';
+import {
+  normalizePlayerKey,
+  playerIdentityKind,
+  playerKeyFor,
+  playerPrimaryId,
+} from './playerIdentity';
 
 type Accumulator = EncounterSummary;
 
-export function calculateEncounters(matches: MatchState[], profilePrimaryId?: string): EncounterSummary[] {
+/**
+ * Aggregates recurring player identities across matches into teammate and
+ * opponent encounter counts relative to the selected profile.
+ */
+export function calculateEncounters(
+  matches: MatchState[],
+  profilePrimaryId?: string,
+): EncounterSummary[] {
   const profileKey = normalizePlayerKey(profilePrimaryId);
   if (!profileKey) return [];
   const values = new Map<string, Accumulator>();
-  for (const match of [...matches].sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
-    const profile = match.participants.find((player) => playerKeyFor(player) === profileKey);
+  for (const match of [...matches].sort((a, b) =>
+    a.startedAt.localeCompare(b.startedAt),
+  )) {
+    const profile = match.participants.find(
+      (player) => playerKeyFor(player) === profileKey,
+    );
     if (!profile) continue;
-    const profileWon = match.lifecycle === 'completed' && match.winnerTeamNumber === profile.teamNumber;
+    const profileWon =
+      match.lifecycle === 'completed' &&
+      match.winnerTeamNumber === profile.teamNumber;
     for (const player of match.participants) {
       const playerKey = playerKeyFor(player);
       if (!playerKey || playerKey === profileKey) continue;
@@ -46,5 +64,7 @@ export function calculateEncounters(matches: MatchState[], profilePrimaryId?: st
       values.set(playerKey, current);
     }
   }
-  return [...values.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen));
+  return [...values.values()].sort((a, b) =>
+    b.lastSeen.localeCompare(a.lastSeen),
+  );
 }

@@ -1,6 +1,8 @@
 export type MatchLifecycle = 'live' | 'completed' | 'incomplete';
-export type PlaylistCategory = 'ranked' | 'casual' | 'private' | 'lan' | 'unknown';
-export type FeedConnectionState = 'stopped' | 'connecting' | 'waiting' | 'live' | 'unavailable';
+export type PlaylistCategory =
+  'ranked' | 'casual' | 'private' | 'lan' | 'unknown';
+export type FeedConnectionState =
+  'stopped' | 'connecting' | 'waiting' | 'live' | 'unavailable';
 export type TimelinePreset = 'curated' | 'everything' | 'custom';
 
 export interface StatsEnvelope {
@@ -152,20 +154,50 @@ export const defaultSettings: FennecSettings = {
   analytics: { playlistMode: 'ranked', groupByPlaylist: true },
 };
 
-export function normalizeSettings(input?: Partial<FennecSettings>): FennecSettings {
+/**
+ * Merges persisted settings with defaults while constraining numeric ranges and
+ * preserving only valid timeline selections and appearance values.
+ */
+export function normalizeSettings(
+  input?: Partial<FennecSettings>,
+): FennecSettings {
   const webSocketPort = Number(input?.webSocketPort);
   const sessionGapMinutes = Number(input?.sessionGapMinutes);
-  const theme = input?.theme && ['dark', 'light', 'system'].includes(input.theme) ? input.theme : defaultSettings.theme;
-  const timelinePreset = input?.timelinePreset && ['curated', 'everything', 'custom'].includes(input.timelinePreset) ? input.timelinePreset : defaultSettings.timelinePreset;
+  const theme =
+    input?.theme && ['dark', 'light', 'system'].includes(input.theme)
+      ? input.theme
+      : defaultSettings.theme;
+  const timelinePreset =
+    input?.timelinePreset &&
+    ['curated', 'everything', 'custom'].includes(input.timelinePreset)
+      ? input.timelinePreset
+      : defaultSettings.timelinePreset;
   return {
     ...defaultSettings,
     ...input,
-    webSocketPort: Number.isInteger(webSocketPort) && webSocketPort >= 1024 && webSocketPort <= 65535 ? webSocketPort : defaultSettings.webSocketPort,
-    sessionGapMinutes: Number.isInteger(sessionGapMinutes) && sessionGapMinutes >= 1 && sessionGapMinutes <= 240 ? sessionGapMinutes : defaultSettings.sessionGapMinutes,
+    webSocketPort:
+      Number.isInteger(webSocketPort) &&
+      webSocketPort >= 1024 &&
+      webSocketPort <= 65535
+        ? webSocketPort
+        : defaultSettings.webSocketPort,
+    sessionGapMinutes:
+      Number.isInteger(sessionGapMinutes) &&
+      sessionGapMinutes >= 1 &&
+      sessionGapMinutes <= 240
+        ? sessionGapMinutes
+        : defaultSettings.sessionGapMinutes,
     theme,
     timelinePreset,
-    enabledTimelineEvents: Array.isArray(input?.enabledTimelineEvents) ? input.enabledTimelineEvents.filter((item): item is string => typeof item === 'string') : [],
-    timelineAttributes: input?.timelineAttributes && typeof input.timelineAttributes === 'object' ? input.timelineAttributes : {},
+    enabledTimelineEvents: Array.isArray(input?.enabledTimelineEvents)
+      ? input.enabledTimelineEvents.filter(
+          (item): item is string => typeof item === 'string',
+        )
+      : [],
+    timelineAttributes:
+      input?.timelineAttributes && typeof input.timelineAttributes === 'object'
+        ? input.timelineAttributes
+        : {},
     sidebarCollapsed: input?.sidebarCollapsed === true,
     autoOpenLiveMatch: input?.autoOpenLiveMatch === true,
     analytics: defaultSettings.analytics,

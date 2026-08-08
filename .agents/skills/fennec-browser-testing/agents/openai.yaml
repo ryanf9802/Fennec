@@ -1,4 +1,4 @@
 interface:
-  display_name: "Fennec Browser Testing"
-  short_description: "Test Fennec UI with shared Playwright"
-  default_prompt: "Use $fennec-browser-testing to validate this Fennec UI change in Chromium."
+  display_name: 'Fennec Browser Testing'
+  short_description: 'Test Fennec UI with shared Playwright'
+  default_prompt: 'Use $fennec-browser-testing to validate this Fennec UI change in Chromium.'

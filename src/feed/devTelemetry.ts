@@ -1,11 +1,17 @@
 export type FeedTelemetryDetails = Record<string, unknown>;
 
-export type FeedTelemetryReporter = (event: string, details?: FeedTelemetryDetails) => void;
+export type FeedTelemetryReporter = (
+  event: string,
+  details?: FeedTelemetryDetails,
+) => void;
 
 const endpoint = '/__fennec/dev-telemetry';
 let warnedAboutDelivery = false;
 
-export const reportDevFeedTelemetry: FeedTelemetryReporter = (event, details = {}) => {
+export const reportDevFeedTelemetry: FeedTelemetryReporter = (
+  event,
+  details = {},
+) => {
   if (!import.meta.env.DEV) return;
 
   const payload = {
@@ -23,6 +29,9 @@ export const reportDevFeedTelemetry: FeedTelemetryReporter = (event, details = {
   }).catch((error) => {
     if (warnedAboutDelivery) return;
     warnedAboutDelivery = true;
-    console.warn('[fennec:feed] Could not forward development telemetry to Vite.', error);
+    console.warn(
+      '[fennec:feed] Could not forward development telemetry to Vite.',
+      error,
+    );
   });
 };

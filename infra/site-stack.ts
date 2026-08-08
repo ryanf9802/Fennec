@@ -14,11 +14,17 @@ export interface FennecSiteStackProps extends cdk.StackProps {
 }
 
 export class FennecSiteStack extends cdk.Stack {
+  /**
+   * Provisions the private site origin, CDN, and security policies, enabling
+   * custom-domain resources only when the complete Route 53 tuple is present.
+   */
   constructor(scope: Construct, id: string, props: FennecSiteStackProps = {}) {
     super(scope, id, props);
     const domainValues = [props.domainName, props.zoneName, props.hostedZoneId];
     if (domainValues.some(Boolean) && !domainValues.every(Boolean)) {
-      throw new Error('FENNEC_APP_DOMAIN, FENNEC_ZONE_NAME, and FENNEC_HOSTED_ZONE_ID must be provided together.');
+      throw new Error(
+        'FENNEC_APP_DOMAIN, FENNEC_ZONE_NAME, and FENNEC_HOSTED_ZONE_ID must be provided together.',
+      );
     }
 
     const bucket = new s3.Bucket(this, 'SiteBucket', {
@@ -54,19 +60,36 @@ export class FennecSiteStack extends cdk.Stack {
       enableAcceptEncodingGzip: true,
     });
 
-    const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeaders', {
-      securityHeadersBehavior: {
-        contentSecurityPolicy: {
-          override: true,
-          contentSecurityPolicy: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*",
+    const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(
+      this,
+      'SecurityHeaders',
+      {
+        securityHeadersBehavior: {
+          contentSecurityPolicy: {
+            override: true,
+            contentSecurityPolicy:
+              "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*",
+          },
+          contentTypeOptions: { override: true },
+          frameOptions: {
+            frameOption: cloudfront.HeadersFrameOption.DENY,
+            override: true,
+          },
+          referrerPolicy: {
+            referrerPolicy:
+              cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+            override: true,
+          },
+          strictTransportSecurity: {
+            accessControlMaxAge: cdk.Duration.days(365),
+            includeSubdomains: true,
+            preload: true,
+            override: true,
+          },
+          xssProtection: { protection: true, modeBlock: true, override: true },
         },
-        contentTypeOptions: { override: true },
-        frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
-        referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, override: true },
-        strictTransportSecurity: { accessControlMaxAge: cdk.Duration.days(365), includeSubdomains: true, preload: true, override: true },
-        xssProtection: { protection: true, modeBlock: true, override: true },
       },
-    });
+    );
 
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultRootObject: 'index.html',
@@ -94,14 +117,32 @@ export class FennecSiteStack extends cdk.Stack {
     });
 
     if (zone && props.domainName) {
-      const target = route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(distribution));
-      new route53.ARecord(this, 'AliasA', { zone, recordName: props.domainName, target });
-      new route53.AaaaRecord(this, 'AliasAaaa', { zone, recordName: props.domainName, target });
+      const target = route53.RecordTarget.fromAlias(
+        new targets.CloudFrontTarget(distribution),
+      );
+      new route53.ARecord(this, 'AliasA', {
+        zone,
+        recordName: props.domainName,
+        target,
+      });
+      new route53.AaaaRecord(this, 'AliasAaaa', {
+        zone,
+        recordName: props.domainName,
+        target,
+      });
     }
 
     new cdk.CfnOutput(this, 'SiteBucketName', { value: bucket.bucketName });
-    new cdk.CfnOutput(this, 'DistributionId', { value: distribution.distributionId });
-    new cdk.CfnOutput(this, 'DistributionDomainName', { value: distribution.distributionDomainName });
-    new cdk.CfnOutput(this, 'SiteUrl', { value: props.domainName ? `https://${props.domainName}` : `https://${distribution.distributionDomainName}` });
+    new cdk.CfnOutput(this, 'DistributionId', {
+      value: distribution.distributionId,
+    });
+    new cdk.CfnOutput(this, 'DistributionDomainName', {
+      value: distribution.distributionDomainName,
+    });
+    new cdk.CfnOutput(this, 'SiteUrl', {
+      value: props.domainName
+        ? `https://${props.domainName}`
+        : `https://${distribution.distributionDomainName}`,
+    });
   }
 }

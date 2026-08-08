@@ -1,5 +1,11 @@
 import type { PlayerIdentityKind } from '../domain/playerIdentity';
-import type { EncounterSummary, FennecProfile, FennecSettings, MatchState, SessionGroup } from '../domain/types';
+import type {
+  EncounterSummary,
+  FennecProfile,
+  FennecSettings,
+  MatchState,
+  SessionGroup,
+} from '../domain/types';
 
 export type MatchResultFilter = 'win' | 'loss' | 'incomplete';
 export type RelationshipFilter = 'together' | 'against';
@@ -53,18 +59,29 @@ export interface HistoryRepository {
   countMatches(): Promise<number>;
   countSessions(): Promise<number>;
   firstMatchStartedAt(): Promise<string | undefined>;
-  listSessions(cursor?: string, limit?: number): Promise<HistoryPage<SessionGroup>>;
+  listSessions(
+    cursor?: string,
+    limit?: number,
+  ): Promise<HistoryPage<SessionGroup>>;
   getSession(id: string): Promise<SessionGroup | undefined>;
   listMatches(query?: MatchHistoryQuery): Promise<HistoryPage<MatchState>>;
   getMatch(id: string): Promise<MatchState | undefined>;
   loadLiveMatches(): Promise<MatchState[]>;
   searchPlayers(query?: string, limit?: number): Promise<PlayerRecord[]>;
-  getPlayerHistory(profileKey: string, playerKey: string, query?: Omit<MatchHistoryQuery, 'profileKey' | 'playerKey'>): Promise<PlayerHistoryResult>;
+  getPlayerHistory(
+    profileKey: string,
+    playerKey: string,
+    query?: Omit<MatchHistoryQuery, 'profileKey' | 'playerKey'>,
+  ): Promise<PlayerHistoryResult>;
   getTimelineCatalog(): Promise<Record<string, string[]>>;
   iterateMatches(pageSize?: number): AsyncIterable<MatchState>;
   saveMatch(match: MatchState, sessionGapMinutes: number): Promise<void>;
   clearHistory(): Promise<void>;
-  replaceAll(matches: MatchState[], settings: FennecSettings, profile?: FennecProfile): Promise<void>;
+  replaceAll(
+    matches: MatchState[],
+    settings: FennecSettings,
+    profile?: FennecProfile,
+  ): Promise<void>;
   compactRawEvents(now?: Date): Promise<number>;
   storageStatistics(): Promise<StorageStatistics>;
 }

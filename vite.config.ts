@@ -8,31 +8,40 @@ function devTelemetry(): Plugin {
     name: 'fennec-dev-telemetry',
     apply: 'serve',
     configureServer(server) {
-      server.middlewares.use('/__fennec/dev-telemetry', (request, response, next) => {
-        if (request.method !== 'POST') {
-          next();
-          return;
-        }
-
-        let body = '';
-        request.setEncoding('utf8');
-        request.on('data', (chunk: string) => {
-          body += chunk;
-          if (body.length > 128_000) request.destroy();
-        });
-        request.on('end', () => {
-          try {
-            const payload = JSON.parse(body) as Record<string, unknown>;
-            server.config.logger.info(`[fennec:feed] ${JSON.stringify(payload)}`, { timestamp: true });
-            response.statusCode = 204;
-            response.end();
-          } catch (error) {
-            server.config.logger.warn(`[fennec:feed] Invalid telemetry payload: ${error instanceof Error ? error.message : String(error)}`, { timestamp: true });
-            response.statusCode = 400;
-            response.end();
+      server.middlewares.use(
+        '/__fennec/dev-telemetry',
+        (request, response, next) => {
+          if (request.method !== 'POST') {
+            next();
+            return;
           }
-        });
-      });
+
+          let body = '';
+          request.setEncoding('utf8');
+          request.on('data', (chunk: string) => {
+            body += chunk;
+            if (body.length > 128_000) request.destroy();
+          });
+          request.on('end', () => {
+            try {
+              const payload = JSON.parse(body) as Record<string, unknown>;
+              server.config.logger.info(
+                `[fennec:feed] ${JSON.stringify(payload)}`,
+                { timestamp: true },
+              );
+              response.statusCode = 204;
+              response.end();
+            } catch (error) {
+              server.config.logger.warn(
+                `[fennec:feed] Invalid telemetry payload: ${error instanceof Error ? error.message : String(error)}`,
+                { timestamp: true },
+              );
+              response.statusCode = 400;
+              response.end();
+            }
+          });
+        },
+      );
     },
   };
 }

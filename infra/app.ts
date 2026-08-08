@@ -6,9 +6,12 @@ import { FennecSiteStack } from './site-stack';
 const app = new cdk.App();
 const account = process.env.AWS_ACCOUNT_ID?.trim();
 const region = process.env.AWS_REGION?.trim() || 'us-east-1';
-if (account && !/^\d{12}$/.test(account)) throw new Error('AWS_ACCOUNT_ID must be a 12-digit personal AWS account ID.');
+if (account && !/^\d{12}$/.test(account))
+  throw new Error('AWS_ACCOUNT_ID must be a 12-digit personal AWS account ID.');
 if (process.env.FENNEC_APP_DOMAIN?.trim() && region !== 'us-east-1') {
-  throw new Error('FennecSite must deploy in us-east-1 so its ACM certificate can be used by CloudFront.');
+  throw new Error(
+    'FennecSite must deploy in us-east-1 so its ACM certificate can be used by CloudFront.',
+  );
 }
 const env = account ? { account, region } : undefined;
 
@@ -23,6 +26,7 @@ new FennecSiteStack(app, 'FennecSite', {
 new FennecCiAccessStack(app, 'FennecCiAccess', {
   env,
   description: 'GitHub OIDC deployment access for Fennec',
-  repository: process.env.FENNEC_GITHUB_REPOSITORY?.trim() || 'ryanf9802/Fennec',
+  repository:
+    process.env.FENNEC_GITHUB_REPOSITORY?.trim() || 'ryanf9802/Fennec',
   existingProviderArn: process.env.GITHUB_OIDC_PROVIDER_ARN?.trim(),
 });

@@ -1,6 +1,12 @@
 import { resolvePlaylist } from './playlists';
 import { isTrackablePrimaryId, normalizePlayerName } from './playerIdentity';
-import type { MatchState, ParticipantState, StatsEnvelope, TeamState, TimelineEvent } from './types';
+import type {
+  MatchState,
+  ParticipantState,
+  StatsEnvelope,
+  TeamState,
+  TimelineEvent,
+} from './types';
 
 export interface ReduceResult {
   current: MatchState;
@@ -12,15 +18,21 @@ function stringValue(value: unknown): string | undefined {
 }
 
 function numberValue(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : 0;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.trunc(value)
+    : 0;
 }
 
 function optionalNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
 }
 
 function createMatch(guid: string | undefined, now: string): MatchState {
@@ -84,53 +96,94 @@ function team(value: Record<string, unknown>): TeamState {
 }
 
 function playerReference(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined;
   const record = value as Record<string, unknown>;
   const name = stringValue(record.Name);
   if (!name) return undefined;
-  return { name, shortcut: optionalNumber(record.Shortcut), teamNumber: numberValue(record.TeamNum) };
+  return {
+    name,
+    shortcut: optionalNumber(record.Shortcut),
+    teamNumber: numberValue(record.TeamNum),
+  };
 }
 
-function mergeParticipants(previous: ParticipantState[], current: ParticipantState[]): ParticipantState[] {
-  const merged: ParticipantState[] = previous.map((value) => ({ ...value, isPresent: false }));
+function mergeParticipants(
+  previous: ParticipantState[],
+  current: ParticipantState[],
+): ParticipantState[] {
+  const merged: ParticipantState[] = previous.map((value) => ({
+    ...value,
+    isPresent: false,
+  }));
   for (const value of current) {
-    let index = isTrackablePrimaryId(value.primaryId) ? merged.findIndex((candidate) => candidate.primaryId === value.primaryId) : -1;
-    if (index < 0 && value.shortcut !== undefined) index = merged.findIndex((candidate) => candidate.shortcut === value.shortcut);
+    let index = isTrackablePrimaryId(value.primaryId)
+      ? merged.findIndex((candidate) => candidate.primaryId === value.primaryId)
+      : -1;
+    if (index < 0 && value.shortcut !== undefined)
+      index = merged.findIndex(
+        (candidate) => candidate.shortcut === value.shortcut,
+      );
     const normalizedName = normalizePlayerName(value.name);
-    if (index < 0 && normalizedName) index = merged.findIndex((candidate) => candidate.teamNumber === value.teamNumber && normalizePlayerName(candidate.name) === normalizedName);
+    if (index < 0 && normalizedName)
+      index = merged.findIndex(
+        (candidate) =>
+          candidate.teamNumber === value.teamNumber &&
+          normalizePlayerName(candidate.name) === normalizedName,
+      );
     if (index < 0) merged.push(value);
     else merged[index] = { ...merged[index], ...value, isPresent: true };
   }
   return merged;
 }
 
+/**
+ * Accumulates derived speed, control, and positional samples from the latest
+ * match snapshot without replacing previously captured event telemetry.
+ */
 function accumulateSnapshot(match: MatchState): void {
-  const capture = match.capture ??= {
+  const capture = (match.capture ??= {
     version: 1,
     updateStatePackets: 0,
     activePlayPackets: 0,
     ballSpeed: { samples: 0, sum: 0 },
     lastTouchSamplesByTeam: {},
-  };
+  });
   capture.updateStatePackets += 1;
-  if (!match.roundActive || match.isPaused || match.isReplay || !match.ball) return;
+  if (!match.roundActive || match.isPaused || match.isReplay || !match.ball)
+    return;
   capture.activePlayPackets += 1;
   const speed = match.ball.speed;
   capture.ballSpeed.samples += 1;
   capture.ballSpeed.sum += speed;
-  capture.ballSpeed.min = capture.ballSpeed.min === undefined ? speed : Math.min(capture.ballSpeed.min, speed);
-  capture.ballSpeed.max = capture.ballSpeed.max === undefined ? speed : Math.max(capture.ballSpeed.max, speed);
+  capture.ballSpeed.min =
+    capture.ballSpeed.min === undefined
+      ? speed
+      : Math.min(capture.ballSpeed.min, speed);
+  capture.ballSpeed.max =
+    capture.ballSpeed.max === undefined
+      ? speed
+      : Math.max(capture.ballSpeed.max, speed);
   const team = match.ball.lastTouchTeamNumber;
-  if (team !== undefined && team !== 255) capture.lastTouchSamplesByTeam[String(team)] = (capture.lastTouchSamplesByTeam[String(team)] ?? 0) + 1;
+  if (team !== undefined && team !== 255)
+    capture.lastTouchSamplesByTeam[String(team)] =
+      (capture.lastTouchSamplesByTeam[String(team)] ?? 0) + 1;
 }
 
 function recordArray(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
-    ? value.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item))
+    ? value.filter(
+        (item): item is Record<string, unknown> =>
+          !!item && typeof item === 'object' && !Array.isArray(item),
+      )
     : [];
 }
 
-function storeEvent(match: MatchState, envelope: StatsEnvelope, now: string): TimelineEvent {
+function storeEvent(
+  match: MatchState,
+  envelope: StatsEnvelope,
+  now: string,
+): TimelineEvent {
   const sequence = (match.events.at(-1)?.sequence ?? 0) + 1;
   return {
     id: `${match.id}:${sequence}`,
@@ -143,19 +196,35 @@ function storeEvent(match: MatchState, envelope: StatsEnvelope, now: string): Ti
   };
 }
 
-export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: StatsEnvelope, now = new Date().toISOString()): ReduceResult {
+/**
+ * Applies Stats API snapshots and events to the match state machine, handling
+ * lifecycle transitions, match rollover, participant merging, and finalization.
+ */
+export function reduceStatsEnvelope(
+  previous: MatchState | undefined,
+  envelope: StatsEnvelope,
+  now = new Date().toISOString(),
+): ReduceResult {
   const guid = stringValue(envelope.data.MatchGuid);
-  if (previous?.lifecycle === 'completed' && envelope.event === 'UpdateState' && (!guid || guid === previous.matchGuid)) {
+  if (
+    previous?.lifecycle === 'completed' &&
+    envelope.event === 'UpdateState' &&
+    (!guid || guid === previous.matchGuid)
+  ) {
     return { current: previous };
   }
-  const needsNew = !previous ||
+  const needsNew =
+    !previous ||
     (!!guid && !!previous.matchGuid && guid !== previous.matchGuid) ||
-    (previous.lifecycle !== 'live' && (envelope.event === 'MatchCreated' || envelope.event === 'MatchInitialized'));
+    (previous.lifecycle !== 'live' &&
+      (envelope.event === 'MatchCreated' ||
+        envelope.event === 'MatchInitialized'));
 
   let superseded: MatchState | undefined;
   let match: MatchState;
   if (needsNew) {
-    if (previous?.lifecycle === 'live') superseded = { ...previous, lifecycle: 'incomplete', endedAt: now };
+    if (previous?.lifecycle === 'live')
+      superseded = { ...previous, lifecycle: 'incomplete', endedAt: now };
     match = createMatch(guid, now);
   } else {
     const { events, ...state } = previous;
@@ -168,7 +237,10 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
   if (envelope.event === 'UpdateState') {
     match.lifecycle = 'live';
     delete match.endedAt;
-    match.participants = mergeParticipants(match.participants, recordArray(envelope.data.Players).map(participant));
+    match.participants = mergeParticipants(
+      match.participants,
+      recordArray(envelope.data.Players).map(participant),
+    );
     const game = envelope.data.Game;
     if (game && typeof game === 'object' && !Array.isArray(game)) {
       const gameRecord = game as Record<string, unknown>;
@@ -186,9 +258,15 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
       const ball = gameRecord.Ball;
       if (ball && typeof ball === 'object' && !Array.isArray(ball)) {
         const ballRecord = ball as Record<string, unknown>;
-        match.ball = { speed: optionalNumber(ballRecord.Speed) ?? 0, lastTouchTeamNumber: optionalNumber(ballRecord.TeamNum) };
+        match.ball = {
+          speed: optionalNumber(ballRecord.Speed) ?? 0,
+          lastTouchTeamNumber: optionalNumber(ballRecord.TeamNum),
+        };
       }
-      match.viewTarget = gameRecord.bHasTarget === true ? playerReference(gameRecord.Target) : undefined;
+      match.viewTarget =
+        gameRecord.bHasTarget === true
+          ? playerReference(gameRecord.Target)
+          : undefined;
     }
     if (!match.roundPhaseObserved && !match.isReplay) match.roundActive = true;
     accumulateSnapshot(match);
@@ -209,14 +287,17 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
     match.roundActive = false;
     match.events = [...match.events, storeEvent(match, envelope, now)];
   } else {
-    if (envelope.event === 'CountdownBegin' || envelope.event === 'GoalScored' || envelope.event === 'GoalReplayStart') {
+    if (
+      envelope.event === 'CountdownBegin' ||
+      envelope.event === 'GoalScored' ||
+      envelope.event === 'GoalReplayStart'
+    ) {
       match.roundActive = false;
       match.roundPhaseObserved = true;
     } else if (envelope.event === 'RoundStarted') {
       match.roundActive = true;
       match.roundPhaseObserved = true;
-    }
-    else if (envelope.event === 'MatchPaused') match.isPaused = true;
+    } else if (envelope.event === 'MatchPaused') match.isPaused = true;
     else if (envelope.event === 'MatchUnpaused') match.isPaused = false;
     else if (envelope.event === 'PlayerLeft') {
       const primaryId = stringValue(envelope.data.PrimaryId);
@@ -224,9 +305,19 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
       const teamNumber = optionalNumber(envelope.data.TeamNum);
       const playerName = stringValue(envelope.data.PlayerName);
       const normalizedName = normalizePlayerName(playerName);
-      let leaving = isTrackablePrimaryId(primaryId) ? match.participants.find((value) => value.primaryId === primaryId) : undefined;
-      if (!leaving && shortcut !== undefined) leaving = match.participants.find((value) => value.shortcut === shortcut);
-      if (!leaving && normalizedName) leaving = match.participants.find((value) => normalizePlayerName(value.name) === normalizedName && (teamNumber === undefined || value.teamNumber === teamNumber));
+      let leaving = isTrackablePrimaryId(primaryId)
+        ? match.participants.find((value) => value.primaryId === primaryId)
+        : undefined;
+      if (!leaving && shortcut !== undefined)
+        leaving = match.participants.find(
+          (value) => value.shortcut === shortcut,
+        );
+      if (!leaving && normalizedName)
+        leaving = match.participants.find(
+          (value) =>
+            normalizePlayerName(value.name) === normalizedName &&
+            (teamNumber === undefined || value.teamNumber === teamNumber),
+        );
       if (leaving) leaving.isPresent = false;
     }
     match.events = [...match.events, storeEvent(match, envelope, now)];
@@ -235,15 +326,21 @@ export function reduceStatsEnvelope(previous: MatchState | undefined, envelope: 
   return { current: match, superseded };
 }
 
-export function recoverActiveMatch(matches: MatchState[], now = Date.now()): MatchState | undefined {
-  const liveMatches = matches.filter((match) => match.lifecycle === 'live').sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt));
+export function recoverActiveMatch(
+  matches: MatchState[],
+  now = Date.now(),
+): MatchState | undefined {
+  const liveMatches = matches
+    .filter((match) => match.lifecycle === 'live')
+    .sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt));
   const active = liveMatches[0];
   if (!active) return undefined;
   for (const superseded of liveMatches.slice(1)) {
     superseded.lifecycle = 'incomplete';
     superseded.endedAt = superseded.lastEventAt;
   }
-  if (now - new Date(active.lastEventAt).getTime() <= 15 * 60_000) return active;
+  if (now - new Date(active.lastEventAt).getTime() <= 15 * 60_000)
+    return active;
   active.lifecycle = 'incomplete';
   active.endedAt = active.lastEventAt;
   return undefined;
