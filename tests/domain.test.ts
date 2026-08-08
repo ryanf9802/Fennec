@@ -14,6 +14,20 @@ describe('Stats API domain', () => {
     expect(parseEnvelope('{"Event":"MatchCreated","Data":{}}').event).toBe('MatchCreated');
   });
 
+  it('parses the JSON-encoded Data shape emitted by the game WebSocket', () => {
+    const envelope = parseEnvelope(JSON.stringify({
+      Event: 'UpdateState',
+      Data: JSON.stringify({ MatchGuid: 'live-match', Game: { PlaylistId: 6 } }),
+    }));
+
+    expect(envelope).toEqual({
+      event: 'UpdateState',
+      data: { MatchGuid: 'live-match', Game: { PlaylistId: 6 } },
+    });
+    expect(() => parseEnvelope('{"Event":"UpdateState","Data":"not-json"}')).toThrow(/valid JSON/);
+    expect(() => parseEnvelope('{"Event":"UpdateState","Data":"[]"}')).toThrow(/object Data/);
+  });
+
   it('reduces snapshots while preserving discrete event payloads', () => {
     const snapshot = parseEnvelope(JSON.stringify({ Event: 'UpdateState', Data: { MatchGuid: 'match-1', Players: [{ Name: 'Me', PrimaryId: 'Steam|1|0', TeamNum: 0, Score: 250, Goals: 1, Shots: 2, Saves: 1 }], Game: { PlaylistId: 11, TimeSeconds: 180, Teams: [{ TeamNum: 0, Score: 1 }, { TeamNum: 1, Score: 0 }] } } }));
     const first = reduceStatsEnvelope(undefined, snapshot, '2026-08-08T00:00:00Z').current;

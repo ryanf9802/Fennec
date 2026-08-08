@@ -5,8 +5,15 @@ export function parseEnvelope(input: string): StatsEnvelope {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Stats API message must be an object.');
   const record = parsed as Record<string, unknown>;
   const event = record.Event;
-  const data = record.Data;
+  let data = record.Data;
   if (typeof event !== 'string' || event.length === 0) throw new Error('Stats API message requires a string Event.');
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data) as unknown;
+    } catch {
+      throw new Error('Stats API message Data string must contain valid JSON.');
+    }
+  }
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Stats API message requires an object Data.');
   return { event, data: data as Record<string, unknown> };
 }
