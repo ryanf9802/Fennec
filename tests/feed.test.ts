@@ -19,7 +19,8 @@ describe('browser Stats API feed', () => {
     const states: string[] = [];
     const events: string[] = [];
     const diagnostics: string[] = [];
-    const feed = new WebSocketStatsFeed('ws://127.0.0.1:49124');
+    const telemetry: Array<{ event: string; details?: Record<string, unknown> }> = [];
+    const feed = new WebSocketStatsFeed('ws://127.0.0.1:49124', (event, details) => { telemetry.push({ event, details }); });
     feed.start({
       onState: (state) => { states.push(state); },
       onEnvelope: (envelope) => { events.push(envelope.event); },
@@ -28,12 +29,53 @@ describe('browser Stats API feed', () => {
     const socket = FakeWebSocket.instances[0]!;
     expect(socket.url).toBe('ws://127.0.0.1:49124');
     socket.emit('open');
-    socket.emit('message', { data: '{}' });
+    socket.emit('message', { data: '{"Event":"MatchCreated","Data":null}' });
     socket.emit('message', { data: '{"Event":"GoalScored","Data":{}}' });
     await Promise.resolve();
     expect(states).toEqual(['connecting', 'waiting', 'live']);
     expect(events).toEqual(['GoalScored']);
     expect(diagnostics[0]).toMatch(/malformed/);
+    expect(telemetry).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event: 'connected' }),
+      expect.objectContaining({
+        event: 'frame_rejected',
+        details: expect.objectContaining({
+          error: 'Stats API message requires an object Data.',
+          preview: '{"Event":"MatchCreated","Data":null}',
+        }),
+      }),
+      expect.objectContaining({
+        event: 'frame_received',
+        details: expect.objectContaining({ statsEvent: 'GoalScored', dataKeys: [] }),
+      }),
+      expect.objectContaining({
+        event: 'feed_live',
+        details: expect.objectContaining({ firstEvent: 'GoalScored', frame: 2 }),
+      }),
+    ]));
+    feed.stop();
+  });
+
+  it('distinguishes valid packets that fail during application processing', async () => {
+    const diagnostics: string[] = [];
+    const telemetry: Array<{ event: string; details?: Record<string, unknown> }> = [];
+    const feed = new WebSocketStatsFeed('ws://127.0.0.1:49124', (event, details) => { telemetry.push({ event, details }); });
+    feed.start({
+      onState: () => undefined,
+      onEnvelope: () => { throw new Error('storage unavailable'); },
+      onDiagnostic: (message) => { diagnostics.push(message); },
+    });
+
+    FakeWebSocket.instances[0]!.emit('message', { data: '{"Event":"UpdateState","Data":{"Game":{}}}' });
+    await Promise.resolve();
+
+    expect(diagnostics).toEqual(['Failed to process Stats API event UpdateState: storage unavailable']);
+    expect(telemetry).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        event: 'frame_processing_failed',
+        details: expect.objectContaining({ statsEvent: 'UpdateState', error: 'storage unavailable' }),
+      }),
+    ]));
     feed.stop();
   });
 });

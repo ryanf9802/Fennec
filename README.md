@@ -67,6 +67,10 @@ pnpm test:e2e
 The direct browser adapter connects to `ws://127.0.0.1:49124` and retries with
 bounded exponential backoff. The feed is isolated behind `StatsFeedAdapter` so
 a future optional background companion can use the same application model.
+While Vite is running, development-only feed telemetry is mirrored to its
+terminal with the `[fennec:feed]` prefix. It includes socket lifecycle changes,
+sampled packet metadata, event packets, and bounded raw previews for rejected
+packets; production builds omit this reporting path.
 
 ## AWS deployment
 
