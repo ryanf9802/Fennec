@@ -7,9 +7,23 @@ const mocks = vi.hoisted(() => ({
   handlers: undefined as StatsFeedHandlers | undefined,
   pendingSaves: [] as Array<() => void>,
   savedMatches: [] as MatchState[],
+  checkpoints: [] as MatchState[],
   latestMatch: undefined as MatchState | undefined,
   profile: undefined as { primaryId: string; displayName: string } | undefined,
   endCurrentSession: vi.fn(async () => 'ended' as const),
+}));
+
+vi.mock('../src/feed/HybridStatsFeed', () => ({
+  HybridStatsFeed: class {
+    start(handlers: StatsFeedHandlers) {
+      mocks.handlers = handlers;
+    }
+    stop() {}
+    checkpoint(match: MatchState) {
+      mocks.checkpoints.push(match);
+    }
+    tombstone() {}
+  },
 }));
 
 vi.mock('../src/data/database', () => ({
@@ -113,14 +127,100 @@ function clockUpdate(timeSeconds: number): StatsEnvelope {
   };
 }
 
+function stateUpdate(playlistId: number, matchGuid = ''): StatsEnvelope {
+  return {
+    event: 'UpdateState',
+    data: {
+      MatchGuid: matchGuid,
+      Players: [
+        {
+          Name: 'Viewer',
+          PrimaryId: 'Steam|viewer|0',
+          Shortcut: 1,
+          TeamNum: 0,
+        },
+      ],
+      Game: { PlaylistId: playlistId, TimeSeconds: 300 },
+    },
+  };
+}
+
 describe('Fennec live state', () => {
   afterEach(() => {
     for (const resolve of mocks.pendingSaves.splice(0)) resolve();
     mocks.savedMatches.length = 0;
+    mocks.checkpoints.length = 0;
     mocks.latestMatch = undefined;
     mocks.profile = undefined;
     mocks.handlers = undefined;
     mocks.endCurrentSession.mockClear();
+  });
+
+  it('keeps training live without saving or checkpointing it', async () => {
+    mocks.profile = { primaryId: 'Steam|viewer|0', displayName: 'Viewer' };
+    render(
+      <FennecProvider>
+        <LiveStateProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    await act(async () => {
+      await mocks.handlers!.onEnvelope(stateUpdate(9));
+      await mocks.handlers!.onCheckpoint?.({
+        id: 'companion-training',
+        lifecycle: 'live',
+        startedAt: '2026-08-09T00:00:00Z',
+        lastEventAt: '2026-08-09T00:00:01Z',
+        playlistId: 9,
+        playlistName: 'Training',
+        playlistCategory: 'unknown',
+        arena: 'Woods',
+        timeSeconds: 1,
+        isOvertime: false,
+        isReplay: false,
+        teams: [],
+        participants: [],
+        events: [],
+      });
+    });
+
+    expect(screen.getByText('active match')).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Connection status: Live' }),
+    ).toBeInTheDocument();
+    expect(mocks.savedMatches).toEqual([]);
+    expect(mocks.checkpoints).toEqual([]);
+  });
+
+  it('starts persistence after training rolls over into a game', async () => {
+    render(
+      <FennecProvider>
+        <LiveStateProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    await act(async () => {
+      await mocks.handlers!.onEnvelope(stateUpdate(9));
+      await mocks.handlers!.onEnvelope({
+        event: 'MatchDestroyed',
+        data: { MatchGuid: '' },
+      });
+      await mocks.handlers!.onEnvelope({
+        event: 'MatchCreated',
+        data: { MatchGuid: 'ranked-match' },
+      });
+      await mocks.handlers!.onEnvelope(stateUpdate(13, 'ranked-match'));
+    });
+
+    expect(mocks.savedMatches).toHaveLength(1);
+    expect(mocks.savedMatches[0]).toMatchObject({
+      matchGuid: 'ranked-match',
+      playlistId: 13,
+    });
+    expect(mocks.checkpoints).toHaveLength(1);
+    expect(mocks.checkpoints[0]?.playlistId).toBe(13);
   });
 
   it('publishes clock packets without waiting for match persistence', async () => {
@@ -130,6 +230,11 @@ describe('Fennec live state', () => {
       </FennecProvider>,
     );
     await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    await act(async () => {
+      await mocks.handlers!.onEnvelope(stateUpdate(13, 'live-match'));
+    });
+    for (const resolve of mocks.pendingSaves.splice(0)) resolve();
 
     act(() => {
       void mocks.handlers!.onEnvelope(clockUpdate(12));
@@ -150,8 +255,9 @@ describe('Fennec live state', () => {
     );
     await waitFor(() => expect(mocks.handlers).toBeDefined());
 
-    act(() => {
-      void mocks.handlers!.onEnvelope(clockUpdate(12));
+    await act(async () => {
+      await mocks.handlers!.onEnvelope(stateUpdate(13, 'live-match'));
+      await mocks.handlers!.onEnvelope(clockUpdate(12));
     });
     act(() => screen.getByRole('button', { name: 'Switch profile' }).click());
     act(() => {

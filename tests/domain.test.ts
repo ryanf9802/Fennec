@@ -30,6 +30,11 @@ import { derivedFiftyFacts } from '../src/domain/passes';
 import { normalizePlayerKey, playerKeyFor } from '../src/domain/playerIdentity';
 import { sessionMetrics } from '../src/domain/metrics';
 import {
+  isHistoryEligibleMatch,
+  isTrainingMatch,
+  resolvePlaylist,
+} from '../src/domain/playlists';
+import {
   defaultSettings,
   type MatchState,
   type ParticipantState,
@@ -88,6 +93,17 @@ const event = (
 });
 
 describe('Stats API domain', () => {
+  it('identifies training as live-only activity', () => {
+    expect(resolvePlaylist(9)).toEqual({
+      name: 'Training',
+      category: 'unknown',
+    });
+    expect(isTrainingMatch({ playlistId: 9 })).toBe(true);
+    expect(isHistoryEligibleMatch({ playlistId: 9 })).toBe(false);
+    expect(isHistoryEligibleMatch({ playlistId: 0 })).toBe(false);
+    expect(isHistoryEligibleMatch({ playlistId: 11 })).toBe(true);
+  });
+
   it('validates envelopes', () => {
     expect(() => parseEnvelope('{}')).toThrow(/Event/);
     expect(parseEnvelope('{"Event":"MatchCreated","Data":{}}').event).toBe(

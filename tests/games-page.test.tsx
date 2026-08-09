@@ -48,9 +48,13 @@ function session(endedManually = false): SessionGroup {
   };
 }
 
-function renderPage(value = session(), withProfile = true) {
+function renderPage(
+  value = session(),
+  withProfile = true,
+  activeMatch?: MatchState,
+) {
   mocks.fennec = {
-    activeMatch: undefined,
+    activeMatch,
     profile: withProfile
       ? { primaryId: 'Steam|you|0', displayName: 'You' }
       : undefined,
@@ -97,6 +101,25 @@ describe('closed session presentation', () => {
       screen.getByRole('link', { name: /Earlier today.*1 game/ }),
     ).toBeInTheDocument();
     expect(screen.queryByText('In focus')).not.toBeInTheDocument();
+  });
+
+  it('labels live training and explains that it is not saved', () => {
+    renderPage(session(), true, {
+      ...match,
+      id: 'training',
+      lifecycle: 'live',
+      playlistId: 9,
+      playlistName: 'Training',
+      observedByPrimaryId: 'Steam|you|0',
+    });
+
+    expect(screen.getByText('Training now')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Training' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Live only — not saved to history/),
+    ).toBeInTheDocument();
   });
 
   it('prompts for a player instead of showing unscoped history', () => {

@@ -19,6 +19,7 @@ import {
   type TimelineEvent,
 } from '../domain/types';
 import { recalculateDerivedTouchStats } from '../domain/passes';
+import { isHistoryEligibleMatch } from '../domain/playlists';
 import type {
   EndSessionResult,
   HistoryPage,
@@ -1185,6 +1186,7 @@ export async function saveMatch(
   idleMinutes = 30,
 ): Promise<void> {
   await normalizeExistingData();
+  if (!isHistoryEligibleMatch(match)) return;
   pendingMatches.set(match.id, { match, idleMinutes });
   const existing = matchDrains.get(match.id);
   if (existing) return existing;
@@ -1531,10 +1533,12 @@ export async function replaceAll(
   profile?: FennecProfile,
 ): Promise<void> {
   await settleMatchWrites();
-  const ordered = [...matches].sort(
-    (a, b) =>
-      a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id),
-  );
+  const ordered = matches
+    .filter(isHistoryEligibleMatch)
+    .sort(
+      (a, b) =>
+        a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id),
+    );
   const grouped = groupSessionRecords(ordered, settings.sessionGapMinutes);
   const appearances = ordered.flatMap((match) =>
     match.participants.map((player) => appearance(match, player)),

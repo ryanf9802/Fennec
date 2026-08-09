@@ -8,6 +8,7 @@ const playlists: Record<number, [string, PlaylistCategory]> = {
   6: ['Private Match', 'private'],
   7: ['Season', 'unknown'],
   8: ['Exhibition', 'unknown'],
+  9: ['Training', 'unknown'],
   10: ['Ranked Duel', 'ranked'],
   11: ['Ranked Doubles', 'ranked'],
   13: ['Ranked Standard', 'ranked'],
@@ -21,6 +22,18 @@ const playlists: Record<number, [string, PlaylistCategory]> = {
   39: ['Hoops', 'casual'],
   40: ['Rumble', 'casual'],
 };
+
+export function isTrainingMatch(match: { playlistId: number }): boolean {
+  return match.playlistId === 9;
+}
+
+/**
+ * Delays durable history until the Stats API has identified the activity and
+ * rejects training, which remains useful only as transient live state.
+ */
+export function isHistoryEligibleMatch(match: { playlistId: number }): boolean {
+  return match.playlistId > 0 && !isTrainingMatch(match);
+}
 
 export function resolvePlaylist(id: number): {
   name: string;

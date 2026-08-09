@@ -1,4 +1,9 @@
-import { createBackup, matchesCsv, parseBackup } from '../src/data/backup';
+import {
+  createBackup,
+  matchesCsv,
+  parseBackup,
+  streamBackup,
+} from '../src/data/backup';
 import { defaultSettings, type MatchState } from '../src/domain/types';
 
 const value: MatchState = {
@@ -92,6 +97,58 @@ const value: MatchState = {
 };
 
 describe('portable data', () => {
+  it('excludes training from JSON and CSV exports', () => {
+    const training = {
+      ...structuredClone(value),
+      id: 'training',
+      playlistId: 9,
+      playlistName: 'Training',
+    };
+
+    expect(
+      createBackup([training, value], defaultSettings).matches.map(
+        (match) => match.id,
+      ),
+    ).toEqual(['one']);
+    expect(matchesCsv([training, value], 'Steam|1|0')).not.toContain(
+      'training',
+    );
+  });
+
+  it('excludes training from streamed backups', async () => {
+    const writes: string[] = [];
+    const training = {
+      ...structuredClone(value),
+      id: 'training',
+      playlistId: 9,
+      playlistName: 'Training',
+    };
+    Object.defineProperty(window, 'showSaveFilePicker', {
+      configurable: true,
+      value: async () => ({
+        createWritable: async () => ({
+          write: async (chunk: string) => writes.push(chunk),
+          close: async () => undefined,
+        }),
+      }),
+    });
+
+    async function* matches() {
+      yield training;
+      yield value;
+    }
+
+    try {
+      expect(
+        await streamBackup('backup.ndjson', matches(), defaultSettings),
+      ).toBe(true);
+      expect(writes.join('')).not.toContain('"id":"training"');
+      expect(writes.join('')).toContain('"id":"one"');
+    } finally {
+      Reflect.deleteProperty(window, 'showSaveFilePicker');
+    }
+  });
+
   it('round-trips the versioned backup', () => {
     const backup = createBackup(
       [

@@ -17,6 +17,7 @@ import { sessionIdleGapElapsed } from '../domain/sessions';
 import { formatClock, matchElapsedSeconds } from '../domain/timeline';
 import { formatTeamScore, profileTeamNumber } from '../domain/teamPresentation';
 import { playerKeyForPrimaryId } from '../domain/playerIdentity';
+import { isTrainingMatch } from '../domain/playlists';
 import { matchBelongsToProfile } from '../domain/profileScope';
 import { useSessions } from '../data/historyQueries';
 
@@ -47,6 +48,9 @@ export function GamesPage() {
     activeMatch && matchBelongsToProfile(activeMatch, profile?.primaryId)
       ? activeMatch
       : undefined;
+  const trainingActive = visibleActiveMatch
+    ? isTrainingMatch(visibleActiveMatch)
+    : false;
   const orderedSessions =
     sessionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const current = orderedSessions[0];
@@ -155,12 +159,15 @@ export function GamesPage() {
                 <Radio className="size-5" />
               </span>
               <div>
-                <div className="eyebrow text-fennec-cyan">Live now</div>
+                <div className="eyebrow text-fennec-cyan">
+                  {trainingActive ? 'Training now' : 'Live now'}
+                </div>
                 <h2 className="mt-0.5 text-xl font-extrabold sm:text-2xl">
                   {visibleActiveMatch.playlistName}
                 </h2>
                 <p className="text-muted mt-1 text-sm">
                   {visibleActiveMatch.arena || 'Waiting for match state'}
+                  {trainingActive && ' · Live only — not saved to history'}
                 </p>
               </div>
             </div>

@@ -21,6 +21,7 @@ import {
   type TeamPresentation,
 } from '../domain/teamPresentation';
 import type { MatchState, ParticipantState } from '../domain/types';
+import { isTrainingMatch } from '../domain/playlists';
 import { useMatch, usePlayerHistoryAvailability } from '../data/historyQueries';
 
 const stats: Array<{
@@ -232,6 +233,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
       </div>
     );
   const preferredTeamNumber = profileTeamNumber(match, profile?.primaryId);
+  const training = isTrainingMatch(match);
   const teams = orderedTeams(match.teams, preferredTeamNumber);
   const canDelete = !supplied && match.lifecycle !== 'live';
   const removeMatch = async () => {
@@ -248,7 +250,9 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
     }
   };
   return (
-    <div className="space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-6 xl:space-y-0">
+    <div
+      className={`space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:gap-6 xl:space-y-0 ${training ? 'xl:grid-rows-[auto_auto_auto_minmax(0,1fr)]' : 'xl:grid-rows-[auto_auto_minmax(0,1fr)]'}`}
+    >
       <Link
         to="/"
         className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"
@@ -258,7 +262,10 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
       </Link>
       <header className="flex flex-wrap items-start justify-between gap-5">
         <div>
-          <h1 className="text-3xl font-black sm:text-4xl">
+          {training && <div className="eyebrow">Live training</div>}
+          <h1
+            className={`${training ? 'mt-1' : ''} text-3xl font-black sm:text-4xl`}
+          >
             {match.playlistName}
           </h1>
           <p className="text-muted mt-2 flex flex-wrap items-center gap-x-1.5">
@@ -290,6 +297,18 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
           </div>
         </div>
       </header>
+      {training && (
+        <div
+          role="status"
+          className="surface-flat border-cyan-300/30 rounded-2xl px-4 py-3 text-sm"
+        >
+          <strong className="text-fennec-cyan">Training session</strong>
+          <span className="text-muted ml-2">
+            Live only — this activity and its stats are not saved to game
+            history.
+          </span>
+        </div>
+      )}
       <div className="grid min-w-0 gap-6 xl:min-h-0 xl:grid-cols-[minmax(0,7fr)_minmax(16.5rem,3fr)]">
         <section className="scoreboard-container min-w-0 xl:min-h-0 xl:overflow-y-auto">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">

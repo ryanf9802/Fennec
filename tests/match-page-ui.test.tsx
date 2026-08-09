@@ -153,4 +153,24 @@ describe('historical match deletion', () => {
       screen.queryByRole('button', { name: 'Delete match' }),
     ).not.toBeInTheDocument();
   });
+
+  it('clearly identifies training as live-only activity', () => {
+    render(
+      <MemoryRouter>
+        <MatchPage
+          match={{
+            ...historicalMatch,
+            lifecycle: 'live',
+            playlistId: 9,
+            playlistName: 'Training',
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Live training')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Live only — this activity and its stats are not saved to game history.',
+    );
+  });
 });

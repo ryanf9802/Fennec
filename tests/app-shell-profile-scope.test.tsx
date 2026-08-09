@@ -78,4 +78,21 @@ describe('profile-scoped live navigation', () => {
       '/live',
     );
   });
+
+  it('labels training separately from a live match', () => {
+    mocks.activeMatch = {
+      ...liveMatch('Steam|you|0'),
+      playlistId: 9,
+      playlistName: 'Training',
+    };
+    render(
+      <MemoryRouter>
+        <AppShell>Content</AppShell>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Live training' })).toHaveAttribute(
+      'href',
+      '/live',
+    );
+  });
 });

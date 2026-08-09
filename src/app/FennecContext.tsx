@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { recoverActiveMatch, reduceStatsEnvelope } from '../domain/reducer';
+import { isHistoryEligibleMatch } from '../domain/playlists';
 import {
   defaultSettings,
   type FeedConnectionState,
@@ -140,7 +141,11 @@ export function FennecProvider({
     let timer: number | undefined;
     let pending: MatchState | undefined;
     const persist = (match: MatchState) => {
-      if (generation !== historyGenerationRef.current) return;
+      if (
+        generation !== historyGenerationRef.current ||
+        !isHistoryEligibleMatch(match)
+      )
+        return;
       lastCheckpoint = Date.now();
       pending = undefined;
       void saveMatch(match, settings.sessionGapMinutes)
@@ -155,6 +160,10 @@ export function FennecProvider({
         );
     };
     const schedule = (match: MatchState, immediate: boolean) => {
+      if (!isHistoryEligibleMatch(match)) {
+        if (pending?.id === match.id) pending = undefined;
+        return;
+      }
       pending = match;
       if (immediate || Date.now() - lastCheckpoint >= 1_000) {
         if (timer) window.clearTimeout(timer);
@@ -179,6 +188,7 @@ export function FennecProvider({
       onState: setConnection,
       onDiagnostic: setDiagnostic,
       onCheckpoint: async (match) => {
+        if (!isHistoryEligibleMatch(match)) return;
         await saveMatch(match, settings.sessionGapMinutes);
         await queryClient.invalidateQueries({ queryKey: historyKeys.all });
       },
@@ -202,7 +212,8 @@ export function FennecProvider({
         const nextConnection =
           result.current.lifecycle === 'live' ? 'live' : 'waiting';
         setConnection(nextConnection);
-        feed.checkpoint?.(result.current);
+        if (isHistoryEligibleMatch(result.current))
+          feed.checkpoint?.(result.current);
         const addedEvent =
           result.current.events.length > (previous?.events.length ?? 0);
         if (result.superseded) persist(result.superseded);

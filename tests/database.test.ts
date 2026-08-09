@@ -118,6 +118,21 @@ describe('IndexedDB storage', () => {
     expect(loaded[0]?.events[0]?.payload.GoalSpeed).toBe(100);
   });
 
+  it('does not persist training through live saves or restores', async () => {
+    const training = {
+      ...structuredClone(match),
+      id: 'training',
+      playlistId: 9,
+      playlistName: 'Training',
+    };
+
+    await saveMatch(training);
+    expect(await loadMatches()).toEqual([]);
+
+    await replaceAll([training, match], defaultSettings);
+    expect((await loadMatches()).map((item) => item.id)).toEqual(['stored']);
+  });
+
   it('loads the latest match with participants and events', async () => {
     await saveMatch(playedMatch('older', '2026-08-08T00:00:00Z', true, true));
     await saveMatch(

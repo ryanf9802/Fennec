@@ -6,6 +6,7 @@ import {
 } from '../domain/types';
 import { observedBallSpeed, playerTouchAnalytics } from '../domain/analytics';
 import { recalculateDerivedTouchStats } from '../domain/passes';
+import { isHistoryEligibleMatch } from '../domain/playlists';
 
 export interface FennecBackup {
   format: 'fennec-backup';
@@ -48,7 +49,7 @@ export function createBackup(
     exportedAt: new Date().toISOString(),
     settings,
     profile,
-    matches: matches.map(normalizeMatch),
+    matches: matches.filter(isHistoryEligibleMatch).map(normalizeMatch),
   };
 }
 
@@ -169,10 +170,12 @@ export async function streamBackup(
   };
   try {
     await writer.write(`${JSON.stringify(header)}\n`);
-    for await (const match of matches)
+    for await (const match of matches) {
+      if (!isHistoryEligibleMatch(match)) continue;
       await writer.write(
         `${JSON.stringify({ type: 'match', value: normalizeMatch(match) })}\n`,
       );
+    }
   } finally {
     await writer.close();
   }
@@ -229,9 +232,9 @@ export function matchesCsv(matches: MatchState[], profileId: string): string {
       'match_maximum_ball_speed',
     ],
   ];
-  for (const match of [...matches].sort((a, b) =>
-    a.startedAt.localeCompare(b.startedAt),
-  )) {
+  for (const match of matches
+    .filter(isHistoryEligibleMatch)
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
     const player = match.participants.find(
       (item) => item.primaryId === profileId,
     );

@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
+import { isTrainingMatch } from '../domain/playlists';
 import { matchBelongsToProfile } from '../domain/profileScope';
 import { ConnectionStatus } from './ConnectionStatus';
 
@@ -37,6 +38,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     activeMatch && matchBelongsToProfile(activeMatch, profile?.primaryId)
       ? activeMatch
       : undefined;
+  const liveLabel =
+    visibleActiveMatch && isTrainingMatch(visibleActiveMatch)
+      ? 'Live training'
+      : 'Live match';
   const collapsed = settings.sidebarCollapsed;
   return (
     <div className="app-backdrop flex min-h-screen min-w-0">
@@ -103,13 +108,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           {visibleActiveMatch && (
             <NavLink
               to="/live"
-              aria-label="Live match"
-              title={collapsed ? 'Live match' : undefined}
+              aria-label={liveLabel}
+              title={collapsed ? liveLabel : undefined}
               className={`mt-3 flex min-h-11 items-center rounded-xl bg-cyan-400/12 font-bold text-fennec-cyan ${collapsed ? 'justify-center' : 'justify-center lg:justify-start lg:gap-3 lg:px-3'}`}
             >
               <Radio className="live-pulse size-5 shrink-0 rounded-full" />
               {!collapsed && (
-                <span className="hidden lg:inline">Live match</span>
+                <span className="hidden lg:inline">{liveLabel}</span>
               )}
             </NavLink>
           )}
