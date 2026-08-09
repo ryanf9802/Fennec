@@ -10,11 +10,13 @@ import { useOverview, usePlayers } from '../data/historyQueries';
  */
 export function ProfilePage() {
   const { profile, selectProfile } = useFennec();
-  const [search, setSearch] = useState(profile?.displayName ?? '');
-  const [selected, setSelected] = useState(profile?.primaryId ?? '');
+  const [searchDraft, setSearch] = useState<string>();
+  const [selectedDraft, setSelected] = useState<string>();
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [saved, setSaved] = useState(false);
+  const search = searchDraft ?? profile?.displayName ?? '';
+  const selected = selectedDraft ?? profile?.primaryId ?? '';
   const availablePlayersQuery = usePlayers('', true);
   const playersQuery = usePlayers(search, true);
   const overviewQuery = useOverview(playerKeyForPrimaryId(profile?.primaryId));
@@ -29,6 +31,8 @@ export function ProfilePage() {
   const hasPlayers = availablePlayers.length > 0;
   const hasSelectionChange =
     selected.length > 0 && selected !== (profile?.primaryId ?? '');
+  const playerLoaded =
+    selected.length > 0 && (selected === profile?.primaryId || saved);
 
   const choose = (player: (typeof players)[number]) => {
     setSelected(player.primaryId);
@@ -190,12 +194,12 @@ export function ProfilePage() {
             )}
           </div>
           <button
-            className="button-primary shrink-0"
-            disabled={!hasSelectionChange}
+            className={`${playerLoaded ? 'button-loaded' : 'button-primary'} shrink-0`}
+            disabled={!hasSelectionChange || saved}
             onClick={saveSelection}
           >
             <Check className="size-4" />
-            Use player
+            {playerLoaded ? 'Player loaded' : 'Use player'}
           </button>
         </div>
         {!hasPlayers && !availablePlayersQuery.isLoading && (

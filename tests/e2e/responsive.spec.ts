@@ -644,19 +644,26 @@ test('profile player selection is searchable and explicit', async ({
   await expect(page.getByText('Play a match to discover players.')).toHaveCount(
     0,
   );
-  const usePlayer = page.getByRole('button', { name: 'Use player' });
-  await expect(usePlayer).toBeDisabled();
+  const loadedPlayer = page.getByRole('button', { name: 'Player loaded' });
+  await expect(loadedPlayer).toBeDisabled();
+  await expect(loadedPlayer).toHaveCSS(
+    'background-image',
+    /linear-gradient.*rgb\(110, 231, 183\).*rgb\(52, 211, 153\)/,
+  );
   const searchBox = (await search.boundingBox())!;
-  const usePlayerBox = (await usePlayer.boundingBox())!;
+  const usePlayerBox = (await loadedPlayer.boundingBox())!;
   expect(usePlayerBox.x).toBeGreaterThan(searchBox.x + searchBox.width);
   expect(usePlayerBox.y).toBeCloseTo(searchBox.y, 0);
 
   await search.fill('Lu');
   await expect(page.getByRole('option', { name: /Luna/ })).toBeVisible();
   await page.getByRole('option', { name: /Luna/ }).click();
+  const usePlayer = page.getByRole('button', { name: 'Use player' });
   await expect(usePlayer).toBeEnabled();
   await usePlayer.click();
-  await expect(usePlayer).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Player loaded' }),
+  ).toBeDisabled();
   await expect(
     page.getByText('Profile updated.', { exact: true }),
   ).toBeVisible();

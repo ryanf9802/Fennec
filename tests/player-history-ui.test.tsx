@@ -9,13 +9,14 @@ const mocks = vi.hoisted(() => ({
     primaryId: 'Steam|you|0',
     displayName: 'You',
   } as { primaryId: string; displayName: string } | undefined,
+  selectProfile: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../src/app/FennecContext', () => ({
   useFennec: () => ({
     profile: mocks.profile,
     settings: defaultSettings,
-    selectProfile: vi.fn(),
+    selectProfile: mocks.selectProfile,
   }),
 }));
 
@@ -162,6 +163,7 @@ function LocationProbe() {
 describe('player profile UI', () => {
   beforeEach(() => {
     mocks.profile = { primaryId: 'Steam|you|0', displayName: 'You' };
+    mocks.selectProfile.mockClear();
   });
   it('opens a player profile over the match without changing location', () => {
     render(
@@ -259,22 +261,36 @@ describe('player profile UI', () => {
     expect(
       screen.queryByRole('option', { name: /Boomer/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use player' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Player loaded' }),
+    ).toBeDisabled();
   });
 
-  it('enables Use player only after selecting a different player', () => {
+  it('shows the loaded player and enables changes to a different player', async () => {
     render(
       <MemoryRouter>
         <ProfilePage />
       </MemoryRouter>,
     );
 
-    const usePlayer = screen.getByRole('button', { name: 'Use player' });
-    expect(usePlayer).toBeDisabled();
+    const loadedPlayer = screen.getByRole('button', {
+      name: 'Player loaded',
+    });
+    expect(loadedPlayer).toBeDisabled();
+    expect(loadedPlayer).toHaveClass('button-loaded');
 
     fireEvent.focus(screen.getByRole('combobox', { name: 'Search players' }));
     fireEvent.click(screen.getByRole('option', { name: /Teammate/ }));
+    const usePlayer = screen.getByRole('button', { name: 'Use player' });
     expect(usePlayer).toBeEnabled();
+    fireEvent.click(usePlayer);
+    expect(
+      await screen.findByRole('button', { name: 'Player loaded' }),
+    ).toBeDisabled();
+    expect(mocks.selectProfile).toHaveBeenCalledWith({
+      primaryId: 'Epic|teammate|0',
+      displayName: 'Teammate',
+    });
   });
 
   it('highlights player selection until a profile is chosen', () => {

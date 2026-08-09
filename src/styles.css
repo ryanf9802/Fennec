@@ -148,6 +148,7 @@ textarea:focus-visible {
   padding-left: 2.5rem;
 }
 .button-primary,
+.button-loaded,
 .button-secondary,
 .button-danger {
   display: inline-flex;
@@ -164,6 +165,14 @@ textarea:focus-visible {
 .button-primary {
   background: linear-gradient(135deg, #36d7ff, #1aa7db);
   color: #041321;
+}
+.button-loaded {
+  background: linear-gradient(135deg, #6ee7b7, #34d399);
+  color: #041b14;
+}
+.button-loaded:disabled {
+  cursor: default;
+  opacity: 1;
 }
 .button-secondary {
   background: var(--surface-strong);
