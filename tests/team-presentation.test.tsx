@@ -18,6 +18,7 @@ vi.mock('../src/app/FennecContext', () => ({
 
 vi.mock('../src/data/historyQueries', () => ({
   useMatch: () => ({ data: undefined, isLoading: false, isError: false }),
+  usePlayerHistoryAvailability: () => ({ data: [] }),
 }));
 
 const match: MatchState = {
