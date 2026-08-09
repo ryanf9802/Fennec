@@ -33,6 +33,8 @@ jobs:
           if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
             throw "Tag $env:GITHUB_REF_NAME must match package version v$packageVersion"
           }
+      - name: Build web application
+        run: pnpm build
       - name: Rust tests
         working-directory: src-tauri
         run: cargo test --locked
