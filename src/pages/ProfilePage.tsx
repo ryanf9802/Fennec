@@ -27,6 +27,8 @@ export function ProfilePage() {
     }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
   const hasPlayers = availablePlayers.length > 0;
+  const hasSelectionChange =
+    selected.length > 0 && selected !== (profile?.primaryId ?? '');
 
   const choose = (player: (typeof players)[number]) => {
     setSelected(player.primaryId);
@@ -103,9 +105,9 @@ export function ProfilePage() {
           </p>
         )}
         <div className="relative mt-5 max-w-2xl">
-          <Search className="text-muted pointer-events-none absolute left-3 top-3.5 size-4" />
+          <Search className="text-muted pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <input
-            className="control pl-10"
+            className="control control-with-leading-icon"
             type="search"
             role="combobox"
             aria-label="Search players"
@@ -185,16 +187,16 @@ export function ProfilePage() {
               )}
             </div>
           )}
-          <div className="mt-3 flex justify-end">
-            <button
-              className="button-primary"
-              disabled={!selected}
-              onClick={saveSelection}
-            >
-              <Check className="size-4" />
-              Use player
-            </button>
-          </div>
+        </div>
+        <div className="mt-3 flex max-w-2xl justify-end">
+          <button
+            className="button-primary"
+            disabled={!hasSelectionChange}
+            onClick={saveSelection}
+          >
+            <Check className="size-4" />
+            Use player
+          </button>
         </div>
         {!hasPlayers && !availablePlayersQuery.isLoading && (
           <p className="text-muted mt-3 text-sm">

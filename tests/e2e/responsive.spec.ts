@@ -614,15 +614,19 @@ test('profile player selection is searchable and explicit', async ({
     'placeholder',
     'Search players by display name',
   );
+  await expect(search).toHaveCSS('padding-left', '40px');
   await expect(page.getByText('Play a match to discover players.')).toHaveCount(
     0,
   );
+  const usePlayer = page.getByRole('button', { name: 'Use player' });
+  await expect(usePlayer).toBeDisabled();
 
   await search.fill('Lu');
   await expect(page.getByRole('option', { name: /Luna/ })).toBeVisible();
   await page.getByRole('option', { name: /Luna/ }).click();
-  await expect(page.getByRole('button', { name: 'Use player' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Use player' }).click();
+  await expect(usePlayer).toBeEnabled();
+  await usePlayer.click();
+  await expect(usePlayer).toBeDisabled();
   await expect(
     page.getByText('Profile updated.', { exact: true }),
   ).toBeVisible();

@@ -144,6 +144,9 @@ textarea:focus-visible {
   color: var(--text);
   padding: 0.65rem 0.85rem;
 }
+.control-with-leading-icon {
+  padding-left: 2.5rem;
+}
 .button-primary,
 .button-secondary,
 .button-danger {

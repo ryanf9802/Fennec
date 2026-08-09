@@ -132,6 +132,15 @@ vi.mock('../src/data/historyQueries', () => ({
         lastSeen: botMatch.startedAt,
       },
       {
+        playerKey: 'id:Epic|teammate|0',
+        primaryId: 'Epic|teammate|0',
+        identityKind: 'platform',
+        latestName: 'Teammate',
+        normalizedName: 'teammate',
+        firstSeen: botMatch.startedAt,
+        lastSeen: botMatch.startedAt,
+      },
+      {
         playerKey: 'name:boomer',
         identityKind: 'name',
         latestName: 'Boomer',
@@ -244,9 +253,22 @@ describe('player profile UI', () => {
     expect(
       screen.queryByRole('option', { name: /Boomer/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use player' })).not.toHaveClass(
-      'settings-save-fab',
+    expect(screen.getByRole('button', { name: 'Use player' })).toBeDisabled();
+  });
+
+  it('enables Use player only after selecting a different player', () => {
+    render(
+      <MemoryRouter>
+        <ProfilePage />
+      </MemoryRouter>,
     );
+
+    const usePlayer = screen.getByRole('button', { name: 'Use player' });
+    expect(usePlayer).toBeDisabled();
+
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Search players' }));
+    fireEvent.click(screen.getByRole('option', { name: /Teammate/ }));
+    expect(usePlayer).toBeEnabled();
   });
 
   it('highlights player selection until a profile is chosen', () => {
