@@ -138,7 +138,9 @@ test('3D touch map controls and preference persist across matches', async ({
   ).toBeVisible();
   const viewport = page.getByTestId('ball-touch-map-viewport');
   await expect(
-    viewport.getByText('Drag to pan · scroll or pinch to zoom'),
+    viewport.getByText(
+      'Left drag to pan · right drag to rotate · scroll or pinch to zoom',
+    ),
   ).toBeVisible();
   await expect(page.getByText('● Blue touch')).toHaveCount(0);
   await expect(page.getByText('■ Blue goal')).toHaveCount(0);
@@ -197,6 +199,23 @@ test('3D touch map controls and preference persist across matches', async ({
   await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
   await expect(pitch).toHaveValue('0');
   await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 100);
+  await page.mouse.up({ button: 'right' });
+  await expect(pitch).toHaveValue('30');
+  await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
+  expect(
+    await viewport.evaluate((element) => {
+      const event = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+      });
+      element.dispatchEvent(event);
+      return event.defaultPrevented;
+    }),
+  ).toBe(true);
 
   await page.goto('/matches/demo-current-1?demo=1');
   await expect(

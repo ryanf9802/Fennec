@@ -354,7 +354,9 @@ function Marker({
     <group>
       <group
         position={[position.x, position.y, position.z]}
-        onPointerDown={(event) => event.stopPropagation()}
+        onPointerDown={(event) => {
+          if (event.button === 0) event.stopPropagation();
+        }}
         onClick={activate}
         onPointerEnter={activate}
         onPointerLeave={(event) => {

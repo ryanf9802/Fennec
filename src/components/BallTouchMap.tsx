@@ -152,6 +152,9 @@ export function BallTouchMap({
   );
   const viewport = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number } | undefined>(undefined);
+  const rotation = useRef<{ pointerId: number; y: number } | undefined>(
+    undefined,
+  );
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; x: number; y: number } | undefined>(
     undefined,
@@ -199,7 +202,16 @@ export function BallTouchMap({
     return () => element.removeEventListener('wheel', zoom);
   }, [arena]);
 
-  const startPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button === 2) {
+      event.preventDefault();
+      rotation.current = {
+        pointerId: event.pointerId,
+        y: event.clientY,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
     if (event.button !== 0) return;
     pointers.current.set(event.pointerId, {
       x: event.clientX,
@@ -216,7 +228,19 @@ export function BallTouchMap({
     }
     event.currentTarget.setPointerCapture(event.pointerId);
   };
-  const pan = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (rotation.current?.pointerId === event.pointerId) {
+      const dy = event.clientY - rotation.current.y;
+      rotation.current = {
+        pointerId: event.pointerId,
+        y: event.clientY,
+      };
+      updateCamera((current) => ({
+        ...current,
+        pitch: current.pitch + dy * 0.3,
+      }));
+      return;
+    }
     if (!pointers.current.has(event.pointerId) || !drag.current) return;
     pointers.current.set(event.pointerId, {
       x: event.clientX,
@@ -257,7 +281,13 @@ export function BallTouchMap({
       targetZ: current.targetZ - dy * scale,
     }));
   };
-  const stopPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const stopDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (rotation.current?.pointerId === event.pointerId) {
+      rotation.current = undefined;
+      if (event.currentTarget.hasPointerCapture(event.pointerId))
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      return;
+    }
     pointers.current.delete(event.pointerId);
     pinch.current = undefined;
     const remaining = [...pointers.current.values()][0];
@@ -305,10 +335,11 @@ export function BallTouchMap({
         data-camera-target={`${Math.round(camera.targetX)},${Math.round(camera.targetZ)}`}
         data-camera-distance={Math.round(camera.distance)}
         className="surface-flat relative h-[clamp(22rem,56vw,38rem)] cursor-grab touch-none overflow-hidden rounded-2xl active:cursor-grabbing"
-        onPointerDown={startPan}
-        onPointerMove={pan}
-        onPointerUp={stopPan}
-        onPointerCancel={stopPan}
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={stopDrag}
+        onPointerCancel={stopDrag}
+        onContextMenu={(event) => event.preventDefault()}
       >
         <SceneErrorBoundary>
           <BallTouchScene
@@ -322,7 +353,7 @@ export function BallTouchMap({
         </SceneErrorBoundary>
 
         <div className="surface-strong text-muted pointer-events-none absolute left-3 top-3 rounded-lg px-3 py-2 text-xs shadow-xl">
-          Drag to pan · scroll or pinch to zoom
+          Left drag to pan · right drag to rotate · scroll or pinch to zoom
         </div>
 
         <div

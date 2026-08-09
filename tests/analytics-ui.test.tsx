@@ -129,7 +129,9 @@ describe('ball touch map', () => {
       depth: 880,
     });
     expect(scene.props?.points.map((point) => point.kind)).toEqual(['touch']);
-    const hint = screen.getByText('Drag to pan · scroll or pinch to zoom');
+    const hint = screen.getByText(
+      'Left drag to pan · right drag to rotate · scroll or pinch to zoom',
+    );
     expect(screen.getByTestId('ball-touch-map-viewport')).toContainElement(
       hint,
     );
