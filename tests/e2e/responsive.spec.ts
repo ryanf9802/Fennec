@@ -124,6 +124,47 @@ test('demo feed opens a live match and settings remain usable', async ({
   await expect(page.getByLabel('WebSocket port')).toHaveValue('49124');
 });
 
+test('dark is the default while system and light remain opt-in', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/settings?demo=1');
+
+  const appearance = page.getByLabel('Appearance');
+  await expect(appearance).toHaveValue('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect
+    .poll(() =>
+      page
+        .locator('html')
+        .evaluate((element) => getComputedStyle(element).colorScheme),
+    )
+    .toBe('dark');
+
+  await appearance.selectOption('system');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  await page.reload();
+  await expect(appearance).toHaveValue('system');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.reload();
+  await expect(appearance).toHaveValue('system');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+  await appearance.selectOption('light');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  await page.reload();
+  await expect(appearance).toHaveValue('light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
 test('3D touch map controls and preference persist across matches', async ({
   page,
 }) => {
