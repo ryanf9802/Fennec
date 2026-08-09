@@ -204,15 +204,24 @@ test('3D touch map controls and preference persist across matches', async ({
 
   await page.mouse.down();
   await expect(viewport).toHaveCSS('cursor', 'grabbing');
-  await page.mouse.move(box.x + box.width / 2, box.y + 180);
+  await page.mouse.move(box.x + box.width / 2 + 100, box.y + 180);
   await expect
     .poll(async () => {
-      const [, targetZ] = (await viewport.getAttribute('data-camera-target'))!
+      const [targetX, targetZ] = (await viewport.getAttribute(
+        'data-camera-target',
+      ))!
         .split(',')
         .map(Number);
-      return targetZ;
+      return targetX > 0 && targetZ > 0;
     })
-    .toBeLessThan(0);
+    .toBe(true);
+  const [pannedTargetX, pannedTargetZ] = (await viewport.getAttribute(
+    'data-camera-target',
+  ))!
+    .split(',')
+    .map(Number);
+  expect(pannedTargetX).toBeGreaterThan(0);
+  expect(pannedTargetZ).toBeGreaterThan(0);
   await page.mouse.up();
   await expect(viewport).toHaveCSS('cursor', 'grab');
   await expect(viewport).not.toHaveAttribute('data-camera-target', '0,0');
@@ -232,7 +241,7 @@ test('3D touch map controls and preference persist across matches', async ({
   await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2);
   await page.mouse.up({ button: 'right' });
   await expect(pitch).toHaveValue('30');
-  await expect(rotation).toHaveValue('30');
+  await expect(rotation).toHaveValue('-30');
   await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
   expect(
     await viewport.evaluate((element) => {

@@ -280,7 +280,7 @@ export function BallTouchMap({
       updateCamera((current) => ({
         ...current,
         pitch: current.pitch - dy * 0.3,
-        yaw: current.yaw + dx * 0.3,
+        yaw: current.yaw - dx * 0.3,
       }));
       return;
     }
@@ -320,8 +320,8 @@ export function BallTouchMap({
       camera.distance / Math.max(320, event.currentTarget.clientHeight);
     updateCamera((current) => ({
       ...current,
-      targetX: current.targetX - dx * scale,
-      targetZ: current.targetZ - dy * scale,
+      targetX: current.targetX + dx * scale,
+      targetZ: current.targetZ + dy * scale,
     }));
   };
   const stopDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
