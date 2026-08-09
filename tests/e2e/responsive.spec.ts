@@ -487,6 +487,63 @@ test('setup starts with a centered route choice and expands after selection', as
   ).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('paired setup exposes companion launch preferences', async ({ page }) => {
+  let dashboardCommandSeen = false;
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-companion-token', 'e2e-token');
+  });
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/permission-probe') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    if (path.startsWith('/commands/')) {
+      dashboardCommandSeen = path.endsWith('/enable-dashboard-auto-open');
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        version: '0.2.1',
+        protocolVersion: 1,
+        paired: path === '/status',
+        gameRunning: false,
+        feedConnected: false,
+        lastPacketAt: '2026-08-09T00:00:00Z',
+        stores: ['steam', 'epic'],
+        configuredStores: ['steam', 'epic'],
+        launchOnStartup: false,
+        openDashboardOnGameStart: false,
+        updateStatus: 'current',
+      }),
+    });
+  });
+
+  await page.goto('/onboarding?demo=1');
+  await page.getByRole('button', { name: /With companion/ }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Launch Fennec with Rocket League' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Enable Windows startup (recommended)' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Add Steam shortcut' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Add Epic shortcut' }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Open dashboard with Rocket League' })
+    .click();
+  await expect.poll(() => dashboardCommandSeen).toBe(true);
+  await expect(
+    page.getByText('The dashboard will open when Rocket League starts.'),
+  ).toBeVisible();
+});
+
 test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
   await page.goto('/?demo=1');
   await expect(page.getByText('Past sessions')).toBeVisible();

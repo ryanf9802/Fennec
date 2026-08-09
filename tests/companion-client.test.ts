@@ -1,4 +1,5 @@
 import {
+  companionCommand,
   companionDownloadUrl,
   companionOpenUrl,
 } from '../src/companion/client';
@@ -25,6 +26,28 @@ describe('companion pairing launch URL', () => {
   it('uses the stable latest-release Windows installer asset', () => {
     expect(companionDownloadUrl).toBe(
       'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe',
+    );
+  });
+
+  it('sends authenticated dashboard launch preference commands', async () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: vi.fn().mockReturnValue('paired-token'),
+        setItem: vi.fn(),
+      },
+    });
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(companionCommand('enable-dashboard-auto-open')).resolves.toBe(
+      true,
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      'http://127.0.0.1:49125/commands/enable-dashboard-auto-open',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { Authorization: 'Bearer paired-token' },
+      }),
     );
   });
 });

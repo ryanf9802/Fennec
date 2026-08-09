@@ -64,6 +64,7 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
+        launch_handler: { client_mode: 'navigate-existing' },
         background_color: '#07111f',
         theme_color: '#07111f',
         icons: [

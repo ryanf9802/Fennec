@@ -53,12 +53,15 @@ The optional Tauri companion under `src-tauri` runs in the Windows tray. It
 discovers Steam and Epic installations independently, safely backs up and
 updates the effective Stats API file (requesting elevation only when needed),
 captures while the browser is closed, and synchronizes frames, checkpoints, and
-deletions with a paired browser. Its optional per-store desktop shortcuts launch
-Rocket League through Steam or Epic, monitor the exact game executable, and exit
-the companion when that game process ends unless Windows startup is enabled.
+deletions with a paired browser. Its optional per-store Windows desktop
+shortcuts launch Rocket League through Steam or Epic, monitor the exact game
+executable, and exit the companion when that game process ends unless Windows
+startup is enabled.
 When startup is enabled, the lightweight collector remains idle in the tray
 after the game closes so it is ready for the next session. Settings can register
-or remove it from the current user's Windows sign-in startup.
+or remove it from the current user's Windows sign-in startup. An opt-in setting
+can also open the dashboard once when Rocket League starts; an installed PWA may
+handle that link, with the default browser as the fallback.
 
 The companion checks for signed updates shortly after launch and every hour. It
 downloads updates in the background, waits until Rocket League capture has been

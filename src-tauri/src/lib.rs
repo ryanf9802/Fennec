@@ -55,6 +55,7 @@ pub(crate) fn configure_with_elevation(path: &std::path::Path) -> std::io::Resul
     }
 }
 
+const PRODUCTION_APP_URL: &str = "https://app.fennec.gg/";
 const PRODUCTION_SETUP_URL: &str = "https://app.fennec.gg/setup";
 const PAIRING_RETURN_URLS: [&str; 5] = [
     PRODUCTION_SETUP_URL,
@@ -71,12 +72,37 @@ fn pairing_url(return_to: Option<&str>, token: &str) -> String {
     format!("{return_to}#companion={token}")
 }
 
-fn open_fennec(token: &str, return_to: Option<&str>) {
-    let url = pairing_url(return_to, token);
+fn open_url(url: &str) {
     #[cfg(windows)]
-    let _ = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+    let _ = Command::new("cmd").args(["/C", "start", "", url]).spawn();
     #[cfg(not(windows))]
     let _ = Command::new("xdg-open").arg(url).spawn();
+}
+
+fn open_fennec(token: &str, return_to: Option<&str>) {
+    open_url(&pairing_url(return_to, token));
+}
+
+fn should_open_dashboard(was_running: bool, is_running: bool, enabled: bool) -> bool {
+    enabled && !was_running && is_running
+}
+
+async fn monitor_game_launches(state: Arc<AppState>, installs: Vec<store::StoreInstall>) {
+    let mut monitor = store::GameProcessMonitor::new(&installs);
+    let mut was_running = false;
+    loop {
+        let is_running = monitor.any_running();
+        let enabled = state
+            .health
+            .read()
+            .expect("health lock")
+            .open_dashboard_on_game_start;
+        if should_open_dashboard(was_running, is_running, enabled) {
+            open_url(PRODUCTION_APP_URL);
+        }
+        was_running = is_running;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    }
 }
 
 fn launch_from_url(app: tauri::AppHandle, value: &url::Url) {
@@ -178,6 +204,7 @@ pub fn run() {
                     feed_connected: false,
                     last_packet_at: None,
                     launch_on_startup: store::launch_on_startup(),
+                    open_dashboard_on_game_start: store::open_dashboard_on_game_start(),
                     update_status: UpdateStatus::Current,
                     available_update_version: None,
                     last_update_check_at: None,
@@ -194,6 +221,10 @@ pub fn run() {
                 }
             });
             tauri::async_runtime::spawn(server::collect_stats(state));
+            tauri::async_runtime::spawn(monitor_game_launches(
+                app.state::<Arc<AppState>>().inner().clone(),
+                installs,
+            ));
             updater::spawn(
                 app.handle().clone(),
                 app.state::<Arc<AppState>>().inner().clone(),
@@ -235,7 +266,9 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{pairing_url, should_exit_after_game, PRODUCTION_SETUP_URL};
+    use super::{
+        pairing_url, should_exit_after_game, should_open_dashboard, PRODUCTION_SETUP_URL,
+    };
 
     #[test]
     fn pairing_accepts_known_local_development_urls() {
@@ -257,5 +290,13 @@ mod tests {
     fn shortcut_companion_exits_only_when_windows_startup_is_disabled() {
         assert!(should_exit_after_game(false));
         assert!(!should_exit_after_game(true));
+    }
+
+    #[test]
+    fn dashboard_opens_only_on_an_enabled_game_start_transition() {
+        assert!(should_open_dashboard(false, true, true));
+        assert!(!should_open_dashboard(true, true, true));
+        assert!(!should_open_dashboard(false, false, true));
+        assert!(!should_open_dashboard(false, true, false));
     }
 }

@@ -22,6 +22,12 @@ describe('PWA identity', () => {
     expect(viteConfig).not.toMatch(/name: 'Fennec[^']/);
   });
 
+  it('reuses an existing installed window for companion-opened links', () => {
+    expect(viteConfig).toContain(
+      "launch_handler: { client_mode: 'navigate-existing' }",
+    );
+  });
+
   it('advertises transparent favicon-mark icons for installation', () => {
     expect(viteConfig).toContain("src: '/icons/icon-192.png'");
     expect(viteConfig).toContain("src: '/icons/icon-512.png'");

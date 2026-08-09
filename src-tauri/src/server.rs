@@ -46,6 +46,7 @@ pub struct RuntimeHealth {
     pub feed_connected: bool,
     pub last_packet_at: Option<String>,
     pub launch_on_startup: bool,
+    pub open_dashboard_on_game_start: bool,
     pub update_status: UpdateStatus,
     pub available_update_version: Option<String>,
     pub last_update_check_at: Option<String>,
@@ -117,6 +118,8 @@ async fn command(
     let result = match command.as_str() {
         "enable-startup" => store::set_launch_on_startup(true),
         "disable-startup" => store::set_launch_on_startup(false),
+        "enable-dashboard-auto-open" => store::set_open_dashboard_on_game_start(true),
+        "disable-dashboard-auto-open" => store::set_open_dashboard_on_game_start(false),
         _ => {
             let kind = if command.ends_with("steam") {
                 Some(StoreKind::Steam)
@@ -148,6 +151,16 @@ async fn command(
     };
     if result.is_ok() && (command == "enable-startup" || command == "disable-startup") {
         state.health.write().expect("health lock").launch_on_startup = command == "enable-startup";
+    }
+    if result.is_ok()
+        && (command == "enable-dashboard-auto-open"
+            || command == "disable-dashboard-auto-open")
+    {
+        state
+            .health
+            .write()
+            .expect("health lock")
+            .open_dashboard_on_game_start = command == "enable-dashboard-auto-open";
     }
     if result.is_ok() && command.starts_with("configure-") {
         state.health.write().expect("health lock").configured_stores = store::configured_stores();

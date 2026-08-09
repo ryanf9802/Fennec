@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum StoreKind {
     Steam,
@@ -228,6 +228,36 @@ pub async fn wait_for_game_lifecycle(executable: PathBuf) -> io::Result<()> {
     Ok(())
 }
 
+pub struct GameProcessMonitor {
+    executables: Vec<PathBuf>,
+    system: sysinfo::System,
+}
+
+impl GameProcessMonitor {
+    pub fn new(installs: &[StoreInstall]) -> Self {
+        Self {
+            executables: installs
+                .iter()
+                .map(|install| install.executable.clone())
+                .collect(),
+            system: sysinfo::System::new(),
+        }
+    }
+
+    pub fn any_running(&mut self) -> bool {
+        self.system
+            .refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        self.system.processes().values().any(|process| {
+            process.exe().is_some_and(|path| {
+                self.executables.iter().any(|executable| {
+                    path.to_string_lossy()
+                        .eq_ignore_ascii_case(&executable.to_string_lossy())
+                })
+            })
+        })
+    }
+}
+
 fn process_running(executable: &Path) -> bool {
     let mut system = sysinfo::System::new_all();
     system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
@@ -239,22 +269,55 @@ fn process_running(executable: &Path) -> bool {
     })
 }
 
+fn shortcut_details(kind: StoreKind) -> (&'static str, &'static str) {
+    match kind {
+        StoreKind::Steam => ("Steam", "fennec://launch/steam"),
+        StoreKind::Epic => ("Epic", "fennec://launch/epic"),
+    }
+}
+
+#[cfg(windows)]
 pub fn create_shortcut(kind: StoreKind) -> io::Result<PathBuf> {
     let profile = std::env::var_os("USERPROFILE")
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Windows user profile not found"))?;
-    let label = match kind {
-        StoreKind::Steam => "Steam",
-        StoreKind::Epic => "Epic",
-    };
-    let slug = label.to_ascii_lowercase();
-    let path = PathBuf::from(profile)
-        .join("Desktop")
-        .join(format!("Rocket League ({label}) with Fennec.url"));
-    fs::write(
-        &path,
-        format!("[InternetShortcut]\r\nURL=fennec://launch/{slug}\r\n"),
-    )?;
+    let (label, uri) = shortcut_details(kind);
+    let desktop = PathBuf::from(profile).join("Desktop");
+    let path = desktop.join(format!("Rocket League ({label}) with Fennec.lnk"));
+    let legacy = desktop.join(format!("Rocket League ({label}) with Fennec.url"));
+    let executable = std::env::current_exe()?;
+    let explorer = PathBuf::from(
+        std::env::var_os("SystemRoot")
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Windows root not found"))?,
+    )
+    .join("explorer.exe");
+    let working_directory = executable
+        .parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "companion directory not found"))?;
+    let icon = format!("{},0", executable.to_string_lossy());
+    let description = format!("Launch Rocket League ({label}) with Fennec");
+    let script = r#"$shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut($args[0]); $shortcut.TargetPath = $args[1]; $shortcut.Arguments = $args[2]; $shortcut.WorkingDirectory = $args[3]; $shortcut.IconLocation = $args[4]; $shortcut.Description = $args[5]; $shortcut.Save()"#;
+    let status = Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .arg(&path)
+        .arg(&explorer)
+        .arg(uri)
+        .arg(working_directory)
+        .arg(&icon)
+        .arg(&description)
+        .status()?;
+    if !status.success() || !path.exists() {
+        return Err(io::Error::other("Windows shortcut creation failed"));
+    }
+    let _ = fs::remove_file(legacy);
     Ok(path)
+}
+
+#[cfg(not(windows))]
+pub fn create_shortcut(_kind: StoreKind) -> io::Result<PathBuf> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "Windows shortcuts are only available on Windows",
+    ))
 }
 
 #[cfg(windows)]
@@ -299,6 +362,44 @@ pub fn set_launch_on_startup(_enabled: bool) -> io::Result<()> {
     ))
 }
 
+#[cfg(windows)]
+pub fn open_dashboard_on_game_start() -> bool {
+    use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey("Software\\Fennec\\Companion")
+        .and_then(|key| key.get_value::<u32, _>("OpenDashboardOnGameStart"))
+        .is_ok_and(|value| value != 0)
+}
+
+#[cfg(not(windows))]
+pub fn open_dashboard_on_game_start() -> bool {
+    false
+}
+
+#[cfg(windows)]
+pub fn set_open_dashboard_on_game_start(enabled: bool) -> io::Result<()> {
+    use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+    let (key, _) = RegKey::predef(HKEY_CURRENT_USER)
+        .create_subkey("Software\\Fennec\\Companion")?;
+    if enabled {
+        key.set_value("OpenDashboardOnGameStart", &1_u32)
+    } else {
+        match key.delete_value("OpenDashboardOnGameStart") {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error),
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn set_open_dashboard_on_game_start(_enabled: bool) -> io::Result<()> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "Dashboard launch preferences are only available on Windows",
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,5 +407,23 @@ mod tests {
     #[test]
     fn parses_escaped_vdf_path() {
         assert_eq!(unescape_vdf_path(r"D:\\Games"), PathBuf::from(r"D:\Games"));
+    }
+
+    #[test]
+    fn shortcut_details_are_store_specific() {
+        assert_eq!(
+            shortcut_details(StoreKind::Steam),
+            ("Steam", "fennec://launch/steam")
+        );
+        assert_eq!(
+            shortcut_details(StoreKind::Epic),
+            ("Epic", "fennec://launch/epic")
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn dashboard_auto_open_defaults_off() {
+        assert!(!open_dashboard_on_game_start());
     }
 }

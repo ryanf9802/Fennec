@@ -9,6 +9,7 @@ export interface CompanionHealth {
   stores?: Array<'steam' | 'epic'>;
   configuredStores: Array<'steam' | 'epic'>;
   launchOnStartup: boolean;
+  openDashboardOnGameStart?: boolean;
   updateStatus?:
     | 'current'
     | 'checking'
@@ -102,7 +103,9 @@ export async function companionCommand(
     | 'configure-steam'
     | 'configure-epic'
     | 'enable-startup'
-    | 'disable-startup',
+    | 'disable-startup'
+    | 'enable-dashboard-auto-open'
+    | 'disable-dashboard-auto-open',
 ): Promise<boolean> {
   try {
     const response = await fetch(`http://127.0.0.1:49125/commands/${command}`, {
