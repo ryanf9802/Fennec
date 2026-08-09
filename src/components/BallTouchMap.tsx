@@ -92,27 +92,6 @@ function matchesFilter(
   return point.actors.some((actor) => actor.primaryId === id);
 }
 
-function adjacentTouches(
-  points: SpatialEventPoint[],
-  activePoint?: SpatialEventPoint,
-): { previousId?: string; nextId?: string } {
-  if (!activePoint) return {};
-  const touches = points.filter(isTouchMarker);
-  if (isTouchMarker(activePoint)) {
-    const index = touches.findIndex((point) => point.id === activePoint.id);
-    return {
-      previousId: touches[index - 1]?.id,
-      nextId: touches[index + 1]?.id,
-    };
-  }
-  return {
-    previousId: [...touches]
-      .reverse()
-      .find((point) => point.sequence < activePoint.sequence)?.id,
-    nextId: touches.find((point) => point.sequence > activePoint.sequence)?.id,
-  };
-}
-
 class SceneErrorBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }
@@ -187,15 +166,11 @@ export function BallTouchMap({
       ),
   );
   const activePoint = points.find((point) => point.id === active);
-  const { previousId, nextId } = adjacentTouches(points, activePoint);
   const emphasizedIds = new Set(
     activePoint
-      ? [
-          activePoint.id,
-          activePoint.associatedPointId,
-          previousId,
-          nextId,
-        ].filter((id): id is string => !!id)
+      ? [activePoint.id, activePoint.associatedPointId].filter(
+          (id): id is string => !!id,
+        )
       : [],
   );
   const visible = points.filter(
@@ -342,8 +317,6 @@ export function BallTouchMap({
             cameraState={camera}
             activeId={active}
             emphasizedIds={[...emphasizedIds]}
-            previousId={previousId}
-            nextId={nextId}
             onActivate={setActive}
           />
         </SceneErrorBoundary>

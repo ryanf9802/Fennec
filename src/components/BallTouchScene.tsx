@@ -10,7 +10,6 @@ import {
   Color,
   DoubleSide,
   Float32BufferAttribute,
-  type Group,
   LineBasicMaterial,
   LineSegments,
   type Mesh,
@@ -32,6 +31,12 @@ const orangeTeamColor = '#fb923c';
 
 function teamColor(teamNumber: number): string {
   return teamNumber === 1 ? orangeTeamColor : blueTeamColor;
+}
+
+function litMarkerColor(color: string, opacity: number): Color {
+  const result = new Color(color);
+  if (opacity < 1) result.multiplyScalar(0.18);
+  return result;
 }
 
 function CameraRig({ state }: { state: TouchMapCameraState }) {
@@ -253,40 +258,6 @@ function ActiveGuide({ point }: { point: SpatialEventPoint }) {
   return <primitive object={object} />;
 }
 
-function NeighborArrow({ direction }: { direction: 'left' | 'right' }) {
-  const group = useRef<Group>(null);
-  const { camera } = useThree();
-  const shape = useMemo(() => {
-    const side = direction === 'left' ? -1 : 1;
-    const next = new Shape();
-    next.moveTo(side * 0.72, 0);
-    next.lineTo(side * 0.12, 0.5);
-    next.lineTo(side * 0.12, 0.2);
-    next.lineTo(side * -0.68, 0.2);
-    next.lineTo(side * -0.68, -0.2);
-    next.lineTo(side * 0.12, -0.2);
-    next.lineTo(side * 0.12, -0.5);
-    next.closePath();
-    return next;
-  }, [direction]);
-  useFrame(() => group.current?.quaternion.copy(camera.quaternion));
-  return (
-    <group ref={group}>
-      <mesh renderOrder={21} scale={[58, 58, 58]}>
-        <shapeGeometry args={[shape]} />
-        <meshBasicMaterial
-          color="#f8fafc"
-          depthTest={false}
-          depthWrite={false}
-          opacity={0.78}
-          side={DoubleSide}
-          transparent
-        />
-      </mesh>
-    </group>
-  );
-}
-
 function GoalDisc({ active, opacity }: { active: boolean; opacity: number }) {
   const mesh = useRef<Mesh>(null);
   const { camera } = useThree();
@@ -325,7 +296,7 @@ function FiftyMarker({
         <mesh key={`${index}:${color}`} rotation={[0, Math.PI / 2, 0]}>
           <sphereGeometry args={[radius, 20, 14, index * Math.PI, Math.PI]} />
           <meshStandardMaterial
-            color={new Color(color)}
+            color={litMarkerColor(color, opacity)}
             depthWrite={opacity === 1}
             emissive={active ? color : '#000000'}
             emissiveIntensity={active ? 0.28 : 0}
@@ -353,21 +324,19 @@ function FiftyMarker({
 
 /**
  * Chooses semantic geometry for one marker while keeping pointer behavior,
- * fading, neighbor arrows, and active height guidance consistent.
+ * fading and active height guidance consistent.
  */
 function Marker({
   profile,
   point,
   active,
   muted,
-  arrow,
   onActivate,
 }: {
   profile: ArenaProfile;
   point: SpatialEventPoint;
   active: boolean;
   muted: boolean;
-  arrow?: 'left' | 'right';
   onActivate(id?: string): void;
 }) {
   const position =
@@ -401,7 +370,7 @@ function Marker({
           <mesh>
             <octahedronGeometry args={[active ? 150 : 115, 0]} />
             <meshStandardMaterial
-              color={new Color(color)}
+              color={litMarkerColor(color, opacity)}
               depthWrite={opacity === 1}
               emissive={active ? color : '#000000'}
               emissiveIntensity={active ? 0.28 : 0}
@@ -414,7 +383,7 @@ function Marker({
           <mesh>
             <sphereGeometry args={[active ? 125 : 91.25, 20, 14]} />
             <meshStandardMaterial
-              color={new Color(color)}
+              color={litMarkerColor(color, opacity)}
               depthWrite={opacity === 1}
               emissive={active ? color : '#000000'}
               emissiveIntensity={active ? 0.28 : 0}
@@ -424,7 +393,6 @@ function Marker({
             />
           </mesh>
         )}
-        {arrow && <NeighborArrow direction={arrow} />}
       </group>
       {active && point.kind !== 'goal' && <ActiveGuide point={point} />}
     </group>
@@ -437,8 +405,6 @@ function Scene({
   cameraState,
   activeId,
   emphasizedIds,
-  previousId,
-  nextId,
   onActivate,
 }: BallTouchSceneProps) {
   return (
@@ -454,13 +420,6 @@ function Scene({
           point={point}
           active={point.id === activeId}
           muted={!!activeId && !emphasizedIds.includes(point.id)}
-          arrow={
-            point.id === previousId
-              ? 'left'
-              : point.id === nextId
-                ? 'right'
-                : undefined
-          }
           onActivate={onActivate}
         />
       ))}
@@ -475,8 +434,6 @@ export interface BallTouchSceneProps {
   cameraState: TouchMapCameraState;
   activeId?: string;
   emphasizedIds: string[];
-  previousId?: string;
-  nextId?: string;
   onActivate(id?: string): void;
 }
 

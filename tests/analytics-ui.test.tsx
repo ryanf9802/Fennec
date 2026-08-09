@@ -146,11 +146,8 @@ describe('ball touch map', () => {
     expect(selectedTouch).toHaveAccessibleName(/touch, at 1:00/);
     expect(selectedTouch).toBeInTheDocument();
     fireEvent.focus(selectedTouch);
-    expect(scene.props?.nextId).toBe('map:2');
-    expect(scene.props?.emphasizedIds).toEqual(
-      expect.arrayContaining(['map:1', 'map:2']),
-    );
-    expect(scene.props?.points.map((point) => point.id)).toContain('map:2');
+    expect(scene.props?.emphasizedIds).toEqual(['map:1']);
+    expect(scene.props?.points.map((point) => point.id)).not.toContain('map:2');
     fireEvent.blur(selectedTouch);
     expect(
       screen.queryByRole('button', { name: /Them · touch/ }),
@@ -163,8 +160,7 @@ describe('ball touch map', () => {
       screen.getByRole('button', { name: /Them · touch/ }),
     ).toHaveAccessibleName(/touch, at 2:00/);
     fireEvent.focus(screen.getByRole('button', { name: /Them · touch/ }));
-    expect(scene.props?.previousId).toBe('map:1');
-    expect(scene.props?.nextId).toBeUndefined();
+    expect(scene.props?.emphasizedIds).toEqual(['map:2']);
     expect(scene.props?.points.map((point) => point.kind)).toEqual([
       'touch',
       'touch',
@@ -234,11 +230,7 @@ describe('ball touch map', () => {
     fireEvent.focus(secondGoal);
     expect(screen.getByText('Them · Goal #2 scored')).toBeInTheDocument();
     expect(screen.getByText(/4:00 · XYZ 200, 5000, 500/)).toBeInTheDocument();
-    expect(scene.props?.emphasizedIds).toEqual(
-      expect.arrayContaining(['map:2', 'map:5']),
-    );
-    expect(scene.props?.emphasizedIds).not.toContain('map:1');
-    expect(scene.props?.emphasizedIds).not.toContain('map:4');
+    expect(scene.props?.emphasizedIds).toEqual(['map:5']);
   });
 
   it('combines a scoring 50 and reveals its filtered goal association', () => {
@@ -304,12 +296,14 @@ describe('ball touch map', () => {
     expect(
       screen.getByText('Me vs Them · 50/50 · Goal #1 scoring touch'),
     ).toBeInTheDocument();
-    expect(scene.props?.emphasizedIds).toEqual(
-      expect.arrayContaining(['fifty:map:11', 'map:12']),
-    );
+    expect(scene.props?.emphasizedIds).toEqual(['fifty:map:11', 'map:12']);
     expect(scene.props?.points.map((point) => point.kind)).toEqual([
       'fifty',
       'goal',
     ]);
+    fireEvent.focus(
+      screen.getByRole('button', { name: /Them · Goal #1 scored/ }),
+    );
+    expect(scene.props?.emphasizedIds).toEqual(['map:12', 'fifty:map:11']);
   });
 });
