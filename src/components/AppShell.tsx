@@ -121,15 +121,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="shrink-0 p-3">
           {collapsed ? (
-            <div
-              className="mx-auto size-2 rounded-full bg-fennec-cyan"
-              title="Fennec is running"
+            <ConnectionStatus
+              connection={connection}
+              demoMode={demoMode}
+              showLabel={false}
+              className="surface-flat w-full justify-center rounded-full px-3 py-1.5 text-xs"
             />
           ) : (
             <>
-              <div
-                className="mx-auto size-2 rounded-full bg-fennec-cyan lg:hidden"
-                title="Fennec is running"
+              <ConnectionStatus
+                connection={connection}
+                demoMode={demoMode}
+                showLabel={false}
+                className="surface-flat w-full justify-center rounded-full px-3 py-1.5 text-xs lg:hidden"
               />
               <ConnectionStatus
                 connection={connection}

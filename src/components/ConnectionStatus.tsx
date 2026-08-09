@@ -4,10 +4,12 @@ import type { FeedConnectionState } from '../domain/types';
 export function ConnectionStatus({
   connection,
   demoMode = false,
+  showLabel = true,
   className = '',
 }: {
   connection: FeedConnectionState;
   demoMode?: boolean;
+  showLabel?: boolean;
   className?: string;
 }) {
   const presentation = connectionPresentation(connection);
@@ -24,7 +26,9 @@ export function ConnectionStatus({
         aria-hidden="true"
         className={`size-2 shrink-0 rounded-full ${presentation.pulse ? 'live-pulse' : ''} ${presentation.indicatorClass}`}
       />
-      <span className="min-w-0 truncate whitespace-nowrap">{label}</span>
+      {showLabel && (
+        <span className="min-w-0 truncate whitespace-nowrap">{label}</span>
+      )}
     </div>
   );
 }

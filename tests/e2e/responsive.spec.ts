@@ -852,7 +852,7 @@ test('primary pages reserve a stable root scrollbar gutter', async ({
   expect(settings.mainWidth).toBe(games.mainWidth);
 });
 
-test('desktop sidebar connection status fits without clipping', async ({
+test('desktop sidebar connection status fits and stays meaningful when collapsed', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 620 });
@@ -864,6 +864,7 @@ test('desktop sidebar connection status fits without clipping', async ({
     'aria-label',
     /^Connection status: Demo · /,
   );
+  await expect(status).toHaveAttribute('data-connection-state', 'live');
   const [sidebarBox, statusBox] = await Promise.all([
     sidebar.boundingBox(),
     status.boundingBox(),
@@ -880,6 +881,24 @@ test('desktop sidebar connection status fits without clipping', async ({
       scroll: element.scrollWidth,
     }));
   expect(labelDimensions.scroll).toBeLessThanOrEqual(labelDimensions.client);
+
+  const expandedState = await status.getAttribute('data-connection-state');
+  const expandedIndicatorClass = await status
+    .locator('[aria-hidden="true"]')
+    .getAttribute('class');
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+
+  await expect(status).toBeVisible();
+  await expect(status).toHaveAttribute(
+    'aria-label',
+    /^Connection status: Demo · /,
+  );
+  await expect(status).toHaveAttribute('data-connection-state', expandedState!);
+  await expect(status).toHaveText('');
+  await expect(status.locator('[aria-hidden="true"]')).toHaveAttribute(
+    'class',
+    expandedIndicatorClass!,
+  );
 });
 
 test('scoreboard columns align and the desktop timeline scrolls independently', async ({
