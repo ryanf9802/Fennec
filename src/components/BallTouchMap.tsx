@@ -237,7 +237,7 @@ export function BallTouchMap({
       };
       updateCamera((current) => ({
         ...current,
-        pitch: current.pitch + dy * 0.3,
+        pitch: current.pitch - dy * 0.3,
       }));
       return;
     }

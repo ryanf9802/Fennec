@@ -200,9 +200,9 @@ test('3D touch map controls and preference persist across matches', async ({
   await expect(pitch).toHaveValue('0');
   await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
 
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down({ button: 'right' });
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 100);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.up({ button: 'right' });
   await expect(pitch).toHaveValue('30');
   await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
