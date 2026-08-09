@@ -54,7 +54,7 @@ function PlayerRow({
 }) {
   const playerKey = playerKeyFor(player);
   const inspectable =
-    hasHistory && !!playerKey && playerKey !== playerKeyForPrimaryId(profileId);
+    !!playerKey && playerKey !== playerKeyForPrimaryId(profileId);
   const bot = playerIdentityKind(playerKey) === 'name';
   const profileLabel = `View profile for ${player.name}${player.isPresent === false ? ' (no longer in match)' : ''}`;
   return (
@@ -80,10 +80,12 @@ function PlayerRow({
                 fill
               />
             </span>
-            <History
-              aria-hidden="true"
-              className="text-muted size-3.5 shrink-0 group-hover/player:text-fennec-cyan"
-            />
+            {hasHistory && (
+              <History
+                aria-hidden="true"
+                className="text-muted size-3.5 shrink-0 group-hover/player:text-fennec-cyan"
+              />
+            )}
           </button>
         ) : (
           <PlayerName

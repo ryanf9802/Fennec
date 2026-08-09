@@ -186,8 +186,8 @@ describe('player profile UI', () => {
       'leading-none',
     );
     expect(
-      screen.queryByRole('button', { name: 'View profile for Solo' }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'View profile for Solo' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText('Solo').closest('th')?.querySelector('.lucide-history'),
     ).not.toBeInTheDocument();
@@ -215,6 +215,12 @@ describe('player profile UI', () => {
       screen.getByRole('button', { name: 'Close player profile' }),
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/matches/bots');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View profile for Solo' }),
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('/matches/bots');
   });
 
