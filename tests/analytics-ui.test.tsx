@@ -234,6 +234,11 @@ describe('ball touch map', () => {
     fireEvent.focus(secondGoal);
     expect(screen.getByText('Them · Goal #2 scored')).toBeInTheDocument();
     expect(screen.getByText(/4:00 · XYZ 200, 5000, 500/)).toBeInTheDocument();
+    expect(scene.props?.emphasizedIds).toEqual(
+      expect.arrayContaining(['map:2', 'map:5']),
+    );
+    expect(scene.props?.emphasizedIds).not.toContain('map:1');
+    expect(scene.props?.emphasizedIds).not.toContain('map:4');
   });
 
   it('combines a scoring 50 and reveals its filtered goal association', () => {

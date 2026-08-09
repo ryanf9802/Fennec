@@ -272,22 +272,15 @@ function NeighborArrow({ direction }: { direction: 'left' | 'right' }) {
   useFrame(() => group.current?.quaternion.copy(camera.quaternion));
   return (
     <group ref={group}>
-      <mesh renderOrder={20} scale={[260, 260, 260]}>
-        <shapeGeometry args={[shape]} />
-        <meshBasicMaterial
-          color="#07111f"
-          depthTest={false}
-          depthWrite={false}
-          side={DoubleSide}
-        />
-      </mesh>
-      <mesh renderOrder={21} scale={[190, 190, 190]}>
+      <mesh renderOrder={21} scale={[58, 58, 58]}>
         <shapeGeometry args={[shape]} />
         <meshBasicMaterial
           color="#f8fafc"
           depthTest={false}
           depthWrite={false}
+          opacity={0.78}
           side={DoubleSide}
+          transparent
         />
       </mesh>
     </group>
@@ -315,15 +308,13 @@ function GoalDisc({ active, opacity }: { active: boolean; opacity: number }) {
 function FiftyMarker({
   point,
   active,
-  contextual,
   opacity,
 }: {
   point: SpatialEventPoint;
   active: boolean;
-  contextual: boolean;
   opacity: number;
 }) {
-  const radius = active || contextual ? 180 : 91.25;
+  const radius = active ? 125 : 91.25;
   const teams = [...new Set(point.actors.map((actor) => actor.teamNumber))]
     .sort((first, second) => first - second)
     .slice(0, 2);
@@ -331,7 +322,7 @@ function FiftyMarker({
   return (
     <>
       {colors.map((color, index) => (
-        <mesh key={`${index}:${color}`}>
+        <mesh key={`${index}:${color}`} rotation={[0, Math.PI / 2, 0]}>
           <sphereGeometry args={[radius, 20, 14, index * Math.PI, Math.PI]} />
           <meshStandardMaterial
             color={new Color(color)}
@@ -385,7 +376,7 @@ function Marker({
       : gameToScene(point);
   const team = point.actors[0]?.teamNumber;
   const color = teamColor(point.scoringTeamNumber ?? team ?? 0);
-  const opacity = muted ? 0.25 : 1;
+  const opacity = muted ? 0.12 : 1;
   const activate = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
     onActivate(point.id);
@@ -405,15 +396,10 @@ function Marker({
         {point.kind === 'goal' ? (
           <GoalDisc active={active} opacity={opacity} />
         ) : point.kind === 'fifty' ? (
-          <FiftyMarker
-            active={active}
-            contextual={!!arrow}
-            opacity={opacity}
-            point={point}
-          />
+          <FiftyMarker active={active} opacity={opacity} point={point} />
         ) : point.isScoringTouch ? (
           <mesh>
-            <octahedronGeometry args={[active || arrow ? 190 : 115, 0]} />
+            <octahedronGeometry args={[active ? 150 : 115, 0]} />
             <meshStandardMaterial
               color={new Color(color)}
               depthWrite={opacity === 1}
@@ -426,7 +412,7 @@ function Marker({
           </mesh>
         ) : (
           <mesh>
-            <sphereGeometry args={[active || arrow ? 180 : 91.25, 20, 14]} />
+            <sphereGeometry args={[active ? 125 : 91.25, 20, 14]} />
             <meshStandardMaterial
               color={new Color(color)}
               depthWrite={opacity === 1}
