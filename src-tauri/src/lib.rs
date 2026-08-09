@@ -204,7 +204,7 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&open, &quit])?;
             let menu_token = token.clone();
             TrayIconBuilder::new()
-                .icon(app.default_window_icon().expect("bundle icon").clone())
+                .icon(tauri::include_image!("icons/tray-icon.png"))
                 .tooltip("Fennec Companion")
                 .menu(&menu)
                 .show_menu_on_left_click(true)
