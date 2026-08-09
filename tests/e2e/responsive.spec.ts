@@ -228,6 +228,22 @@ test('3D touch map controls and preference persist across matches', async ({
   await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
   await expect(pitch).toHaveValue('0');
   await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
+  await rotation.fill('90');
+  await page.mouse.move(box.x + box.width / 2, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 100, box.y + 120);
+  await expect
+    .poll(async () => {
+      const [targetX, targetZ] = (await viewport.getAttribute(
+        'data-camera-target',
+      ))!
+        .split(',')
+        .map(Number);
+      return Math.abs(targetX) <= 1 && targetZ > 0;
+    })
+    .toBe(true);
+  await page.mouse.up();
+  await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
   for (let index = 0; index < 20; index += 1) {
     await page.mouse.wheel(0, -100);
   }

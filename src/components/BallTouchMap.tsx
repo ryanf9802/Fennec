@@ -17,6 +17,7 @@ import {
 import {
   constrainCameraState,
   defaultCameraState,
+  viewRelativePanDelta,
   type TouchMapCameraState,
 } from '../domain/touchMapGeometry';
 import type { MatchState } from '../domain/types';
@@ -318,11 +319,14 @@ export function BallTouchMap({
     drag.current = { x: event.clientX, y: event.clientY };
     const scale =
       camera.distance / Math.max(320, event.currentTarget.clientHeight);
-    updateCamera((current) => ({
-      ...current,
-      targetX: current.targetX - dx * scale,
-      targetZ: current.targetZ - dy * scale,
-    }));
+    updateCamera((current) => {
+      const delta = viewRelativePanDelta(dx, dy, orientationYaw + current.yaw);
+      return {
+        ...current,
+        targetX: current.targetX + delta.x * scale,
+        targetZ: current.targetZ + delta.z * scale,
+      };
+    });
   };
   const stopDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (rotation.current?.pointerId === event.pointerId) {

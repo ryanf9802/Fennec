@@ -22,6 +22,20 @@ export interface WallPanel {
   zMax: number;
 }
 
+export function viewRelativePanDelta(
+  screenX: number,
+  screenY: number,
+  yawDegrees: number,
+): { x: number; z: number } {
+  const yaw = (yawDegrees * Math.PI) / 180;
+  const cosine = Math.cos(yaw);
+  const sine = Math.sin(yaw);
+  return {
+    x: -screenX * cosine - screenY * sine,
+    z: screenX * sine - screenY * cosine,
+  };
+}
+
 export function gameToScene(
   point: Pick<SpatialEventPoint, 'x' | 'y' | 'z'>,
 ): ScenePoint {

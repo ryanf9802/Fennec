@@ -23,6 +23,7 @@ import {
   constrainCameraState,
   gameToScene,
   goalMarkerPosition,
+  viewRelativePanDelta,
 } from '../src/domain/touchMapGeometry';
 import { derivedFiftyFacts } from '../src/domain/passes';
 import { normalizePlayerKey, playerKeyFor } from '../src/domain/playerIdentity';
@@ -1037,6 +1038,16 @@ describe('Stats API domain', () => {
     expect(besideGoal.distance).toBe(distances.min);
     expect(distances.min / distances.default).toBe(0.5);
     expect(distances.max / distances.default).toBeLessThan(1.1);
+  });
+
+  it('maps screen-space panning through the effective camera yaw', () => {
+    expect(viewRelativePanDelta(100, 50, 0)).toEqual({ x: -100, z: -50 });
+    const quarterTurn = viewRelativePanDelta(100, 50, 90);
+    expect(quarterTurn.x).toBeCloseTo(-50);
+    expect(quarterTurn.z).toBeCloseTo(100);
+    const orangeOrientation = viewRelativePanDelta(100, 50, 180);
+    expect(orangeOrientation.x).toBeCloseTo(100);
+    expect(orangeOrientation.z).toBeCloseTo(50);
   });
 
   it('reports unavailable observed speed for legacy matches', () => {
