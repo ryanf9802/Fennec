@@ -58,9 +58,12 @@ function pointTitle(point: SpatialEventPoint): string {
       ? `Goal #${point.goalNumber} scoring touch`
       : 'Goal scoring touch'
     : undefined;
-  if (point.kind === 'fifty')
-    return `${actors} · 50/50${scoring ? ` · ${scoring}` : ''}`;
-  return `${actors} · ${scoring ?? point.kind}`;
+  const details = [
+    point.kind === 'fifty' ? '50/50' : undefined,
+    point.isSave ? 'Save' : undefined,
+    scoring,
+  ].filter((value): value is string => !!value);
+  return `${actors} · ${details.join(' · ') || point.kind}`;
 }
 
 function pointLabel(point: SpatialEventPoint): string {

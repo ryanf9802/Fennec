@@ -721,6 +721,97 @@ describe('Stats API domain', () => {
     );
   });
 
+  it('classifies nearby regular and epic save awards as the same saved touch', () => {
+    const value = match(
+      'saves',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.participants = [
+      { ...player('Keeper', 'Steam|1|0', 0), shortcut: 4 },
+      { ...player('Rival', 'Epic|2|0', 1), shortcut: 5 },
+    ];
+    value.events = [
+      event('saves', 1, 'RoundStarted', {}, 100),
+      event(
+        'saves',
+        2,
+        'StatfeedEvent',
+        {
+          EventName: 'EpicSave',
+          Type: 'Epic Save',
+          MainTarget: { Name: 'Keeper', Shortcut: 4, TeamNum: 0 },
+        },
+        100,
+      ),
+      event(
+        'saves',
+        3,
+        'BallHit',
+        {
+          Players: [{ Name: 'Keeper', Shortcut: 4, TeamNum: 0 }],
+          Ball: { Location: { X: 10, Y: 20, Z: 30 } },
+        },
+        100,
+      ),
+      event(
+        'saves',
+        4,
+        'BallHit',
+        {
+          Players: [{ Name: 'Keeper', Shortcut: 4, TeamNum: 0 }],
+          Ball: { Location: { X: 40, Y: 50, Z: 60 } },
+        },
+        98,
+      ),
+      event(
+        'saves',
+        5,
+        'StatfeedEvent',
+        {
+          Type: 'Save',
+          MainTarget: { Name: 'Keeper', Shortcut: 4, TeamNum: 0 },
+        },
+        98,
+      ),
+      {
+        ...event(
+          'saves',
+          6,
+          'BallHit',
+          {
+            Players: [{ Name: 'Rival', Shortcut: 5, TeamNum: 1 }],
+            Ball: { Location: { X: 70, Y: 80, Z: 90 } },
+          },
+          97,
+        ),
+        receivedAt: '2026-08-08T00:00:02Z',
+      },
+      event('saves', 7, 'GoalScored', {}, 96),
+      event(
+        'saves',
+        8,
+        'StatfeedEvent',
+        {
+          EventName: 'Save',
+          MainTarget: { Name: 'Keeper', Shortcut: 4, TeamNum: 0 },
+        },
+        97,
+      ),
+    ];
+
+    expect(
+      spatialEventPoints(value).map((point) => ({
+        id: point.id,
+        isSave: point.isSave,
+      })),
+    ).toEqual([
+      { id: 'saves:3', isSave: true },
+      { id: 'saves:4', isSave: true },
+      { id: 'saves:6', isSave: undefined },
+    ]);
+  });
+
   it('numbers goal points by match sequence without renumbering omitted goals', () => {
     const value = match(
       'goal-points',
@@ -830,6 +921,18 @@ describe('Stats API domain', () => {
         id: 'scoring-fifty:3',
         matchId: value.id,
         sequence: 3,
+        eventName: 'StatfeedEvent',
+        receivedAt: '2026-08-08T00:01:00.300Z',
+        elapsedSeconds: 60.3,
+        payload: {
+          EventName: 'Save',
+          MainTarget: { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+        },
+      },
+      {
+        id: 'scoring-fifty:4',
+        matchId: value.id,
+        sequence: 4,
         eventName: 'GoalScored',
         receivedAt: '2026-08-08T00:01:01.000Z',
         elapsedSeconds: 61,
@@ -855,13 +958,14 @@ describe('Stats API domain', () => {
         id: 'fifty:scoring-fifty:2',
         kind: 'fifty',
         sourceEventIds: ['scoring-fifty:1', 'scoring-fifty:2'],
+        isSave: true,
         isScoringTouch: true,
         scoringTeamNumber: 1,
         goalNumber: 1,
-        associatedPointId: 'scoring-fifty:3',
+        associatedPointId: 'scoring-fifty:4',
       }),
       expect.objectContaining({
-        id: 'scoring-fifty:3',
+        id: 'scoring-fifty:4',
         kind: 'goal',
         associatedPointId: 'fifty:scoring-fifty:2',
       }),

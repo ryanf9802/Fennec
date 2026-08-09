@@ -83,6 +83,20 @@ const match: MatchState = {
       },
     },
     {
+      id: 'map:4',
+      matchId: 'map',
+      sequence: 4,
+      eventName: 'StatfeedEvent',
+      receivedAt: '2026-08-08T00:01:00.100Z',
+      matchClockSeconds: 240,
+      elapsedSeconds: 60.1,
+      payload: {
+        EventName: 'EpicSave',
+        Type: 'Epic Save',
+        MainTarget: { Name: 'Me', Shortcut: 1, TeamNum: 0 },
+      },
+    },
+    {
       id: 'map:3',
       matchId: 'map',
       sequence: 3,
@@ -294,8 +308,8 @@ describe('ball touch map', () => {
     ])
       expect(screen.queryByText(keyLabel)).not.toBeInTheDocument();
 
-    const selectedTouch = screen.getByRole('button', { name: /Me · touch/ });
-    expect(selectedTouch).toHaveAccessibleName(/touch, at 1:00/);
+    const selectedTouch = screen.getByRole('button', { name: /Me · Save/ });
+    expect(selectedTouch).toHaveAccessibleName(/Save, at 1:00/);
     expect(selectedTouch).toBeInTheDocument();
     fireEvent.focus(selectedTouch);
     expect(scene.props?.emphasizedIds).toEqual(['map:1']);

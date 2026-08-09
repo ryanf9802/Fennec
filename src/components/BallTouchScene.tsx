@@ -476,6 +476,27 @@ function GoalDisc({
   );
 }
 
+function SaveHalo({ active, opacity }: { active: boolean; opacity: number }) {
+  const group = useRef<Group>(null);
+  const { camera } = useThree();
+  useFrame(() => group.current?.quaternion.copy(camera.quaternion));
+  const radius = active ? 178 : 140;
+  return (
+    <group ref={group}>
+      <mesh renderOrder={6}>
+        <ringGeometry args={[radius * 0.78, radius, 6]} />
+        <meshBasicMaterial
+          color="#f8fafc"
+          depthWrite={false}
+          opacity={opacity}
+          side={DoubleSide}
+          transparent={opacity < 1}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 function FiftyMarker({
   point,
   teams,
@@ -625,6 +646,7 @@ function Marker({
             />
           </mesh>
         )}
+        {point.isSave && <SaveHalo active={active} opacity={opacity} />}
       </group>
       {active && point.kind !== 'goal' && <ActiveGuide point={point} />}
     </group>

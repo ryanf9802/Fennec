@@ -19,6 +19,7 @@ export interface SpatialEventPoint {
   goalNumber?: number;
   associatedPointId?: string;
   isScoringTouch?: boolean;
+  isSave?: boolean;
   scoringTeamNumber?: number;
   x: number;
   y: number;
@@ -29,6 +30,8 @@ export interface SpatialEventPoint {
   postHitSpeed?: number;
   speed?: number;
 }
+
+const saveEventNames = new Set(['save', 'epicsave']);
 
 export interface PlayerTouchAnalytics {
   touches: number;
@@ -132,6 +135,89 @@ function actor(match: MatchState, value: unknown): SpatialActor | undefined {
     shortcut,
     primaryId,
   };
+}
+
+function normalizedEventName(value: unknown): string | undefined {
+  return typeof value === 'string'
+    ? value.toLowerCase().replace(/[^a-z0-9]/g, '')
+    : undefined;
+}
+
+function isSaveEvent(event: TimelineEvent): boolean {
+  if (event.eventName !== 'StatfeedEvent') return false;
+  return [event.payload.EventName, event.payload.Type].some((value) => {
+    const normalized = normalizedEventName(value);
+    return normalized !== undefined && saveEventNames.has(normalized);
+  });
+}
+
+function receivedAt(event: TimelineEvent): number | undefined {
+  const value = Date.parse(event.receivedAt);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function nearbyAward(award: TimelineEvent, touch: TimelineEvent): boolean {
+  if (Math.abs(award.sequence - touch.sequence) > 4) return false;
+  if (
+    award.matchClockSeconds !== undefined &&
+    touch.matchClockSeconds !== undefined
+  )
+    return award.matchClockSeconds === touch.matchClockSeconds;
+  const awardTime = receivedAt(award);
+  const touchTime = receivedAt(touch);
+  return (
+    awardTime !== undefined &&
+    touchTime !== undefined &&
+    Math.abs(awardTime - touchTime) <= 2_000
+  );
+}
+
+/**
+ * Correlates coordinate-free save awards with the same player's nearby hit,
+ * accepting either event order because BallHit telemetry arrives a frame late.
+ */
+function savedTouchIds(match: MatchState): Set<string> {
+  const events = [...match.events].sort(
+    (first, second) => first.sequence - second.sequence,
+  );
+  const segmentById = new Map<string, number>();
+  let segment = 0;
+  for (const event of events) {
+    if (playStarts.has(event.eventName)) segment++;
+    segmentById.set(event.id, segment);
+    if (playStops.has(event.eventName)) segment++;
+  }
+  const touches = events.filter((event) => event.eventName === 'BallHit');
+  const saved = new Set<string>();
+  for (const award of events.filter(isSaveEvent)) {
+    const saver = actor(match, award.payload.MainTarget);
+    if (!saver) continue;
+    const matchedTouch = touches
+      .filter(
+        (touch) =>
+          segmentById.get(touch.id) === segmentById.get(award.id) &&
+          nearbyAward(award, touch) &&
+          (Array.isArray(touch.payload.Players)
+            ? touch.payload.Players
+            : []
+          ).some((value) => actor(match, value)?.key === saver.key),
+      )
+      .sort((first, second) => {
+        const sequenceDifference =
+          Math.abs(first.sequence - award.sequence) -
+          Math.abs(second.sequence - award.sequence);
+        if (sequenceDifference) return sequenceDifference;
+        const firstTime = receivedAt(first);
+        const secondTime = receivedAt(second);
+        const awardTime = receivedAt(award);
+        return awardTime === undefined
+          ? first.sequence - second.sequence
+          : Math.abs((firstTime ?? awardTime) - awardTime) -
+              Math.abs((secondTime ?? awardTime) - awardTime);
+      })[0];
+    if (matchedTouch) saved.add(matchedTouch.id);
+  }
+  return saved;
 }
 
 function participantActor(
@@ -325,7 +411,12 @@ function scoringTouches(match: MatchState): Map<string, string> {
  * identity for consolidated 50s and correlated scoring touches.
  */
 export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
-  const rawPoints = rawSpatialEventPoints(match);
+  const saved = savedTouchIds(match);
+  const rawPoints = rawSpatialEventPoints(match).map((point) =>
+    point.kind === 'touch' && saved.has(point.id)
+      ? { ...point, isSave: true }
+      : point,
+  );
   const rawById = new Map(rawPoints.map((point) => [point.id, point]));
   const eventsById = new Map(match.events.map((event) => [event.id, event]));
   const numbers = goalNumbers(match);
@@ -339,6 +430,7 @@ export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
         kind: 'fifty' as const,
         sequence: fact.sequence,
         sourceEventIds: fact.touchEventIds,
+        isSave: fact.touchEventIds.some((eventId) => saved.has(eventId)),
         actors: fact.participantIndexes.map((index) =>
           participantActor(match.participants[index]!, index),
         ),
