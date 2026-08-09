@@ -73,6 +73,15 @@ function isTouchMarker(point: SpatialEventPoint): boolean {
   return point.kind === 'touch' || point.kind === 'fifty';
 }
 
+function goalBadgePosition(teamNumber: number, yaw: number) {
+  const radians = (yaw * Math.PI) / 180;
+  const direction = teamNumber === 0 ? -1 : 1;
+  return {
+    left: `${50 + direction * Math.cos(radians) * 38}%`,
+    top: `${50 + direction * Math.sin(radians) * 35}%`,
+  };
+}
+
 function matchesFilter(
   point: SpatialEventPoint,
   filter: Filter,
@@ -121,6 +130,10 @@ class SceneErrorBoundary extends Component<
   }
 }
 
+/**
+ * Coordinates semantic point filtering with the map's mouse, touch, camera,
+ * team-orientation, and accessible marker controls in one shared viewport.
+ */
 export function BallTouchMap({
   match,
   profileId,
@@ -142,19 +155,25 @@ export function BallTouchMap({
     touchPoints.some((point) =>
       point.actors.some((actor) => actor.primaryId === profileId),
     );
+  const defaultYaw = profilePlayer?.teamNumber === 1 ? 180 : 0;
+  const leftTeamNumber = profilePlayer?.teamNumber ?? 0;
+  const rightTeamNumber = leftTeamNumber === 0 ? 1 : 0;
+  const teamName = (teamNumber: number) =>
+    match.teams.find((team) => team.teamNumber === teamNumber)?.name ??
+    (teamNumber === 0 ? 'Blue' : 'Orange');
   const [filter, setFilter] = useState<Filter>(
     hasProfileTouches ? 'self' : 'all',
   );
   const [active, setActive] = useState<string>();
   const arena = arenaProfile(match);
   const [camera, setCamera] = useState<TouchMapCameraState>(() =>
-    defaultCameraState(arena),
+    defaultCameraState(arena, defaultYaw),
   );
   const viewport = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number } | undefined>(undefined);
-  const rotation = useRef<{ pointerId: number; y: number } | undefined>(
-    undefined,
-  );
+  const rotation = useRef<
+    { pointerId: number; x: number; y: number } | undefined
+  >(undefined);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; x: number; y: number } | undefined>(
     undefined,
@@ -207,6 +226,7 @@ export function BallTouchMap({
       event.preventDefault();
       rotation.current = {
         pointerId: event.pointerId,
+        x: event.clientX,
         y: event.clientY,
       };
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -230,14 +250,17 @@ export function BallTouchMap({
   };
   const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (rotation.current?.pointerId === event.pointerId) {
+      const dx = event.clientX - rotation.current.x;
       const dy = event.clientY - rotation.current.y;
       rotation.current = {
         pointerId: event.pointerId,
+        x: event.clientX,
         y: event.clientY,
       };
       updateCamera((current) => ({
         ...current,
         pitch: current.pitch - dy * 0.3,
+        yaw: current.yaw + dx * 0.3,
       }));
       return;
     }
@@ -334,6 +357,7 @@ export function BallTouchMap({
         data-testid="ball-touch-map-viewport"
         data-camera-target={`${Math.round(camera.targetX)},${Math.round(camera.targetZ)}`}
         data-camera-distance={Math.round(camera.distance)}
+        data-camera-yaw={Math.round(camera.yaw)}
         className="surface-flat relative h-[clamp(22rem,56vw,38rem)] cursor-grab touch-none overflow-hidden rounded-2xl active:cursor-grabbing"
         onPointerDown={startDrag}
         onPointerMove={moveDrag}
@@ -356,39 +380,104 @@ export function BallTouchMap({
           Left drag to pan · right drag to rotate · scroll or pinch to zoom
         </div>
 
+        {arena.goal && (
+          <>
+            <div
+              className="surface-strong pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs shadow-xl"
+              style={goalBadgePosition(leftTeamNumber, camera.yaw)}
+            >
+              <span className="font-bold">
+                {profilePlayer
+                  ? 'Your goal'
+                  : `${teamName(leftTeamNumber)} goal`}
+              </span>
+              <span
+                className={
+                  leftTeamNumber === 0
+                    ? 'text-fennec-cyan'
+                    : 'text-fennec-orange'
+                }
+              >
+                {' · '}
+                {teamName(leftTeamNumber)}
+              </span>
+            </div>
+            <div
+              className="surface-strong pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-right text-xs shadow-xl"
+              style={goalBadgePosition(rightTeamNumber, camera.yaw)}
+            >
+              <span className="font-bold">
+                {profilePlayer
+                  ? 'Opponent goal'
+                  : `${teamName(rightTeamNumber)} goal`}
+              </span>
+              <span
+                className={
+                  rightTeamNumber === 0
+                    ? 'text-fennec-cyan'
+                    : 'text-fennec-orange'
+                }
+              >
+                {' · '}
+                {teamName(rightTeamNumber)}
+              </span>
+            </div>
+          </>
+        )}
+
         <div
-          className="surface-strong absolute right-3 top-3 flex flex-col items-center gap-2 rounded-xl p-2 shadow-xl"
+          className="absolute right-3 top-3 flex items-start drop-shadow-xl"
           onPointerDown={(event) => event.stopPropagation()}
           onPointerMove={(event) => event.stopPropagation()}
           onPointerUp={(event) => event.stopPropagation()}
           onWheel={(event) => event.stopPropagation()}
         >
-          <button
-            type="button"
-            aria-label="Reset 3D touch map view"
-            title="Reset view"
-            className="text-muted hover:text-fennec-cyan grid size-9 place-items-center rounded-lg transition"
-            onClick={() => setCamera(defaultCameraState(arena))}
-          >
-            <RotateCcw className="size-4" />
-          </button>
-          <input
-            aria-label="Field pitch"
-            aria-valuetext={`${Math.round(camera.pitch)} degrees`}
-            type="range"
-            min="0"
-            max="90"
-            step="1"
-            value={camera.pitch}
-            onChange={(event) =>
-              updateCamera((current) => ({
-                ...current,
-                pitch: Number(event.target.value),
-              }))
-            }
-            className="h-40 w-5 cursor-pointer accent-cyan-400"
-            style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
-          />
+          <div className="surface-strong flex h-[3.25rem] items-center rounded-l-xl px-3">
+            <input
+              aria-label="Field rotation"
+              aria-valuetext={`${Math.round(camera.yaw)} degrees`}
+              type="range"
+              min="0"
+              max="180"
+              step="1"
+              value={camera.yaw}
+              onChange={(event) =>
+                updateCamera((current) => ({
+                  ...current,
+                  yaw: Number(event.target.value),
+                }))
+              }
+              className="w-36 cursor-pointer accent-cyan-400"
+            />
+          </div>
+          <div className="surface-strong flex flex-col items-center gap-2 rounded-b-xl rounded-tr-xl p-2">
+            <button
+              type="button"
+              aria-label="Reset 3D touch map view"
+              title="Reset view"
+              className="text-muted hover:text-fennec-cyan grid size-9 place-items-center rounded-lg transition"
+              onClick={() => setCamera(defaultCameraState(arena, defaultYaw))}
+            >
+              <RotateCcw className="size-4" />
+            </button>
+            <input
+              aria-label="Field pitch"
+              aria-valuetext={`${Math.round(camera.pitch)} degrees`}
+              type="range"
+              min="0"
+              max="90"
+              step="1"
+              value={camera.pitch}
+              onChange={(event) =>
+                updateCamera((current) => ({
+                  ...current,
+                  pitch: Number(event.target.value),
+                }))
+              }
+              className="h-40 w-5 cursor-pointer accent-cyan-400"
+              style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+            />
+          </div>
         </div>
 
         {!visible.length && (

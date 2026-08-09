@@ -135,6 +135,9 @@ describe('ball touch map', () => {
     expect(screen.getByTestId('ball-touch-map-viewport')).toContainElement(
       hint,
     );
+    expect(screen.getByText('Your goal')).toBeInTheDocument();
+    expect(screen.getByText('Opponent goal')).toBeInTheDocument();
+    expect(scene.props?.cameraState.yaw).toBe(0);
     for (const keyLabel of [
       '● Blue touch',
       '● Orange touch',
@@ -172,13 +175,18 @@ describe('ball touch map', () => {
     ).not.toBeInTheDocument();
 
     const pitch = screen.getByRole('slider', { name: 'Field pitch' });
+    const rotation = screen.getByRole('slider', { name: 'Field rotation' });
     expect(pitch).toHaveValue('0');
+    expect(rotation).toHaveValue('0');
     fireEvent.change(pitch, { target: { value: '45' } });
+    fireEvent.change(rotation, { target: { value: '90' } });
     expect(scene.props?.cameraState.pitch).toBe(45);
+    expect(scene.props?.cameraState.yaw).toBe(90);
     fireEvent.click(
       screen.getByRole('button', { name: /reset 3d touch map/i }),
     );
     expect(scene.props?.cameraState.pitch).toBe(0);
+    expect(scene.props?.cameraState.yaw).toBe(0);
   });
 
   it('identifies scored goals by their match-wide sequence number', () => {
@@ -233,6 +241,29 @@ describe('ball touch map', () => {
     expect(screen.getByText('Them · Goal #2 scored')).toBeInTheDocument();
     expect(screen.getByText(/4:00 · XYZ 200, 5000, 500/)).toBeInTheDocument();
     expect(scene.props?.emphasizedIds).toEqual(['map:5']);
+  });
+
+  it('orients the selected orange team goal on the left', () => {
+    render(
+      <BallTouchMap
+        match={{
+          ...match,
+          participants: match.participants.map((participant) => ({
+            ...participant,
+            teamNumber: participant.name === 'Me' ? 1 : 0,
+          })),
+        }}
+        profileId="Steam|1|0"
+      />,
+    );
+
+    expect(scene.props?.cameraState.yaw).toBe(180);
+    expect(screen.getByText('Your goal').parentElement).toHaveTextContent(
+      'Your goal · Orange',
+    );
+    expect(screen.getByText('Opponent goal').parentElement).toHaveTextContent(
+      'Opponent goal · Blue',
+    );
   });
 
   it('combines a scoring 50 and reveals its filtered goal association', () => {

@@ -19,6 +19,7 @@ import {
 import { arenaProfile } from '../src/domain/arenaProfiles';
 import {
   arenaWallPanels,
+  cameraDistanceBounds,
   constrainCameraState,
   gameToScene,
   goalMarkerPosition,
@@ -1016,19 +1017,26 @@ describe('Stats API domain', () => {
     expect(
       constrainCameraState(profile, {
         pitch: 120,
+        yaw: 240,
         targetX: 5600,
         targetZ: 0,
         distance: Number.POSITIVE_INFINITY,
       }),
-    ).toMatchObject({ pitch: 90, targetX: 5600, targetZ: 0 });
+    ).toMatchObject({ pitch: 90, yaw: 180, targetX: 5600, targetZ: 0 });
     const besideGoal = constrainCameraState(profile, {
       pitch: -20,
+      yaw: -40,
       targetX: 5800,
       targetZ: 3000,
       distance: 0,
     });
     expect(besideGoal.pitch).toBe(0);
+    expect(besideGoal.yaw).toBe(0);
     expect(besideGoal.targetX).toBeLessThanOrEqual(5120);
+    const distances = cameraDistanceBounds(profile);
+    expect(besideGoal.distance).toBe(distances.min);
+    expect(distances.min / distances.default).toBe(0.5);
+    expect(distances.max / distances.default).toBeLessThan(1.1);
   });
 
   it('reports unavailable observed speed for legacy matches', () => {

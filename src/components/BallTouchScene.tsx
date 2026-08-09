@@ -42,18 +42,24 @@ function litMarkerColor(color: string, opacity: number): Color {
 function CameraRig({ state }: { state: TouchMapCameraState }) {
   const { camera, invalidate, size } = useThree();
   useEffect(() => {
-    const radians = (state.pitch * Math.PI) / 180;
+    const pitch = (state.pitch * Math.PI) / 180;
+    const yaw = (state.yaw * Math.PI) / 180;
     const framedDistance =
       state.distance *
       Math.max(1, size.height / Math.max(1, size.width)) *
       1.15;
     const target = new Vector3(state.targetX, 0, state.targetZ);
+    const horizontalDistance = Math.sin(pitch) * framedDistance;
     camera.position.set(
-      state.targetX,
-      Math.cos(radians) * framedDistance,
-      state.targetZ + Math.sin(radians) * framedDistance,
+      state.targetX + Math.sin(yaw) * horizontalDistance,
+      Math.cos(pitch) * framedDistance,
+      state.targetZ + Math.cos(yaw) * horizontalDistance,
     );
-    camera.up.set(0, Math.sin(radians), -Math.cos(radians));
+    camera.up.set(
+      -Math.cos(pitch) * Math.sin(yaw),
+      Math.sin(pitch),
+      -Math.cos(pitch) * Math.cos(yaw),
+    );
     camera.lookAt(target);
     invalidate();
   }, [camera, invalidate, size, state]);

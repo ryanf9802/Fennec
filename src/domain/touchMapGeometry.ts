@@ -9,6 +9,7 @@ export interface ScenePoint {
 
 export interface TouchMapCameraState {
   pitch: number;
+  yaw: number;
   targetX: number;
   targetZ: number;
   distance: number;
@@ -186,12 +187,16 @@ export function cameraDistanceBounds(profile: ArenaProfile): {
   const width = profile.yMax - profile.yMin + (profile.goal?.depth ?? 0) * 2;
   const depth = profile.xMax - profile.xMin;
   const extent = Math.max(width, depth);
-  return { min: extent * 0.72, default: extent * 1.28, max: extent * 2.5 };
+  return { min: extent * 0.64, default: extent * 1.28, max: extent * 1.4 };
 }
 
-export function defaultCameraState(profile: ArenaProfile): TouchMapCameraState {
+export function defaultCameraState(
+  profile: ArenaProfile,
+  yaw = 0,
+): TouchMapCameraState {
   return {
     pitch: 0,
+    yaw,
     targetX: 0,
     targetZ: 0,
     distance: cameraDistanceBounds(profile).default,
@@ -206,6 +211,7 @@ export function constrainCameraState(
   const distances = cameraDistanceBounds(profile);
   return {
     pitch: Math.max(0, Math.min(90, state.pitch)),
+    yaw: Math.max(0, Math.min(180, state.yaw)),
     targetX: target.x,
     targetZ: target.z,
     distance: Math.max(distances.min, Math.min(distances.max, state.distance)),

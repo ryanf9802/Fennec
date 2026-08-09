@@ -144,6 +144,8 @@ test('3D touch map controls and preference persist across matches', async ({
   ).toBeVisible();
   await expect(page.getByText('● Blue touch')).toHaveCount(0);
   await expect(page.getByText('■ Blue goal')).toHaveCount(0);
+  await expect(viewport.getByText('Your goal')).toBeVisible();
+  await expect(viewport.getByText('Opponent goal')).toBeVisible();
 
   const goalPoint = page.getByRole('button', {
     name: /You · Goal #1 scored, at 2:00/,
@@ -160,7 +162,21 @@ test('3D touch map controls and preference persist across matches', async ({
   );
 
   const pitch = page.getByRole('slider', { name: 'Field pitch' });
+  const rotation = page.getByRole('slider', { name: 'Field rotation' });
+  const yourGoal = viewport.getByText('Your goal');
+  const opponentGoal = viewport.getByText('Opponent goal');
   await expect(pitch).toHaveValue('0');
+  await expect(rotation).toHaveValue('0');
+  expect((await yourGoal.boundingBox())!.x).toBeLessThan(
+    (await opponentGoal.boundingBox())!.x,
+  );
+  await rotation.fill('180');
+  await expect(viewport).toHaveAttribute('data-camera-yaw', '180');
+  expect((await yourGoal.boundingBox())!.x).toBeGreaterThan(
+    (await opponentGoal.boundingBox())!.x,
+  );
+  await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
+  await expect(rotation).toHaveValue('0');
   await pitch.fill('45');
   await expect(pitch).toHaveAttribute('aria-valuetext', '45 degrees');
 
@@ -178,6 +194,12 @@ test('3D touch map controls and preference persist across matches', async ({
     'data-camera-distance',
     initialDistance!,
   );
+  for (let index = 0; index < 20; index += 1) {
+    await page.mouse.wheel(0, 100);
+  }
+  expect(
+    Number(await viewport.getAttribute('data-camera-distance')),
+  ).toBeLessThanOrEqual(Number(initialDistance) * 1.1);
   await expect
     .poll(() => matchColumn.evaluate((element) => element.scrollTop))
     .toBe(initialScrollTop);
@@ -199,12 +221,20 @@ test('3D touch map controls and preference persist across matches', async ({
   await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
   await expect(pitch).toHaveValue('0');
   await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
+  for (let index = 0; index < 20; index += 1) {
+    await page.mouse.wheel(0, -100);
+  }
+  expect(
+    Number(await viewport.getAttribute('data-camera-distance')),
+  ).toBeLessThanOrEqual(Number(initialDistance) * 0.51);
+  await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 100);
   await page.mouse.down({ button: 'right' });
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2);
   await page.mouse.up({ button: 'right' });
   await expect(pitch).toHaveValue('30');
+  await expect(rotation).toHaveValue('30');
   await expect(viewport).toHaveAttribute('data-camera-target', '0,0');
   expect(
     await viewport.evaluate((element) => {
