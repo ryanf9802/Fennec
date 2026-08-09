@@ -301,11 +301,17 @@ test('setup starts with a centered route choice and expands after selection', as
   const browser = page.getByRole('button', { name: /Browser only/ });
   await expect(companion).toBeVisible();
   await expect(browser).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Choose your setup approach' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Select how you want to set up Fennec. You can change this at any time from the Setup page.',
+    ),
+  ).toBeVisible();
   await expect(companion).toHaveCSS('cursor', 'pointer');
   await expect(browser).toHaveCSS('cursor', 'pointer');
-  const chooserBox = await page
-    .getByRole('region', { name: 'Choose a setup path' })
-    .boundingBox();
+  const chooserBox = await page.getByTestId('setup-path-intro').boundingBox();
   const viewport = page.viewportSize()!;
   expect(
     Math.abs(chooserBox!.y + chooserBox!.height / 2 - viewport.height / 2),
@@ -338,7 +344,17 @@ test('setup starts with a centered route choice and expands after selection', as
     page.getByRole('link', { name: 'Open installed companion' }),
   ).toHaveAttribute(
     'href',
-    `fennec://open?return_to=${encodeURIComponent(`${new URL(page.url()).origin}/setup`)}`,
+    `fennec://open?return_to=${encodeURIComponent(
+      ['5173', '5174'].includes(new URL(page.url()).port)
+        ? `${new URL(page.url()).origin}/setup`
+        : 'https://app.fennec.gg/setup',
+    )}`,
+  );
+  await expect(
+    page.getByRole('link', { name: 'Download latest companion' }),
+  ).toHaveAttribute(
+    'href',
+    'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe',
   );
 
   await page.reload();

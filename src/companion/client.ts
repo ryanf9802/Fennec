@@ -12,6 +12,8 @@ export interface CompanionHealth {
 }
 
 export const companionProtocolVersion = 1;
+export const companionDownloadUrl =
+  'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe';
 
 const productionSetupUrl = 'https://app.fennec.gg/setup';
 const pairingReturnUrls = new Set([

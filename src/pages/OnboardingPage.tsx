@@ -13,6 +13,7 @@ import { BrowserStatsApiSetup } from '../components/BrowserStatsApiSetup';
 import {
   acceptCompanionPairing,
   companionCommand,
+  companionDownloadUrl,
   companionOpenUrl,
   companionProtocolVersion,
 } from '../companion/client';
@@ -174,7 +175,18 @@ export function OnboardingPage() {
   if (!path)
     return (
       <div className="flex min-h-[calc(100vh-8rem)] items-center">
-        <SetupPathChooser onSelect={selectPath} />
+        <div className="w-full space-y-6" data-testid="setup-path-intro">
+          <header className="mx-auto max-w-2xl text-center">
+            <h1 className="text-3xl font-black sm:text-4xl">
+              Choose your setup approach
+            </h1>
+            <p className="text-muted mt-3">
+              Select how you want to set up Fennec. You can change this at any
+              time from the Setup page.
+            </p>
+          </header>
+          <SetupPathChooser onSelect={selectPath} />
+        </div>
       </div>
     );
   return (
@@ -237,9 +249,8 @@ export function OnboardingPage() {
                     </a>
                     <a
                       className="button-secondary"
-                      href="https://github.com/ryanf9802/Fennec/releases/latest"
-                      target="_blank"
-                      rel="noreferrer"
+                      href={companionDownloadUrl}
+                      download
                     >
                       <Download className="size-4" /> Download latest companion
                     </a>

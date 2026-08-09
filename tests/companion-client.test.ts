@@ -1,4 +1,7 @@
-import { companionOpenUrl } from '../src/companion/client';
+import {
+  companionDownloadUrl,
+  companionOpenUrl,
+} from '../src/companion/client';
 
 describe('companion pairing launch URL', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -16,6 +19,12 @@ describe('companion pairing launch URL', () => {
 
     expect(companionOpenUrl()).toBe(
       'fennec://open?return_to=https%3A%2F%2Fapp.fennec.gg%2Fsetup',
+    );
+  });
+
+  it('uses the stable latest-release Windows installer asset', () => {
+    expect(companionDownloadUrl).toBe(
+      'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe',
     );
   });
 });

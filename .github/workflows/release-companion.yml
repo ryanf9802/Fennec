@@ -1,0 +1,59 @@
+name: Release Windows companion
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Enable pinned pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack install
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - run: pnpm install --frozen-lockfile
+      - name: Verify release version
+        shell: pwsh
+        run: |
+          $packageVersion = node -p "require('./package.json').version"
+          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
+            throw "Tag $env:GITHUB_REF_NAME must match package version v$packageVersion"
+          }
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --locked
+      - name: Build companion installer
+        run: pnpm companion:build
+      - name: Prepare stable installer asset
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "Companion installer was not produced"
+          }
+          New-Item -ItemType Directory -Force "release" | Out-Null
+          Copy-Item $installer.FullName "release/Fennec-Companion-Windows-x64-setup.exe"
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            "release/Fennec-Companion-Windows-x64-setup.exe" `
+            --verify-tag `
+            --generate-notes `
+            --title "Fennec $env:GITHUB_REF_NAME"
