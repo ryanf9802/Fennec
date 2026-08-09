@@ -64,7 +64,7 @@ describe('match analytics view switch', () => {
             version: 1,
             updateStatePackets: 1,
             activePlayPackets: 1,
-            ballSpeed: { samples: 1, sum: 1000, max: 1000 },
+            ballSpeed: { samples: 1, sum: 10, max: 10 },
             lastTouchSamplesByTeam: {},
           },
           participants: [
@@ -93,8 +93,8 @@ describe('match analytics view switch', () => {
               payload: {
                 Players: [{ Name: 'You', PrimaryId: 'Steam|1|0', TeamNum: 0 }],
                 Ball: {
-                  PreHitSpeed: 400,
-                  PostHitSpeed: 1000,
+                  PreHitSpeed: 4,
+                  PostHitSpeed: 10,
                   Location: { X: 0, Y: 0, Z: 0 },
                 },
               },

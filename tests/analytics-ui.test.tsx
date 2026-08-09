@@ -76,8 +76,8 @@ const match: MatchState = {
       payload: {
         Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
         Ball: {
-          PreHitSpeed: 300,
-          PostHitSpeed: 900,
+          PreHitSpeed: 3,
+          PostHitSpeed: 9,
           Location: { X: 10, Y: 20, Z: 30 },
         },
       },
@@ -106,7 +106,7 @@ const match: MatchState = {
       elapsedSeconds: 180,
       payload: {
         BallLocation: { X: 100, Y: 5000, Z: 600 },
-        BallSpeed: 700,
+        BallSpeed: 7,
         BallLastTouch: {
           Player: { Name: 'Them', Shortcut: 2, TeamNum: 1 },
         },
@@ -123,8 +123,8 @@ const match: MatchState = {
       payload: {
         Players: [{ Name: 'Them', Shortcut: 2, TeamNum: 1 }],
         Ball: {
-          PreHitSpeed: 500,
-          PostHitSpeed: 800,
+          PreHitSpeed: 5,
+          PostHitSpeed: 8,
           Location: { X: 40, Y: 50, Z: 60 },
         },
       },
@@ -409,7 +409,7 @@ describe('ball touch map', () => {
     expect(scene.props?.emphasizedIds).toEqual(['map:5']);
   });
 
-  it('converts touch speeds from uu/s but GoalSpeed from its km/h scale', () => {
+  it('converts touch speeds from m/s but GoalSpeed from its km/h scale', () => {
     render(
       <BallTouchMap
         match={{
@@ -493,7 +493,7 @@ describe('ball touch map', () => {
           payload: {
             Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
             Ball: {
-              PostHitSpeed: 800,
+              PostHitSpeed: 8,
               Location: { X: 10, Y: 20, Z: 30 },
             },
           },
@@ -508,8 +508,8 @@ describe('ball touch map', () => {
           payload: {
             Players: [{ Name: 'Them', Shortcut: 2, TeamNum: 1 }],
             Ball: {
-              PreHitSpeed: 800,
-              PostHitSpeed: 1200,
+              PreHitSpeed: 8,
+              PostHitSpeed: 12,
               Location: { X: 40, Y: 50, Z: 60 },
             },
           },
@@ -523,7 +523,7 @@ describe('ball touch map', () => {
           elapsedSeconds: 61,
           payload: {
             Scorer: { Name: 'Them', Shortcut: 2, TeamNum: 1 },
-            GoalSpeed: 1200,
+            GoalSpeed: 120,
             ImpactLocation: { X: 100, Y: 5000, Z: 400 },
           },
         },

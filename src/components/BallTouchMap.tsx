@@ -66,7 +66,7 @@ function pointTitle(point: SpatialEventPoint): string {
 function pointLabel(point: SpatialEventPoint, speedUnit: SpeedUnit): string {
   const speed =
     point.kind === 'goal'
-      ? formatSpeed(point.speed, speedUnit, { source: 'goal-speed-kmh' })
+      ? formatSpeed(point.speed, speedUnit, { source: 'kilometers-per-hour' })
       : formatSpeed(point.postHitSpeed, speedUnit);
   return `${pointTitle(point)}, at ${formatClock(point.elapsedSeconds)}, ${speed}`;
 }
@@ -480,7 +480,7 @@ export function BallTouchMap({
               {Math.round(activePoint.z)}
               {activePoint.kind !== 'goal'
                 ? ` · ${formatSpeed(activePoint.preHitSpeed, speedUnit)} → ${formatSpeed(activePoint.postHitSpeed, speedUnit)}`
-                : ` · ${formatSpeed(activePoint.speed, speedUnit, { source: 'goal-speed-kmh' })}`}
+                : ` · ${formatSpeed(activePoint.speed, speedUnit, { source: 'kilometers-per-hour' })}`}
             </div>
           </div>
         )}

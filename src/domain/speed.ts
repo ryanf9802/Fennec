@@ -1,26 +1,26 @@
 import type { SpeedUnit } from './types';
 
-export type SpeedSource = 'unreal-units-per-second' | 'goal-speed-kmh';
+export type SpeedSource = 'meters-per-second' | 'kilometers-per-hour';
 
-const kilometersPerHourPerUnrealUnitPerSecond = 0.036;
+const kilometersPerHourPerMeterPerSecond = 3.6;
 const milesPerHourPerKilometerPerHour = 0.621371192237334;
 
 /**
- * Converts Stats API speeds while preserving the API's inconsistent GoalSpeed
- * behavior. The API currently documents GoalSpeed as uu/s, but its emitted and
- * documented example values use the in-game km/h scale (for example, 87.3),
- * unlike BallHit values around 1450 uu/s. Treat GoalSpeed as km/h until that
- * upstream bug is fixed; this branch must be revisited if Psyonix patches it.
+ * Converts Stats API speeds while preserving its inconsistent live WebSocket
+ * behavior. Although the API documents ball speeds as uu/s, live UpdateState,
+ * BallHit, and CrossbarHit values arrive in m/s, while GoalSpeed arrives in the
+ * in-game km/h scale. Revisit both source mappings if Psyonix patches the
+ * exporter or aligns its payloads with the documentation.
  */
 export function convertSpeed(
   value: number,
   unit: SpeedUnit,
-  source: SpeedSource = 'unreal-units-per-second',
+  source: SpeedSource = 'meters-per-second',
 ): number {
   const kilometersPerHour =
-    source === 'goal-speed-kmh'
+    source === 'kilometers-per-hour'
       ? value
-      : value * kilometersPerHourPerUnrealUnitPerSecond;
+      : value * kilometersPerHourPerMeterPerSecond;
   return unit === 'mph'
     ? kilometersPerHour * milesPerHourPerKilometerPerHour
     : kilometersPerHour;

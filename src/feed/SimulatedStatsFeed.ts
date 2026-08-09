@@ -99,7 +99,7 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
           bOvertime: false,
           bReplay: false,
           Arena: 'DFH Stadium',
-          Ball: { Speed: 910 + blue * 70, TeamNum: blue > orange ? 0 : 1 },
+          Ball: { Speed: 9.1 + blue * 0.7, TeamNum: blue > orange ? 0 : 1 },
         },
       },
     });
@@ -121,8 +121,8 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
         MatchGuid: guid,
         Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }],
         Ball: {
-          PreHitSpeed: 620,
-          PostHitSpeed: 1180,
+          PreHitSpeed: 6.2,
+          PostHitSpeed: 11.8,
           Location: { X: -1450, Y: -820, Z: 180 },
         },
       },
@@ -133,8 +133,8 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
         MatchGuid: guid,
         Players: [{ Name: 'Luna', Shortcut: 2, TeamNum: 0 }],
         Ball: {
-          PreHitSpeed: 830,
-          PostHitSpeed: 1040,
+          PreHitSpeed: 8.3,
+          PostHitSpeed: 10.4,
           Location: { X: 620, Y: 1750, Z: 510 },
         },
       },
@@ -148,8 +148,8 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
           { Name: 'Drift', Shortcut: 3, TeamNum: 1 },
         ],
         Ball: {
-          PreHitSpeed: 1040,
-          PostHitSpeed: 930,
+          PreHitSpeed: 10.4,
+          PostHitSpeed: 9.3,
           Location: { X: 700, Y: 1820, Z: 480 },
         },
       },
@@ -181,11 +181,11 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
       data: {
         MatchGuid: guid,
         BallLocation: { X: -720, Y: -4960, Z: 610 },
-        BallSpeed: 970,
+        BallSpeed: 9.7,
         ImpactForce: 122,
         BallLastTouch: {
           Player: { Name: 'Drift', Shortcut: 3, TeamNum: 1 },
-          Speed: 970,
+          Speed: 9.7,
         },
       },
     });
