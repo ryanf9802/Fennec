@@ -388,7 +388,8 @@ describe('Stats API domain', () => {
       event: 'PlayerJoined',
       data: { MatchGuid: 'clock', PlayerName: 'Early' },
     }).current;
-    expect(value.events[0]?.elapsedSeconds).toBe(0);
+    expect(value.events[0]?.elapsedSeconds).toBeUndefined();
+    expect(value.events[0]?.matchClockSeconds).toBeUndefined();
 
     value = reduceStatsEnvelope(value, {
       event: 'UpdateState',
@@ -719,6 +720,145 @@ describe('Stats API domain', () => {
         averageSpeedChange: 600,
       }),
     );
+  });
+
+  it('canonicalizes duplicate hits for map and player analytics', () => {
+    const value = match(
+      'duplicate-touch',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.regulationDurationSeconds = 300;
+    value.participants = [{ ...player('Me', 'Steam|1|0', 0), shortcut: 4 }];
+    value.events = [
+      {
+        id: 'duplicate-touch:1',
+        matchId: value.id,
+        sequence: 1,
+        eventName: 'BallHit',
+        receivedAt: '2026-08-08T00:04:17.000Z',
+        matchClockSeconds: 0,
+        elapsedSeconds: 0,
+        payload: {
+          MatchGuid: 'duplicate-guid',
+          Players: [{ Name: 'Me', Shortcut: 4, TeamNum: 0 }],
+          Ball: {
+            PreHitSpeed: 600,
+            PostHitSpeed: 900,
+            Location: { X: 10, Y: 20, Z: 30 },
+          },
+        },
+      },
+      {
+        id: 'duplicate-touch:2',
+        matchId: value.id,
+        sequence: 2,
+        eventName: 'BallHit',
+        receivedAt: '2026-08-08T00:04:17.100Z',
+        matchClockSeconds: 43,
+        elapsedSeconds: 257,
+        payload: {
+          MatchGuid: 'duplicate-guid',
+          Players: [{ Name: 'Me', Shortcut: 4, TeamNum: 0 }],
+          Ball: {
+            PreHitSpeed: 600.5,
+            PostHitSpeed: 900.5,
+            Location: { X: 10.5, Y: 20.5, Z: 30.5 },
+          },
+        },
+      },
+      {
+        id: 'duplicate-touch:3',
+        matchId: value.id,
+        sequence: 3,
+        eventName: 'GoalScored',
+        receivedAt: '2026-08-08T00:04:17.200Z',
+        matchClockSeconds: 43,
+        elapsedSeconds: 257,
+        payload: {
+          MatchGuid: 'duplicate-guid',
+          Scorer: { Name: 'Me', Shortcut: 4, TeamNum: 0 },
+          GoalSpeed: 900.5,
+          ImpactLocation: { X: 10.5, Y: 5000, Z: 30.5 },
+        },
+      },
+    ];
+
+    expect(
+      spatialEventPoints(value).find((point) => point.kind === 'touch'),
+    ).toMatchObject({
+      id: 'duplicate-touch:2',
+      sourceEventIds: ['duplicate-touch:1', 'duplicate-touch:2'],
+      elapsedSeconds: 257,
+      isScoringTouch: true,
+      associatedPointId: 'duplicate-touch:3',
+    });
+    expect(playerTouchAnalytics(value, 'Steam|1|0')).toMatchObject({
+      touches: 1,
+      teamTouches: 1,
+      averagePostHitSpeed: 900.5,
+      maximumPostHitSpeed: 900.5,
+    });
+  });
+
+  it('keeps physically distinct nearby hits separate', () => {
+    const value = match(
+      'distinct-touches',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.regulationDurationSeconds = 300;
+    value.participants = [
+      { ...player('Me', 'Steam|1|0', 0), shortcut: 4 },
+      { ...player('Mate', 'Epic|2|0', 0), shortcut: 5 },
+    ];
+    const hit = (
+      sequence: number,
+      milliseconds: number,
+      name: string,
+      shortcut: number,
+      x: number,
+      speed: number,
+    ): TimelineEvent => ({
+      id: `distinct-touches:${sequence}`,
+      matchId: value.id,
+      sequence,
+      eventName: 'BallHit',
+      receivedAt: new Date(
+        Date.parse(value.startedAt) + milliseconds,
+      ).toISOString(),
+      matchClockSeconds: 0,
+      elapsedSeconds: sequence === 1 ? 0 : 200,
+      payload: {
+        Players: [{ Name: name, Shortcut: shortcut, TeamNum: 0 }],
+        Ball: {
+          PreHitSpeed: speed,
+          PostHitSpeed: speed,
+          Location: { X: x, Y: 20, Z: 30 },
+        },
+      },
+    });
+    value.events = [
+      hit(1, 0, 'Me', 4, 10, 600),
+      hit(2, 251, 'Me', 4, 10, 600),
+      hit(3, 300, 'Mate', 5, 10, 600),
+      hit(4, 350, 'Me', 4, 12, 600),
+      hit(5, 400, 'Me', 4, 12, 605),
+      {
+        ...event('distinct-touches', 6, 'MatchPaused', {}),
+        receivedAt: new Date(Date.parse(value.startedAt) + 425).toISOString(),
+      },
+      {
+        ...event('distinct-touches', 7, 'RoundStarted', {}),
+        receivedAt: new Date(Date.parse(value.startedAt) + 450).toISOString(),
+      },
+      hit(8, 475, 'Me', 4, 12, 605),
+    ];
+
+    const points = spatialEventPoints(value);
+    expect(points).toHaveLength(6);
+    expect(points[0]?.elapsedSeconds).toBeUndefined();
+    expect(playerTouchAnalytics(value, 'Steam|1|0').touches).toBe(5);
   });
 
   it('classifies nearby regular and epic save awards as the same saved touch', () => {

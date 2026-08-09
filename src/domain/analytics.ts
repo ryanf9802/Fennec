@@ -156,6 +156,20 @@ function receivedAt(event: TimelineEvent): number | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
+function spatialElapsedSeconds(
+  match: MatchState,
+  event: TimelineEvent,
+): number | undefined {
+  const elapsed = finite(event.elapsedSeconds);
+  if (
+    elapsed === 0 &&
+    event.matchClockSeconds === 0 &&
+    (match.regulationDurationSeconds ?? 0) > 0
+  )
+    return undefined;
+  return elapsed;
+}
+
 function nearbyAward(award: TimelineEvent, touch: TimelineEvent): boolean {
   if (Math.abs(award.sequence - touch.sequence) > 4) return false;
   if (
@@ -260,7 +274,7 @@ function eventPoint(
       sequence: event.sequence,
       sourceEventIds: [event.id],
       ...location,
-      elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
+      elapsedSeconds: spatialElapsedSeconds(match, event),
       actors: players
         .map((value) => actor(match, value))
         .filter((value): value is SpatialActor => !!value),
@@ -284,7 +298,7 @@ function eventPoint(
         : [event.id],
       goalNumber,
       ...location,
-      elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
+      elapsedSeconds: spatialElapsedSeconds(match, event),
       actors: scorer ? [scorer] : [],
       speed: finite(event.payload.GoalSpeed),
     };
@@ -300,7 +314,7 @@ function eventPoint(
       sequence: event.sequence,
       sourceEventIds: [event.id],
       ...location,
-      elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
+      elapsedSeconds: spatialElapsedSeconds(match, event),
       actors: player ? [player] : [],
       speed: finite(event.payload.BallSpeed),
     };
@@ -363,6 +377,127 @@ const playStops = new Set([
 ]);
 const playStarts = new Set(['RoundStarted', 'MatchUnpaused']);
 
+function playSegments(events: TimelineEvent[]): Map<string, number> {
+  const result = new Map<string, number>();
+  let segment = 0;
+  for (const event of [...events].sort(
+    (first, second) => first.sequence - second.sequence,
+  )) {
+    if (playStarts.has(event.eventName)) segment++;
+    result.set(event.id, segment);
+    if (playStops.has(event.eventName)) segment++;
+  }
+  return result;
+}
+
+function actorKeys(point: SpatialEventPoint): string[] {
+  return [...new Set(point.actors.map((value) => value.key))].sort();
+}
+
+function sameActors(
+  first: SpatialEventPoint,
+  second: SpatialEventPoint,
+): boolean {
+  const firstKeys = actorKeys(first);
+  const secondKeys = actorKeys(second);
+  return (
+    firstKeys.length > 0 &&
+    firstKeys.length === secondKeys.length &&
+    firstKeys.every((value, index) => value === secondKeys[index])
+  );
+}
+
+function compatibleNumber(
+  first: number | undefined,
+  second: number | undefined,
+): boolean {
+  return (
+    first === undefined || second === undefined || Math.abs(first - second) <= 1
+  );
+}
+
+/**
+ * Applies the conservative identity, timing, play-segment, position, and speed
+ * constraints required before two raw hit packets can represent one touch.
+ */
+function duplicateTouch(
+  first: SpatialEventPoint,
+  second: SpatialEventPoint,
+  eventsById: Map<string, TimelineEvent>,
+  segmentById: Map<string, number>,
+): boolean {
+  const firstEvent = eventsById.get(first.id);
+  const secondEvent = eventsById.get(second.id);
+  if (!firstEvent || !secondEvent) return false;
+  const firstTime = receivedAt(firstEvent);
+  const secondTime = receivedAt(secondEvent);
+  return (
+    first.kind === 'touch' &&
+    second.kind === 'touch' &&
+    Math.abs(first.sequence - second.sequence) <= 4 &&
+    firstTime !== undefined &&
+    secondTime !== undefined &&
+    Math.abs(firstTime - secondTime) <= 250 &&
+    segmentById.get(first.id) === segmentById.get(second.id) &&
+    sameMatchGuid(firstEvent, secondEvent) &&
+    sameActors(first, second) &&
+    Math.abs(first.x - second.x) <= 1 &&
+    Math.abs(first.y - second.y) <= 1 &&
+    Math.abs(first.z - second.z) <= 1 &&
+    compatibleNumber(first.preHitSpeed, second.preHitSpeed) &&
+    compatibleNumber(first.postHitSpeed, second.postHitSpeed)
+  );
+}
+
+interface CanonicalTouches {
+  points: SpatialEventPoint[];
+  canonicalIdBySourceId: Map<string, string>;
+}
+
+/**
+ * Collapses duplicate telemetry for one physical hit while retaining every raw
+ * source ID and preferring the latest event for downstream goal association.
+ */
+function canonicalTouches(
+  match: MatchState,
+  points: SpatialEventPoint[],
+): CanonicalTouches {
+  const eventsById = new Map(match.events.map((event) => [event.id, event]));
+  const segmentById = playSegments(match.events);
+  const canonical: SpatialEventPoint[] = [];
+  const canonicalIdBySourceId = new Map<string, string>();
+  for (const point of points
+    .filter((value) => value.kind === 'touch')
+    .sort((first, second) => first.sequence - second.sequence)) {
+    const duplicateIndex = canonical.findIndex((candidate) =>
+      duplicateTouch(candidate, point, eventsById, segmentById),
+    );
+    if (duplicateIndex < 0) {
+      canonical.push(point);
+      canonicalIdBySourceId.set(point.id, point.id);
+      continue;
+    }
+    const previous = canonical[duplicateIndex]!;
+    const elapsed = [previous.elapsedSeconds, point.elapsedSeconds].filter(
+      (value): value is number => value !== undefined,
+    );
+    const merged: SpatialEventPoint = {
+      ...point,
+      sourceEventIds: [
+        ...new Set([...previous.sourceEventIds, ...point.sourceEventIds]),
+      ],
+      isSave: previous.isSave || point.isSave || undefined,
+      elapsedSeconds: elapsed.length ? Math.max(...elapsed) : undefined,
+      preHitSpeed: point.preHitSpeed ?? previous.preHitSpeed,
+      postHitSpeed: point.postHitSpeed ?? previous.postHitSpeed,
+    };
+    canonical[duplicateIndex] = merged;
+    for (const sourceId of merged.sourceEventIds)
+      canonicalIdBySourceId.set(sourceId, merged.id);
+  }
+  return { points: canonical, canonicalIdBySourceId };
+}
+
 /**
  * Correlates each valid goal with the scorer's latest touch in uninterrupted
  * active play, clearing candidates whenever telemetry marks a dead-ball edge.
@@ -417,20 +552,37 @@ export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
       ? { ...point, isSave: true }
       : point,
   );
-  const rawById = new Map(rawPoints.map((point) => [point.id, point]));
+  const canonical = canonicalTouches(match, rawPoints);
+  const normalizedPoints = [
+    ...rawPoints.filter((point) => point.kind !== 'touch'),
+    ...canonical.points,
+  ];
+  const rawById = new Map(normalizedPoints.map((point) => [point.id, point]));
   const eventsById = new Map(match.events.map((event) => [event.id, event]));
   const numbers = goalNumbers(match);
   const fiftyPoints = derivedFiftyFacts(match).flatMap((fact) => {
-    const resolved = rawById.get(fact.resolvedEventId);
+    const resolvedId =
+      canonical.canonicalIdBySourceId.get(fact.resolvedEventId) ??
+      fact.resolvedEventId;
+    const resolved = rawById.get(resolvedId);
     if (!resolved || resolved.kind !== 'touch') return [];
+    const sourceEventIds = [
+      ...new Set(
+        fact.touchEventIds.flatMap((eventId) => {
+          const canonicalId =
+            canonical.canonicalIdBySourceId.get(eventId) ?? eventId;
+          return rawById.get(canonicalId)?.sourceEventIds ?? [eventId];
+        }),
+      ),
+    ];
     return [
       {
         ...resolved,
         id: fact.id,
         kind: 'fifty' as const,
         sequence: fact.sequence,
-        sourceEventIds: fact.touchEventIds,
-        isSave: fact.touchEventIds.some((eventId) => saved.has(eventId)),
+        sourceEventIds,
+        isSave: sourceEventIds.some((eventId) => saved.has(eventId)),
         actors: fact.participantIndexes.map((index) =>
           participantActor(match.participants[index]!, index),
         ),
@@ -450,9 +602,14 @@ export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
     { goalId?: string; goalNumber?: number; teamNumber?: number }
   >();
   for (const [goalId, touchId] of associations) {
+    const canonicalTouchId =
+      canonical.canonicalIdBySourceId.get(touchId) ?? touchId;
     const markerId =
       fiftyIdByTouch.get(touchId) ??
-      (rawById.get(touchId)?.kind === 'touch' ? touchId : undefined);
+      fiftyIdByTouch.get(canonicalTouchId) ??
+      (rawById.get(canonicalTouchId)?.kind === 'touch'
+        ? canonicalTouchId
+        : undefined);
     if (!markerId) continue;
     const goalPoint = rawById.get(goalId);
     const goalEvent = eventsById.get(goalId);
@@ -466,8 +623,10 @@ export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
     });
   }
   const points = [
-    ...rawPoints.filter(
-      (point) => point.kind !== 'touch' || !consumedTouches.has(point.id),
+    ...normalizedPoints.filter(
+      (point) =>
+        point.kind !== 'touch' ||
+        !point.sourceEventIds.some((eventId) => consumedTouches.has(eventId)),
     ),
     ...fiftyPoints,
   ].map((point) => {
@@ -501,9 +660,7 @@ export function playerTouchAnalytics(
   const player = match.participants.find(
     (value) => value.primaryId === primaryId,
   );
-  const touches = rawSpatialEventPoints(match).filter(
-    (point) => point.kind === 'touch',
-  );
+  const touches = canonicalTouches(match, rawSpatialEventPoints(match)).points;
   const selected = primaryId
     ? touches.filter((point) =>
         point.actors.some((value) => value.primaryId === primaryId),

@@ -203,14 +203,15 @@ function storeEvent(
   now: string,
 ): TimelineEvent {
   const sequence = (match.events.at(-1)?.sequence ?? 0) + 1;
+  const clockObserved = match.regulationDurationSeconds !== undefined;
   return {
     id: `${match.id}:${sequence}`,
     matchId: match.id,
     sequence,
     eventName: envelope.event,
     receivedAt: now,
-    matchClockSeconds: match.timeSeconds,
-    elapsedSeconds: match.elapsedSeconds ?? 0,
+    matchClockSeconds: clockObserved ? match.timeSeconds : undefined,
+    elapsedSeconds: clockObserved ? match.elapsedSeconds : undefined,
     payload: structuredClone(envelope.data),
   };
 }
