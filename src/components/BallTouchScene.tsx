@@ -112,14 +112,14 @@ function GoalLabelSprite({
     context.lineTo(4, radius);
     context.quadraticCurveTo(4, 4, radius, 4);
     context.closePath();
-    context.fillStyle = 'rgba(7, 17, 31, 0.92)';
+    context.fillStyle = 'rgba(7, 17, 31, 0.68)';
     context.fill();
-    context.lineWidth = 6;
+    context.lineWidth = 4;
     context.strokeStyle = color;
     context.stroke();
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillStyle = '#f8fafc';
+    context.fillStyle = 'rgba(248, 250, 252, 0.9)';
     context.font = '800 42px "Segoe UI", sans-serif';
     context.fillText(goal.label.toUpperCase(), canvas.width / 2, 57);
     context.fillStyle = color;
@@ -132,11 +132,12 @@ function GoalLabelSprite({
   }, [color, goal.label, goal.teamName]);
   useEffect(() => () => texture.dispose(), [texture]);
   return (
-    <sprite position={position} renderOrder={30} scale={[2100, 650, 1]}>
+    <sprite position={position} renderOrder={-1} scale={[1650, 510, 1]}>
       <spriteMaterial
         map={texture}
-        depthTest={false}
+        depthTest
         depthWrite={false}
+        opacity={0.82}
         transparent
       />
     </sprite>
@@ -396,7 +397,11 @@ function FiftyMarker({
   return (
     <>
       {colors.map((color, index) => (
-        <mesh key={`${index}:${color}`} rotation={[0, Math.PI / 2, 0]}>
+        <mesh
+          key={`${index}:${color}`}
+          renderOrder={4}
+          rotation={[0, Math.PI / 2, 0]}
+        >
           <sphereGeometry args={[radius, 20, 14, index * Math.PI, Math.PI]} />
           <meshStandardMaterial
             color={litMarkerColor(color, opacity)}
@@ -410,7 +415,7 @@ function FiftyMarker({
         </mesh>
       ))}
       {point.isScoringTouch && (
-        <mesh>
+        <mesh renderOrder={5}>
           <octahedronGeometry args={[radius * 1.42, 0]} />
           <meshBasicMaterial
             color={teamColor(point.scoringTeamNumber ?? 0)}
@@ -472,7 +477,7 @@ function Marker({
         ) : point.kind === 'fifty' ? (
           <FiftyMarker active={active} opacity={opacity} point={point} />
         ) : point.isScoringTouch ? (
-          <mesh>
+          <mesh renderOrder={4}>
             <octahedronGeometry args={[active ? 150 : 115, 0]} />
             <meshStandardMaterial
               color={litMarkerColor(color, opacity)}
@@ -485,7 +490,7 @@ function Marker({
             />
           </mesh>
         ) : (
-          <mesh>
+          <mesh renderOrder={4}>
             <sphereGeometry args={[active ? 125 : 91.25, 20, 14]} />
             <meshStandardMaterial
               color={litMarkerColor(color, opacity)}
