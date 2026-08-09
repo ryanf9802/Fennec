@@ -691,6 +691,8 @@ test('settings save action floats above mobile navigation while dirty', async ({
   const save = page.getByRole('button', { name: 'Save settings' });
   await expect(save).toBeVisible();
   await expect(save).toHaveCSS('position', 'fixed');
+  await expect(save).toHaveCSS('min-height', '52px');
+  await expect(save).toHaveCSS('font-weight', '800');
   const saveBox = (await save.boundingBox())!;
   const mobileNavBox = (await page.locator('nav.fixed').boundingBox())!;
   const documentWidth = await page.evaluate(
@@ -706,6 +708,13 @@ test('settings save action floats above mobile navigation while dirty', async ({
     .poll(() => page.evaluate(() => window.scrollY))
     .toBeGreaterThan(0);
   expect((await save.boundingBox())!.y).toBeCloseTo(saveBox.y, 0);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const desktopSaveBox = (await save.boundingBox())!;
+  expect(900 - (desktopSaveBox.y + desktopSaveBox.height)).toBeCloseTo(32, 0);
+  expect(
+    1440 - (desktopSaveBox.x + desktopSaveBox.width),
+  ).toBeGreaterThanOrEqual(32);
 
   await save.click();
   await expect(save).toHaveCount(0);

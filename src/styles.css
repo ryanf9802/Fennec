@@ -188,6 +188,24 @@ textarea:focus-visible {
   right: max(1rem, env(safe-area-inset-right));
   bottom: calc(6rem + env(safe-area-inset-bottom));
   z-index: 40;
+  min-height: 3.25rem;
+  padding: 0.8rem 1.3rem;
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.42),
+    0 0 0 3px rgba(54, 215, 255, 0.16);
+  font-size: 1rem;
+  font-weight: 800;
+  transition:
+    filter 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+.settings-save-fab:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.46),
+    0 0 0 3px rgba(54, 215, 255, 0.24);
 }
 @media (min-width: 640px) {
   .settings-save-fab {

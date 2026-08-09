@@ -454,10 +454,10 @@ export function SettingsPage() {
       </div>
       {hasUnsavedChanges && (
         <button
-          className="settings-save-fab button-primary shadow-2xl shadow-black/40"
+          className="settings-save-fab button-primary"
           onClick={() => void saveDraft()}
         >
-          <Save className="size-4" />
+          <Save className="size-5" />
           Save settings
         </button>
       )}
