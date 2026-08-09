@@ -4,7 +4,7 @@ import {
   type FennecSettings,
   type MatchState,
 } from '../domain/types';
-import { playerTouchAnalytics } from '../domain/analytics';
+import { observedBallSpeed, playerTouchAnalytics } from '../domain/analytics';
 import { recalculateDerivedTouchStats } from '../domain/passes';
 
 export interface FennecBackup {
@@ -183,9 +183,13 @@ export async function streamBackup(
  * Serializes chronological, profile-relative match results and telemetry into
  * an escaped CSV suitable for spreadsheet import.
  */
-export function matchesCsv(matches: MatchState[], profileId?: string): string {
+export function matchesCsv(matches: MatchState[], profileId: string): string {
   const escape = (value: unknown) =>
     `"${String(value ?? '').replaceAll('"', '""')}"`;
+  const decimal = (value?: number) =>
+    value === undefined ? '' : value.toFixed(1);
+  const percentage = (value?: number) =>
+    value === undefined ? '' : decimal(value * 100);
   const rows = [
     [
       'match_id',
@@ -205,6 +209,24 @@ export function matchesCsv(matches: MatchState[], profileId?: string): string {
       'ball_hits',
       'average_post_hit_speed',
       'maximum_post_hit_speed',
+      'player_name',
+      'team_number',
+      'score',
+      'touches',
+      'demos',
+      'arena',
+      'playlist_id',
+      'playlist_category',
+      'ended_at',
+      'elapsed_seconds',
+      'overtime',
+      'team_ball_hits',
+      'team_touch_share_pct',
+      'average_speed_gain',
+      'shooting_pct',
+      'team_last_touch_control_pct',
+      'match_average_ball_speed',
+      'match_maximum_ball_speed',
     ],
   ];
   for (const match of [...matches].sort((a, b) =>
@@ -213,21 +235,30 @@ export function matchesCsv(matches: MatchState[], profileId?: string): string {
     const player = match.participants.find(
       (item) => item.primaryId === profileId,
     );
-    const ownTeam = player
-      ? match.teams.find((team) => team.teamNumber === player.teamNumber)
-      : undefined;
-    const opponentScore = player
-      ? match.teams
-          .filter((team) => team.teamNumber !== player.teamNumber)
-          .reduce((sum, team) => sum + team.score, 0)
-      : '';
+    if (!player) continue;
+    const ownTeam = match.teams.find(
+      (team) => team.teamNumber === player.teamNumber,
+    );
+    const opponentScore = match.teams
+      .filter((team) => team.teamNumber !== player.teamNumber)
+      .reduce((sum, team) => sum + team.score, 0);
     const result =
-      !player || match.lifecycle !== 'completed'
+      match.lifecycle !== 'completed'
         ? ''
         : match.winnerTeamNumber === player.teamNumber
           ? 'win'
           : 'loss';
     const touchAnalytics = playerTouchAnalytics(match, profileId);
+    const touchTelemetryAvailable =
+      match.capture !== undefined ||
+      match.events.some((event) => event.eventName === 'BallHit');
+    const ballSpeed = observedBallSpeed(match);
+    const lastTouchSamples = match.capture?.lastTouchSamplesByTeam ?? {};
+    const totalControlSamples = Object.values(lastTouchSamples).reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+    const ownControlSamples = lastTouchSamples[String(player.teamNumber)] ?? 0;
     rows.push(
       [
         match.id,
@@ -244,9 +275,35 @@ export function matchesCsv(matches: MatchState[], profileId?: string): string {
         player?.saves ?? '',
         player?.shots ?? '',
         player?.carTouches ?? '',
-        touchAnalytics.touches,
-        touchAnalytics.averagePostHitSpeed?.toFixed(1) ?? '',
-        touchAnalytics.maximumPostHitSpeed?.toFixed(1) ?? '',
+        touchTelemetryAvailable ? touchAnalytics.touches : '',
+        touchTelemetryAvailable
+          ? decimal(touchAnalytics.averagePostHitSpeed)
+          : '',
+        touchTelemetryAvailable
+          ? decimal(touchAnalytics.maximumPostHitSpeed)
+          : '',
+        player.name,
+        player.teamNumber,
+        player.score,
+        player.touches,
+        player.demos,
+        match.arena,
+        match.playlistId,
+        match.playlistCategory,
+        match.endedAt ?? '',
+        match.elapsedSeconds ?? '',
+        match.isOvertime,
+        touchTelemetryAvailable ? touchAnalytics.teamTouches : '',
+        touchTelemetryAvailable ? percentage(touchAnalytics.touchShare) : '',
+        touchTelemetryAvailable
+          ? decimal(touchAnalytics.averageSpeedChange)
+          : '',
+        player.shots ? percentage(player.goals / player.shots) : '',
+        totalControlSamples
+          ? percentage(ownControlSamples / totalControlSamples)
+          : '',
+        decimal(ballSpeed.average),
+        decimal(ballSpeed.maximum),
       ].map(String),
     );
   }

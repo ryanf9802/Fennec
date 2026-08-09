@@ -114,10 +114,14 @@ export function SettingsPage() {
   };
 
   const exportCsv = async () => {
+    if (!profile?.primaryId) {
+      setMessage('Select a player profile before exporting CSV.');
+      return;
+    }
     const matches = await loadMatches();
     downloadText(
       `fennec-matches-${new Date().toISOString().slice(0, 10)}.csv`,
-      matchesCsv(matches, profile?.primaryId),
+      matchesCsv(matches, profile.primaryId),
       'text/csv',
     );
   };
