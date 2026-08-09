@@ -287,19 +287,24 @@ test('settings show installation-relative Stats API instructions', async ({
   ).toBeVisible();
   await expect(page.getByRole('button', { name: /copy/i })).toHaveCount(0);
   await expect(page.getByText(/Program Files/)).toHaveCount(0);
-  await expect(page.getByText('Allow local network access')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open setup' })).toBeVisible();
   await expect(
     page.getByText(/set Local network access to Allow, then reload Fennec/),
   ).toBeVisible();
 });
 
-test('onboarding explains the browser local network prompt', async ({
+test('setup explains the browser local network prompt and both paths', async ({
   page,
 }) => {
   await page.goto('/onboarding?demo=1');
-  await expect(page.getByText('Allow local network access')).toBeVisible();
   await expect(
-    page.getByText(/Choose Allow so Fennec can read Rocket League/),
+    page.getByRole('heading', { name: 'Connect Fennec' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /With companion/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Browser only/ }),
   ).toBeVisible();
 });
 
@@ -348,7 +353,7 @@ test('primary pages use the same full content width', async ({ page }) => {
   for (const [path, heading, removedEyebrow] of [
     ['/settings?demo=1', 'Settings', 'Preferences and storage'],
     ['/profile?demo=1', 'Profile', 'Identity'],
-    ['/onboarding?demo=1', 'Connect Rocket League', undefined],
+    ['/setup?demo=1', 'Connect Fennec', undefined],
   ] as const) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();

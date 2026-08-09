@@ -1,0 +1,49 @@
+name: Windows companion
+
+on:
+  push:
+    paths:
+      - 'src-tauri/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/companion.yml'
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/companion.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Enable pinned pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack install
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - run: pnpm install --frozen-lockfile
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --locked
+      - name: Build companion installer
+        run: pnpm companion:build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fennec-companion-windows
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 14

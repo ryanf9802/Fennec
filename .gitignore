@@ -4,6 +4,8 @@ cdk.out/
 coverage/
 playwright-report/
 test-results/
+src-tauri/gen/
+src-tauri/target/
 *.tsbuildinfo
 .env.local
 .env.*.local

@@ -38,9 +38,25 @@ Port=49123
 WebPort=49124
 ```
 
-Restart Rocket League after saving the file. Keep the Fennec browser tab open
-while playing. Fennec cannot edit protected game files or continue recording
-after the tab closes.
+Restart Rocket League after saving the file. The in-app Setup center can inspect
+and update either supported INI file when the browser is allowed to write it.
+Keep the Fennec browser tab or installed PWA open while playing unless the
+optional companion is collecting in the background.
+
+## PWA and Windows companion
+
+Chrome and Edge can install Fennec from the browser. The PWA works offline after
+its first successful load, checks for updates when it becomes visible or comes
+online, and defers a required refresh until a live match has finished.
+
+The optional Tauri companion under `src-tauri` runs in the Windows tray. It
+discovers Steam and Epic installations independently, safely backs up and
+updates the effective Stats API file (requesting elevation only when needed),
+captures while the browser is closed, and synchronizes frames, checkpoints, and
+deletions with a paired browser. Its optional per-store desktop shortcuts launch
+Rocket League through Steam or Epic, monitor the exact game executable, and exit
+the companion when that game process ends. Settings can also register or remove
+the tray collector from the current user's Windows sign-in startup.
 
 ## Local data
 
@@ -52,8 +68,8 @@ remain available after those payloads expire.
 
 History pages use indexed cursor queries instead of loading the complete
 archive into memory. The IndexedDB implementation sits behind a storage-neutral
-repository contract so a future optional companion or remote service can use
-the same domain records and query behavior without changing the UI.
+repository contract, while the paired companion maintains a durable SQLite
+journal for browser/companion handoff.
 
 `http://localhost:5173` and `https://app.fennec.gg` have separate storage.
 `https://fennec.gg` permanently redirects to the app origin so it cannot create
@@ -75,6 +91,10 @@ pnpm build
 pnpm cdk:synth
 pnpm test:e2e
 ```
+
+Windows companion builds additionally require the stable Rust toolchain and the
+Tauri Windows prerequisites. Run `pnpm companion:dev` for development or
+`pnpm companion:build` for the current-user NSIS installer.
 
 Run `pnpm format` to format repository-owned code, configuration, documentation,
 styles, and markup. ESLint also requires explanatory JSDoc on named functions

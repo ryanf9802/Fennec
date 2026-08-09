@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+import { VitePWA } from 'vite-plugin-pwa';
 
 function devTelemetry(): Plugin {
   return {
@@ -47,7 +48,47 @@ function devTelemetry(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [devTelemetry(), react(), tailwindcss()],
+  plugins: [
+    devTelemetry(),
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'prompt',
+      injectRegister: false,
+      includeAssets: ['assets/brand/*.svg', 'icons/*.png'],
+      manifest: {
+        id: '/',
+        name: 'Fennec — Rocket League Stats',
+        short_name: 'Fennec',
+        description: 'A local-first Rocket League session dashboard.',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        background_color: '#07111f',
+        theme_color: '#07111f',
+        icons: [
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          {
+            src: '/icons/icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+        shortcuts: [
+          { name: 'Games', short_name: 'Games', url: '/' },
+          { name: 'Setup', short_name: 'Setup', url: '/setup' },
+          { name: 'Settings', short_name: 'Settings', url: '/settings' },
+        ],
+      },
+      workbox: {
+        cleanupOutdatedCaches: true,
+        navigateFallback: '/index.html',
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+      },
+    }),
+  ],
   test: {
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],

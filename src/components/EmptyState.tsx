@@ -12,7 +12,7 @@ export function EmptyState() {
         Start Rocket League after enabling its Stats API. Fennec will
         automatically build your game timeline and sessions.
       </p>
-      <Link className="button-primary mt-6" to="/onboarding">
+      <Link className="button-primary mt-6" to="/setup">
         Open setup guide
       </Link>
     </div>

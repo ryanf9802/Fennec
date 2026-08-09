@@ -2,6 +2,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Gamepad2,
+  ListChecks,
   Radio,
   Settings,
   UserRound,
@@ -14,6 +15,7 @@ import { ConnectionStatus } from './ConnectionStatus';
 const navigation = [
   { to: '/', label: 'Games', icon: Gamepad2 },
   { to: '/profile', label: 'Profile', icon: UserRound },
+  { to: '/setup', label: 'Setup', icon: ListChecks },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -139,7 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <nav className="surface fixed inset-x-3 bottom-3 z-30 grid grid-cols-3 rounded-2xl p-1.5 md:hidden">
+      <nav className="surface fixed inset-x-3 bottom-3 z-30 grid grid-cols-4 rounded-2xl p-1.5 md:hidden">
         {navigation.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}

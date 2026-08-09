@@ -1,9 +1,19 @@
 import { useEffect, useRef } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { LocalAccessModal } from '../components/LocalAccessModal';
 import { GamesPage } from '../pages/GamesPage';
 import { MatchPage } from '../pages/MatchPage';
 import { OnboardingPage } from '../pages/OnboardingPage';
+import { useLocalAccess } from '../platform/LocalAccessContext';
+import { LiveWakeLock } from '../pwa/LiveWakeLock';
+import { PwaLifecycle } from '../pwa/PwaLifecycle';
 import { ProfilePage } from '../pages/ProfilePage';
 import { SessionPage } from '../pages/SessionPage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -11,7 +21,9 @@ import { useFennec } from './FennecContext';
 
 export function App() {
   const { activeMatch, settings, ready, diagnostic } = useFennec();
+  const localAccess = useLocalAccess();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const opened = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (
@@ -52,26 +64,35 @@ export function App() {
       </div>
     );
   return (
-    <AppShell>
-      <Routes>
-        <Route path="/" element={<GamesPage />} />
-        <Route
-          path="/live"
-          element={
-            activeMatch ? (
-              <MatchPage match={activeMatch} />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
-        />
-        <Route path="/matches/:matchId" element={<MatchPage />} />
-        <Route path="/sessions/:sessionId" element={<SessionPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AppShell>
+    <>
+      <LiveWakeLock />
+      <PwaLifecycle />
+      <AppShell>
+        <Routes>
+          <Route path="/" element={<GamesPage />} />
+          <Route
+            path="/live"
+            element={
+              activeMatch ? (
+                <MatchPage match={activeMatch} />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route path="/matches/:matchId" element={<MatchPage />} />
+          <Route path="/sessions/:sessionId" element={<SessionPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/setup" element={<OnboardingPage />} />
+          <Route
+            path="/onboarding"
+            element={<Navigate to="/setup" replace />}
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AppShell>
+      {!localAccess.satisfied && pathname !== '/setup' && <LocalAccessModal />}
+    </>
   );
 }

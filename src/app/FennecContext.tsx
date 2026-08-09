@@ -32,7 +32,8 @@ import type { EndSessionResult } from '../data/historyRepository';
 import { historyKeys, queryClient } from '../data/historyQueries';
 import type { FennecBackup } from '../data/backup';
 import { SimulatedStatsFeed } from '../feed/SimulatedStatsFeed';
-import { WebSocketStatsFeed } from '../feed/WebSocketStatsFeed';
+import { HybridStatsFeed } from '../feed/HybridStatsFeed';
+import type { StatsFeedAdapter } from '../feed/StatsFeedAdapter';
 import { createDemoHistory } from '../feed/demoHistory';
 
 interface FennecContextValue {
@@ -63,7 +64,13 @@ function applyTheme(theme: FennecSettings['theme']): void {
   document.documentElement.dataset.theme = resolved;
 }
 
-export function FennecProvider({ children }: { children: ReactNode }) {
+export function FennecProvider({
+  children,
+  feedEnabled = true,
+}: {
+  children: ReactNode;
+  feedEnabled?: boolean;
+}) {
   const [ready, setReady] = useState(false);
   const [activeMatch, setActiveMatch] = useState<MatchState>();
   const [profile, setProfile] = useState<FennecProfile>();
@@ -73,6 +80,7 @@ export function FennecProvider({ children }: { children: ReactNode }) {
   const activeRef = useRef<MatchState | undefined>(undefined);
   const profileRef = useRef<FennecProfile | undefined>(undefined);
   const historyGenerationRef = useRef(0);
+  const feedRef = useRef<StatsFeedAdapter | undefined>(undefined);
   const [historyGeneration, setHistoryGeneration] = useState(0);
   const demoMode =
     import.meta.env.VITE_DEMO_FEED === 'true' ||
@@ -122,10 +130,11 @@ export function FennecProvider({ children }: { children: ReactNode }) {
   }, [profile]);
 
   useEffect(() => {
-    if (!ready) return;
-    const feed = demoMode
+    if (!ready || (!demoMode && !feedEnabled)) return;
+    const feed: StatsFeedAdapter = demoMode
       ? new SimulatedStatsFeed()
-      : new WebSocketStatsFeed(`ws://127.0.0.1:${settings.webSocketPort}`);
+      : new HybridStatsFeed(`ws://127.0.0.1:${settings.webSocketPort}`);
+    feedRef.current = feed;
     const generation = historyGenerationRef.current;
     let lastCheckpoint = 0;
     let timer: number | undefined;
@@ -169,6 +178,14 @@ export function FennecProvider({ children }: { children: ReactNode }) {
     feed.start({
       onState: setConnection,
       onDiagnostic: setDiagnostic,
+      onCheckpoint: async (match) => {
+        await saveMatch(match, settings.sessionGapMinutes);
+        await queryClient.invalidateQueries({ queryKey: historyKeys.all });
+      },
+      onTombstone: async (matchId) => {
+        await deleteStoredMatch(matchId);
+        await queryClient.invalidateQueries({ queryKey: historyKeys.all });
+      },
       /**
        * Reduces each feed envelope into live state, checkpoints durable match
        * history, and keeps the selected or demo profile synchronized.
@@ -183,6 +200,7 @@ export function FennecProvider({ children }: { children: ReactNode }) {
         const nextConnection =
           result.current.lifecycle === 'live' ? 'live' : 'waiting';
         setConnection(nextConnection);
+        feed.checkpoint?.(result.current);
         const addedEvent =
           result.current.events.length > (previous?.events.length ?? 0);
         if (result.superseded) persist(result.superseded);
@@ -230,11 +248,13 @@ export function FennecProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', flush);
       feed.stop();
+      if (feedRef.current === feed) feedRef.current = undefined;
       setConnection('stopped');
     };
   }, [
     demoMode,
     historyGeneration,
+    feedEnabled,
     ready,
     settings.sessionGapMinutes,
     settings.webSocketPort,
@@ -254,6 +274,7 @@ export function FennecProvider({ children }: { children: ReactNode }) {
   }, []);
   const deleteMatch = useCallback(async (id: string) => {
     const deleted = await deleteStoredMatch(id);
+    if (deleted) feedRef.current?.tombstone?.(id);
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
     return deleted;
   }, []);
@@ -269,6 +290,8 @@ export function FennecProvider({ children }: { children: ReactNode }) {
   const deleteHistory = useCallback(async () => {
     historyGenerationRef.current++;
     try {
+      for await (const match of historyRepository.iterateMatches())
+        feedRef.current?.tombstone?.(match.id);
       await clearHistory();
       activeRef.current = undefined;
       setActiveMatch(undefined);
