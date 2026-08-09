@@ -1,6 +1,7 @@
 import type { MatchState, ParticipantState, TimelineEvent } from './types';
+import { derivedFiftyFacts } from './passes';
 
-export type SpatialEventKind = 'touch' | 'goal' | 'crossbar';
+export type SpatialEventKind = 'touch' | 'goal' | 'fifty' | 'crossbar';
 
 export interface SpatialActor {
   key: string;
@@ -13,7 +14,12 @@ export interface SpatialActor {
 export interface SpatialEventPoint {
   id: string;
   kind: SpatialEventKind;
+  sequence: number;
+  sourceEventIds: string[];
   goalNumber?: number;
+  associatedPointId?: string;
+  isScoringTouch?: boolean;
+  scoringTeamNumber?: number;
   x: number;
   y: number;
   z: number;
@@ -108,6 +114,23 @@ function actor(match: MatchState, value: unknown): SpatialActor | undefined {
   };
 }
 
+function participantActor(
+  participant: ParticipantState,
+  index: number,
+): SpatialActor {
+  return {
+    key: participant.primaryId
+      ? `id:${participant.primaryId}`
+      : participant.shortcut !== undefined
+        ? `shortcut:${participant.shortcut}`
+        : `participant:${index}`,
+    name: participant.name,
+    teamNumber: participant.teamNumber,
+    shortcut: participant.shortcut,
+    primaryId: participant.primaryId,
+  };
+}
+
 /**
  * Interprets supported telemetry payloads as normalized spatial points,
  * rejecting events that lack the coordinates or actors needed for display.
@@ -127,6 +150,8 @@ function eventPoint(
     return {
       id: event.id,
       kind: 'touch',
+      sequence: event.sequence,
+      sourceEventIds: [event.id],
       ...location,
       elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
       actors: players
@@ -144,6 +169,8 @@ function eventPoint(
     return {
       id: event.id,
       kind: 'goal',
+      sequence: event.sequence,
+      sourceEventIds: [event.id],
       goalNumber,
       ...location,
       elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
@@ -159,6 +186,8 @@ function eventPoint(
     return {
       id: event.id,
       kind: 'crossbar',
+      sequence: event.sequence,
+      sourceEventIds: [event.id],
       ...location,
       elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
       actors: player ? [player] : [],
@@ -168,16 +197,155 @@ function eventPoint(
   return undefined;
 }
 
-export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
-  const goalNumbers = new Map(
+function goalNumbers(match: MatchState): Map<string, number> {
+  return new Map(
     match.events
       .filter(isScoredGoal)
       .sort((first, second) => first.sequence - second.sequence)
       .map((event, index) => [event.id, index + 1]),
   );
+}
+
+function rawSpatialEventPoints(match: MatchState): SpatialEventPoint[] {
+  const numbers = goalNumbers(match);
   return match.events
-    .map((event) => eventPoint(match, event, goalNumbers.get(event.id)))
+    .map((event) => eventPoint(match, event, numbers.get(event.id)))
     .filter((value): value is SpatialEventPoint => !!value);
+}
+
+const playStops = new Set([
+  'CountdownBegin',
+  'GoalScored',
+  'GoalReplayStart',
+  'MatchEnded',
+  'MatchDestroyed',
+  'MatchPaused',
+]);
+const playStarts = new Set(['RoundStarted', 'MatchUnpaused']);
+
+/**
+ * Correlates each valid goal with the scorer's latest touch in uninterrupted
+ * active play, clearing candidates whenever telemetry marks a dead-ball edge.
+ */
+function scoringTouches(match: MatchState): Map<string, string> {
+  const result = new Map<string, string>();
+  const lastTouchByActor = new Map<string, string>();
+  let activePlay = true;
+  for (const event of [...match.events].sort(
+    (first, second) => first.sequence - second.sequence,
+  )) {
+    if (event.eventName === 'GoalScored') {
+      if (activePlay && isScoredGoal(event)) {
+        const scorer = actor(match, event.payload.Scorer);
+        const touchId = scorer && lastTouchByActor.get(scorer.key);
+        if (touchId) result.set(event.id, touchId);
+      }
+      lastTouchByActor.clear();
+      activePlay = false;
+      continue;
+    }
+    if (playStops.has(event.eventName)) {
+      lastTouchByActor.clear();
+      activePlay = false;
+      continue;
+    }
+    if (playStarts.has(event.eventName)) {
+      lastTouchByActor.clear();
+      activePlay = true;
+      continue;
+    }
+    if (event.eventName !== 'BallHit' || !activePlay) continue;
+    const players = Array.isArray(event.payload.Players)
+      ? event.payload.Players
+      : [];
+    for (const value of players) {
+      const touchActor = actor(match, value);
+      if (touchActor) lastTouchByActor.set(touchActor.key, event.id);
+    }
+  }
+  return result;
+}
+
+/**
+ * Builds presentation markers from raw telemetry while preserving source-event
+ * identity for consolidated 50s and correlated scoring touches.
+ */
+export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
+  const rawPoints = rawSpatialEventPoints(match);
+  const rawById = new Map(rawPoints.map((point) => [point.id, point]));
+  const eventsById = new Map(match.events.map((event) => [event.id, event]));
+  const numbers = goalNumbers(match);
+  const fiftyPoints = derivedFiftyFacts(match).flatMap((fact) => {
+    const resolved = rawById.get(fact.resolvedEventId);
+    if (!resolved || resolved.kind !== 'touch') return [];
+    return [
+      {
+        ...resolved,
+        id: fact.id,
+        kind: 'fifty' as const,
+        sequence: fact.sequence,
+        sourceEventIds: fact.touchEventIds,
+        actors: fact.participantIndexes.map((index) =>
+          participantActor(match.participants[index]!, index),
+        ),
+      },
+    ];
+  });
+  const fiftyIdByTouch = new Map(
+    fiftyPoints.flatMap((point) =>
+      point.sourceEventIds.map((eventId) => [eventId, point.id] as const),
+    ),
+  );
+  const consumedTouches = new Set(fiftyIdByTouch.keys());
+  const associations = scoringTouches(match);
+  const markerIdByGoal = new Map<string, string>();
+  const goalByMarkerId = new Map<
+    string,
+    { goalId?: string; goalNumber?: number; teamNumber?: number }
+  >();
+  for (const [goalId, touchId] of associations) {
+    const markerId =
+      fiftyIdByTouch.get(touchId) ??
+      (rawById.get(touchId)?.kind === 'touch' ? touchId : undefined);
+    if (!markerId) continue;
+    const goalPoint = rawById.get(goalId);
+    const goalEvent = eventsById.get(goalId);
+    markerIdByGoal.set(goalId, markerId);
+    goalByMarkerId.set(markerId, {
+      goalId: goalPoint?.id,
+      goalNumber: numbers.get(goalId),
+      teamNumber: goalEvent
+        ? actor(match, goalEvent.payload.Scorer)?.teamNumber
+        : undefined,
+    });
+  }
+  const points = [
+    ...rawPoints.filter(
+      (point) => point.kind !== 'touch' || !consumedTouches.has(point.id),
+    ),
+    ...fiftyPoints,
+  ].map((point) => {
+    if (point.kind === 'goal') {
+      const markerId = markerIdByGoal.get(point.id);
+      return markerId
+        ? {
+            ...point,
+            associatedPointId: markerId,
+          }
+        : point;
+    }
+    const goal = goalByMarkerId.get(point.id);
+    return goal
+      ? {
+          ...point,
+          associatedPointId: goal.goalId,
+          goalNumber: goal.goalNumber,
+          isScoringTouch: true,
+          scoringTeamNumber: goal.teamNumber,
+        }
+      : point;
+  });
+  return points.sort((first, second) => first.sequence - second.sequence);
 }
 
 export function playerTouchAnalytics(
@@ -187,7 +355,7 @@ export function playerTouchAnalytics(
   const player = match.participants.find(
     (value) => value.primaryId === primaryId,
   );
-  const touches = spatialEventPoints(match).filter(
+  const touches = rawSpatialEventPoints(match).filter(
     (point) => point.kind === 'touch',
   );
   const selected = primaryId

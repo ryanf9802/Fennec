@@ -65,6 +65,20 @@ interface TouchActor {
   teamNumber: number;
 }
 
+export interface FiftyFact {
+  id: string;
+  participantIndexes: number[];
+  resolvedEventId: string;
+  sequence: number;
+  touchEventIds: string[];
+}
+
+interface DerivedTouchStats {
+  passes: number[];
+  fifties: number[];
+  fiftyFacts: FiftyFact[];
+}
+
 function touchActors(
   participants: ParticipantState[],
   event: TimelineEvent,
@@ -103,15 +117,16 @@ function opposingAcross(
 }
 
 /**
- * Rebuilds passes and 50s from chronological ball-hit telemetry. Sequential
- * opposing touches form a 50 within 250 ms, while a global 500 ms cooldown
- * collapses rapid exchanges into one challenge.
+ * Walks one chronological play stream to share the same pass, 50, cooldown,
+ * and dead-ball decisions between aggregate totals and map presentation facts.
  */
-export function recalculateDerivedTouchStats(match: MatchState): void {
+function deriveTouchStats(match: MatchState): DerivedTouchStats {
   const passes = match.participants.map(() => 0);
   const fifties = match.participants.map(() => 0);
+  const fiftyFacts: FiftyFact[] = [];
   let pendingPass: TouchActor | undefined;
-  let previousTouch: { actors: TouchActor[]; receivedAt?: number } | undefined;
+  let previousTouch:
+    { actors: TouchActor[]; eventId: string; receivedAt?: number } | undefined;
   let lastFiftyAt: number | undefined;
   let activePlay = true;
   for (const event of [...match.events].sort(
@@ -157,8 +172,11 @@ export function recalculateDerivedTouchStats(match: MatchState): void {
 
     const timestamp = receivedAt(event);
     let challengeActors: TouchActor[] | undefined;
-    if (opposing(actors)) challengeActors = actors;
-    else if (
+    let challengeEventIds: string[] | undefined;
+    if (opposing(actors)) {
+      challengeActors = actors;
+      challengeEventIds = [event.id];
+    } else if (
       timestamp !== undefined &&
       previousTouch?.receivedAt !== undefined &&
       timestamp >= previousTouch.receivedAt &&
@@ -166,22 +184,46 @@ export function recalculateDerivedTouchStats(match: MatchState): void {
       opposingAcross(previousTouch.actors, actors)
     ) {
       challengeActors = [...previousTouch.actors, ...actors];
+      challengeEventIds = [previousTouch.eventId, event.id];
     }
     if (
       challengeActors &&
+      challengeEventIds &&
       (timestamp === undefined ||
         lastFiftyAt === undefined ||
         timestamp - lastFiftyAt >= 500)
     ) {
-      for (const index of new Set(
-        challengeActors.map((actor) => actor.participantIndex),
-      )) {
+      const participantIndexes = [
+        ...new Set(challengeActors.map((actor) => actor.participantIndex)),
+      ];
+      for (const index of participantIndexes) {
         fifties[index] = (fifties[index] ?? 0) + 1;
       }
+      fiftyFacts.push({
+        id: `fifty:${event.id}`,
+        participantIndexes,
+        resolvedEventId: event.id,
+        sequence: event.sequence,
+        touchEventIds: challengeEventIds,
+      });
       if (timestamp !== undefined) lastFiftyAt = timestamp;
     }
-    previousTouch = { actors, receivedAt: timestamp };
+    previousTouch = { actors, eventId: event.id, receivedAt: timestamp };
   }
+  return { passes, fifties, fiftyFacts };
+}
+
+export function derivedFiftyFacts(match: MatchState): FiftyFact[] {
+  return deriveTouchStats(match).fiftyFacts;
+}
+
+/**
+ * Rebuilds passes and 50s from chronological ball-hit telemetry. Sequential
+ * opposing touches form a 50 within 250 ms, while a global 500 ms cooldown
+ * collapses rapid exchanges into one challenge.
+ */
+export function recalculateDerivedTouchStats(match: MatchState): void {
+  const { passes, fifties } = deriveTouchStats(match);
   match.participants = match.participants.map((participant, index) => ({
     ...participant,
     passes: passes[index] ?? 0,

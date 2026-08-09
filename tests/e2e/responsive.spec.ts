@@ -144,7 +144,7 @@ test('3D touch map controls and preference persist across matches', async ({
   await expect(page.getByText('■ Blue goal')).toHaveCount(0);
 
   const goalPoint = page.getByRole('button', {
-    name: /You, Goal #1 scored at 2:00/,
+    name: /You · Goal #1 scored, at 2:00/,
   });
   await goalPoint.focus();
   await expect(viewport.getByText('You · Goal #1 scored')).toBeVisible();

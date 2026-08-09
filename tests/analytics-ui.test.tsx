@@ -142,19 +142,29 @@ describe('ball touch map', () => {
     ])
       expect(screen.queryByText(keyLabel)).not.toBeInTheDocument();
 
-    const selectedTouch = screen.getByRole('button', { name: /Me, touch/ });
-    expect(selectedTouch).toHaveAccessibleName(/touch at 1:00/);
+    const selectedTouch = screen.getByRole('button', { name: /Me · touch/ });
+    expect(selectedTouch).toHaveAccessibleName(/touch, at 1:00/);
     expect(selectedTouch).toBeInTheDocument();
+    fireEvent.focus(selectedTouch);
+    expect(scene.props?.nextId).toBe('map:2');
+    expect(scene.props?.emphasizedIds).toEqual(
+      expect.arrayContaining(['map:1', 'map:2']),
+    );
+    expect(scene.props?.points.map((point) => point.id)).toContain('map:2');
+    fireEvent.blur(selectedTouch);
     expect(
-      screen.queryByRole('button', { name: /Them, touch/ }),
+      screen.queryByRole('button', { name: /Them · touch/ }),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'All' }));
     expect(
-      screen.getByRole('button', { name: /Them, touch/ }),
+      screen.getByRole('button', { name: /Them · touch/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /Them, touch/ }),
-    ).toHaveAccessibleName(/touch at 2:00/);
+      screen.getByRole('button', { name: /Them · touch/ }),
+    ).toHaveAccessibleName(/touch, at 2:00/);
+    fireEvent.focus(screen.getByRole('button', { name: /Them · touch/ }));
+    expect(scene.props?.previousId).toBe('map:1');
+    expect(scene.props?.nextId).toBeUndefined();
     expect(scene.props?.points.map((point) => point.kind)).toEqual([
       'touch',
       'touch',
@@ -219,10 +229,82 @@ describe('ball touch map', () => {
       ]),
     );
     const secondGoal = screen.getByRole('button', {
-      name: /Them, Goal #2 scored at 4:00, 1200 uu\/s/,
+      name: /Them · Goal #2 scored, at 4:00, 1200 uu\/s/,
     });
     fireEvent.focus(secondGoal);
     expect(screen.getByText('Them · Goal #2 scored')).toBeInTheDocument();
     expect(screen.getByText(/4:00 · XYZ 200, 5000, 500/)).toBeInTheDocument();
+  });
+
+  it('combines a scoring 50 and reveals its filtered goal association', () => {
+    const fiftyMatch: MatchState = {
+      ...match,
+      events: [
+        {
+          id: 'map:10',
+          matchId: 'map',
+          sequence: 10,
+          eventName: 'BallHit',
+          receivedAt: '2026-08-08T00:01:00.000Z',
+          elapsedSeconds: 60,
+          payload: {
+            Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+            Ball: {
+              PostHitSpeed: 800,
+              Location: { X: 10, Y: 20, Z: 30 },
+            },
+          },
+        },
+        {
+          id: 'map:11',
+          matchId: 'map',
+          sequence: 11,
+          eventName: 'BallHit',
+          receivedAt: '2026-08-08T00:01:00.200Z',
+          elapsedSeconds: 60.2,
+          payload: {
+            Players: [{ Name: 'Them', Shortcut: 2, TeamNum: 1 }],
+            Ball: {
+              PreHitSpeed: 800,
+              PostHitSpeed: 1200,
+              Location: { X: 40, Y: 50, Z: 60 },
+            },
+          },
+        },
+        {
+          id: 'map:12',
+          matchId: 'map',
+          sequence: 12,
+          eventName: 'GoalScored',
+          receivedAt: '2026-08-08T00:01:01.000Z',
+          elapsedSeconds: 61,
+          payload: {
+            Scorer: { Name: 'Them', Shortcut: 2, TeamNum: 1 },
+            GoalSpeed: 1200,
+            ImpactLocation: { X: 100, Y: 5000, Z: 400 },
+          },
+        },
+      ],
+    };
+    render(<BallTouchMap match={fiftyMatch} profileId="Steam|1|0" />);
+
+    const fifty = screen.getByRole('button', {
+      name: /Me vs Them · 50\/50 · Goal #1 scoring touch/,
+    });
+    expect(screen.queryByRole('button', { name: /Goal #1 scored/ })).toBeNull();
+    fireEvent.focus(fifty);
+    expect(
+      screen.getByRole('button', { name: /Them · Goal #1 scored/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Me vs Them · 50/50 · Goal #1 scoring touch'),
+    ).toBeInTheDocument();
+    expect(scene.props?.emphasizedIds).toEqual(
+      expect.arrayContaining(['fifty:map:11', 'map:12']),
+    );
+    expect(scene.props?.points.map((point) => point.kind)).toEqual([
+      'fifty',
+      'goal',
+    ]);
   });
 });

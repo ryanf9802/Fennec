@@ -27,6 +27,22 @@ export function gameToScene(
   return { x: point.y, y: point.z, z: point.x };
 }
 
+export function goalMarkerPosition(
+  profile: ArenaProfile,
+  point: Pick<SpatialEventPoint, 'x' | 'y' | 'z'>,
+): ScenePoint {
+  if (!profile.goal) return gameToScene(point);
+  const wallY = point.y < 0 ? profile.yMin : profile.yMax;
+  return {
+    x: wallY,
+    y: Math.max(0, Math.min(profile.goal.height, point.z)),
+    z: Math.max(
+      -profile.goal.halfWidth,
+      Math.min(profile.goal.halfWidth, point.x),
+    ),
+  };
+}
+
 export function sceneToGameFloor(sceneX: number, sceneZ: number): ArenaPoint {
   return [sceneZ, sceneX];
 }

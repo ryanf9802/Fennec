@@ -144,10 +144,11 @@ function demoMatch(
         elapsedSeconds: 90,
         payload: {
           Players: [
+            { Name: 'You', Shortcut: 1, TeamNum: 0 },
             {
-              Name: teammates ? 'Luna' : 'Orbit',
-              Shortcut: teammates ? 2 : 4,
-              TeamNum: 0,
+              Name: teammates ? 'Drift' : 'Luna',
+              Shortcut: teammates ? 3 : 2,
+              TeamNum: 1,
             },
           ],
           Ball: {
@@ -157,16 +158,33 @@ function demoMatch(
           },
         },
       },
+      {
+        id: `${id}:3`,
+        matchId: id,
+        sequence: 3,
+        eventName: 'BallHit',
+        receivedAt: new Date(startedAt.getTime() + 110_000).toISOString(),
+        matchClockSeconds: 190,
+        elapsedSeconds: 110,
+        payload: {
+          Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }],
+          Ball: {
+            PreHitSpeed: 860,
+            PostHitSpeed: 1260,
+            Location: { X: 480, Y: 3600, Z: 260 },
+          },
+        },
+      },
       event(
         id,
-        3,
+        4,
         new Date(startedAt.getTime() + 2 * 60_000).toISOString(),
         'You',
       ),
       {
-        id: `${id}:4`,
+        id: `${id}:5`,
         matchId: id,
-        sequence: 4,
+        sequence: 5,
         eventName: 'MatchEnded',
         receivedAt: endedAt,
         matchClockSeconds: 0,

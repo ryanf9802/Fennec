@@ -32,19 +32,85 @@ function goalLabel(point: SpatialEventPoint): string {
   return point.goalNumber ? `Goal #${point.goalNumber} scored` : 'Goal scored';
 }
 
-function pointLabel(point: SpatialEventPoint): string {
-  const actors =
-    point.actors.map((actor) => actor.name).join(', ') || 'Unknown player';
-  if (point.kind === 'touch')
-    return `${actors}, touch at ${formatClock(point.elapsedSeconds)}, ${formatSpeed(point.postHitSpeed)}`;
-  return `${actors}, ${goalLabel(point)} at ${formatClock(point.elapsedSeconds)}, ${formatSpeed(point.speed)}`;
+function actorNames(point: SpatialEventPoint): string {
+  if (point.kind === 'fifty') {
+    const teams = new Map<number, string[]>();
+    for (const actor of point.actors) {
+      const names = teams.get(actor.teamNumber) ?? [];
+      names.push(actor.name);
+      teams.set(actor.teamNumber, names);
+    }
+    return [...teams.entries()]
+      .sort(([first], [second]) => first - second)
+      .map(([, names]) => names.join(' + '))
+      .join(' vs ');
+  }
+  return point.actors.map((actor) => actor.name).join(', ') || 'Unknown player';
 }
 
 function pointTitle(point: SpatialEventPoint): string {
-  const actors =
-    point.actors.map((actor) => actor.name).join(', ') || 'Unknown player';
-  const event = point.kind === 'goal' ? goalLabel(point) : point.kind;
-  return `${actors} · ${event}`;
+  const actors = actorNames(point);
+  if (point.kind === 'goal') return `${actors} · ${goalLabel(point)}`;
+  const scoring = point.isScoringTouch
+    ? point.goalNumber
+      ? `Goal #${point.goalNumber} scoring touch`
+      : 'Goal scoring touch'
+    : undefined;
+  if (point.kind === 'fifty')
+    return `${actors} · 50/50${scoring ? ` · ${scoring}` : ''}`;
+  return `${actors} · ${scoring ?? point.kind}`;
+}
+
+function pointLabel(point: SpatialEventPoint): string {
+  const speed =
+    point.kind === 'goal'
+      ? formatSpeed(point.speed)
+      : formatSpeed(point.postHitSpeed);
+  return `${pointTitle(point)}, at ${formatClock(point.elapsedSeconds)}, ${speed}`;
+}
+
+function isTouchMarker(point: SpatialEventPoint): boolean {
+  return point.kind === 'touch' || point.kind === 'fifty';
+}
+
+function matchesFilter(
+  point: SpatialEventPoint,
+  filter: Filter,
+  profileId: string | undefined,
+  profileTeam: number | undefined,
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'self')
+    return point.actors.some((actor) => actor.primaryId === profileId);
+  if (filter === 'team')
+    return point.actors.some((actor) => actor.teamNumber === profileTeam);
+  if (filter === 'opponents')
+    return point.actors.some(
+      (actor) => profileTeam !== undefined && actor.teamNumber !== profileTeam,
+    );
+  const id = filter.slice('player:'.length);
+  return point.actors.some((actor) => actor.primaryId === id);
+}
+
+function adjacentTouches(
+  points: SpatialEventPoint[],
+  activePoint?: SpatialEventPoint,
+): { previousId?: string; nextId?: string } {
+  if (!activePoint) return {};
+  const touches = points.filter(isTouchMarker);
+  if (isTouchMarker(activePoint)) {
+    const index = touches.findIndex((point) => point.id === activePoint.id);
+    return {
+      previousId: touches[index - 1]?.id,
+      nextId: touches[index + 1]?.id,
+    };
+  }
+  return {
+    previousId: [...touches]
+      .reverse()
+      .find((point) => point.sequence < activePoint.sequence)?.id,
+    nextId: touches.find((point) => point.sequence > activePoint.sequence)?.id,
+  };
 }
 
 class SceneErrorBoundary extends Component<
@@ -88,7 +154,7 @@ export function BallTouchMap({
       spatialEventPoints(match).filter((point) => point.kind !== 'crossbar'),
     [match],
   );
-  const touchPoints = points.filter((point) => point.kind === 'touch');
+  const touchPoints = points.filter(isTouchMarker);
   const profilePlayer = match.participants.find(
     (player) => player.primaryId === profileId,
   );
@@ -120,22 +186,23 @@ export function BallTouchMap({
         point.actors.some((actor) => actor.primaryId === player.primaryId),
       ),
   );
-  const visible = points.filter((point) => {
-    if (filter === 'all') return true;
-    if (filter === 'self')
-      return point.actors.some((actor) => actor.primaryId === profileId);
-    if (filter === 'team')
-      return point.actors.some(
-        (actor) => actor.teamNumber === profilePlayer?.teamNumber,
-      );
-    if (filter === 'opponents')
-      return point.actors.some(
-        (actor) =>
-          profilePlayer && actor.teamNumber !== profilePlayer.teamNumber,
-      );
-    const id = filter.slice('player:'.length);
-    return point.actors.some((actor) => actor.primaryId === id);
-  });
+  const activePoint = points.find((point) => point.id === active);
+  const { previousId, nextId } = adjacentTouches(points, activePoint);
+  const emphasizedIds = new Set(
+    activePoint
+      ? [
+          activePoint.id,
+          activePoint.associatedPointId,
+          previousId,
+          nextId,
+        ].filter((id): id is string => !!id)
+      : [],
+  );
+  const visible = points.filter(
+    (point) =>
+      matchesFilter(point, filter, profileId, profilePlayer?.teamNumber) ||
+      emphasizedIds.has(point.id),
+  );
 
   const updateCamera = (
     update: (current: TouchMapCameraState) => TouchMapCameraState,
@@ -223,7 +290,6 @@ export function BallTouchMap({
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
   };
-  const activePoint = visible.find((point) => point.id === active);
   return (
     <div className="relative space-y-3">
       <div className="flex flex-wrap gap-2" aria-label="Touch map filters">
@@ -275,6 +341,9 @@ export function BallTouchMap({
             points={visible}
             cameraState={camera}
             activeId={active}
+            emphasizedIds={[...emphasizedIds]}
+            previousId={previousId}
+            nextId={nextId}
             onActivate={setActive}
           />
         </SceneErrorBoundary>
@@ -332,7 +401,7 @@ export function BallTouchMap({
               {formatClock(activePoint.elapsedSeconds)} · XYZ{' '}
               {Math.round(activePoint.x)}, {Math.round(activePoint.y)},{' '}
               {Math.round(activePoint.z)}
-              {activePoint.kind === 'touch'
+              {activePoint.kind !== 'goal'
                 ? ` · ${formatSpeed(activePoint.preHitSpeed)} → ${formatSpeed(activePoint.postHitSpeed)}`
                 : ` · ${formatSpeed(activePoint.speed)}`}
             </div>

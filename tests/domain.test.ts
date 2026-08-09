@@ -21,7 +21,9 @@ import {
   arenaWallPanels,
   constrainCameraState,
   gameToScene,
+  goalMarkerPosition,
 } from '../src/domain/touchMapGeometry';
+import { derivedFiftyFacts } from '../src/domain/passes';
 import { normalizePlayerKey, playerKeyFor } from '../src/domain/playerIdentity';
 import { sessionMetrics } from '../src/domain/metrics';
 import {
@@ -774,9 +776,199 @@ describe('Stats API domain', () => {
         goalNumber: point.goalNumber,
       })),
     ).toEqual([
-      { id: 'goal-points:9', goalNumber: 3 },
       { id: 'goal-points:3', goalNumber: 2 },
+      { id: 'goal-points:9', goalNumber: 3 },
     ]);
+  });
+
+  it('consolidates a scoring 50 while retaining raw touch analytics', () => {
+    const value = match(
+      'scoring-fifty',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.participants = [
+      { ...player('Blue', 'Steam|1|0', 0), shortcut: 1 },
+      { ...player('Orange', 'Epic|2|0', 1), shortcut: 2 },
+    ];
+    value.events = [
+      {
+        id: 'scoring-fifty:1',
+        matchId: value.id,
+        sequence: 1,
+        eventName: 'BallHit',
+        receivedAt: '2026-08-08T00:01:00.000Z',
+        elapsedSeconds: 60,
+        payload: {
+          Players: [{ Name: 'Blue', Shortcut: 1, TeamNum: 0 }],
+          Ball: {
+            PostHitSpeed: 800,
+            Location: { X: 10, Y: 20, Z: 30 },
+          },
+        },
+      },
+      {
+        id: 'scoring-fifty:2',
+        matchId: value.id,
+        sequence: 2,
+        eventName: 'BallHit',
+        receivedAt: '2026-08-08T00:01:00.200Z',
+        elapsedSeconds: 60.2,
+        payload: {
+          Players: [{ Name: 'Orange', Shortcut: 2, TeamNum: 1 }],
+          Ball: {
+            PreHitSpeed: 800,
+            PostHitSpeed: 1100,
+            Location: { X: 40, Y: 50, Z: 60 },
+          },
+        },
+      },
+      {
+        id: 'scoring-fifty:3',
+        matchId: value.id,
+        sequence: 3,
+        eventName: 'GoalScored',
+        receivedAt: '2026-08-08T00:01:01.000Z',
+        elapsedSeconds: 61,
+        payload: {
+          Scorer: { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+          GoalSpeed: 1100,
+          ImpactLocation: { X: 100, Y: 5000, Z: 400 },
+        },
+      },
+    ];
+
+    expect(derivedFiftyFacts(value)).toEqual([
+      expect.objectContaining({
+        id: 'fifty:scoring-fifty:2',
+        participantIndexes: [0, 1],
+        resolvedEventId: 'scoring-fifty:2',
+        touchEventIds: ['scoring-fifty:1', 'scoring-fifty:2'],
+      }),
+    ]);
+    const points = spatialEventPoints(value);
+    expect(points).toEqual([
+      expect.objectContaining({
+        id: 'fifty:scoring-fifty:2',
+        kind: 'fifty',
+        sourceEventIds: ['scoring-fifty:1', 'scoring-fifty:2'],
+        isScoringTouch: true,
+        scoringTeamNumber: 1,
+        goalNumber: 1,
+        associatedPointId: 'scoring-fifty:3',
+      }),
+      expect.objectContaining({
+        id: 'scoring-fifty:3',
+        kind: 'goal',
+        associatedPointId: 'fifty:scoring-fifty:2',
+      }),
+    ]);
+    expect(playerTouchAnalytics(value, 'Steam|1|0').touches).toBe(1);
+    expect(playerTouchAnalytics(value, 'Epic|2|0').touches).toBe(1);
+  });
+
+  it('does not correlate a scoring touch across a dead-ball boundary', () => {
+    const value = match(
+      'goal-boundary',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.participants = [{ ...player('Me', 'Steam|1|0', 0), shortcut: 1 }];
+    value.events = [
+      {
+        id: 'goal-boundary:1',
+        matchId: value.id,
+        sequence: 1,
+        eventName: 'BallHit',
+        receivedAt: value.startedAt,
+        payload: {
+          Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+          Ball: { Location: { X: 10, Y: 20, Z: 30 } },
+        },
+      },
+      {
+        id: 'goal-boundary:2',
+        matchId: value.id,
+        sequence: 2,
+        eventName: 'MatchPaused',
+        receivedAt: value.startedAt,
+        payload: {},
+      },
+      {
+        id: 'goal-boundary:3',
+        matchId: value.id,
+        sequence: 3,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        payload: {
+          Scorer: { Name: 'Me', Shortcut: 1, TeamNum: 0 },
+          ImpactLocation: { X: 10, Y: 5000, Z: 300 },
+        },
+      },
+    ];
+
+    expect(
+      spatialEventPoints(value).every(
+        (point) => !point.associatedPointId && !point.isScoringTouch,
+      ),
+    ).toBe(true);
+  });
+
+  it('identifies a scoring touch when legacy goal telemetry has no location', () => {
+    const value = match(
+      'legacy-goal-touch',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.participants = [{ ...player('Me', 'Steam|1|0', 0), shortcut: 1 }];
+    value.events = [
+      {
+        id: 'legacy-goal-touch:1',
+        matchId: value.id,
+        sequence: 1,
+        eventName: 'BallHit',
+        receivedAt: value.startedAt,
+        payload: {
+          Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+          Ball: { Location: { X: 10, Y: 20, Z: 30 } },
+        },
+      },
+      {
+        id: 'legacy-goal-touch:2',
+        matchId: value.id,
+        sequence: 2,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        payload: { Scorer: { Name: 'Me', Shortcut: 1, TeamNum: 0 } },
+      },
+    ];
+
+    expect(spatialEventPoints(value)).toEqual([
+      expect.objectContaining({
+        id: 'legacy-goal-touch:1',
+        isScoringTouch: true,
+        goalNumber: 1,
+        scoringTeamNumber: 0,
+        associatedPointId: undefined,
+      }),
+    ]);
+  });
+
+  it('projects goal markers onto the modeled goal mouth', () => {
+    const value = match(
+      'goal-position',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    const profile = arenaProfile(value);
+
+    expect(goalMarkerPosition(profile, { x: -1200, y: -5000, z: 900 })).toEqual(
+      {
+        x: profile.yMin,
+        y: profile.goal?.height,
+        z: -(profile.goal?.halfWidth ?? 0),
+      },
+    );
   });
 
   it('resolves stable mode-specific arena geometry', () => {

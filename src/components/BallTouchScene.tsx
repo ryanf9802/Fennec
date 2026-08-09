@@ -1,12 +1,19 @@
-import { Canvas, type ThreeEvent, useThree } from '@react-three/fiber';
-import { useEffect, useMemo } from 'react';
+import {
+  Canvas,
+  type ThreeEvent,
+  useFrame,
+  useThree,
+} from '@react-three/fiber';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   BufferGeometry,
   Color,
   DoubleSide,
   Float32BufferAttribute,
+  type Group,
   LineBasicMaterial,
   LineSegments,
+  type Mesh,
   Shape,
   Vector3,
 } from 'three';
@@ -15,6 +22,7 @@ import type { ArenaProfile } from '../domain/arenaProfiles';
 import {
   arenaWallPanels,
   gameToScene,
+  goalMarkerPosition,
   type TouchMapCameraState,
 } from '../domain/touchMapGeometry';
 
@@ -245,25 +253,146 @@ function ActiveGuide({ point }: { point: SpatialEventPoint }) {
   return <primitive object={object} />;
 }
 
-function Marker({
+function NeighborArrow({ direction }: { direction: 'left' | 'right' }) {
+  const group = useRef<Group>(null);
+  const { camera } = useThree();
+  const shape = useMemo(() => {
+    const side = direction === 'left' ? -1 : 1;
+    const next = new Shape();
+    next.moveTo(side * 0.72, 0);
+    next.lineTo(side * 0.12, 0.5);
+    next.lineTo(side * 0.12, 0.2);
+    next.lineTo(side * -0.68, 0.2);
+    next.lineTo(side * -0.68, -0.2);
+    next.lineTo(side * 0.12, -0.2);
+    next.lineTo(side * 0.12, -0.5);
+    next.closePath();
+    return next;
+  }, [direction]);
+  useFrame(() => group.current?.quaternion.copy(camera.quaternion));
+  return (
+    <group ref={group}>
+      <mesh renderOrder={20} scale={[260, 260, 260]}>
+        <shapeGeometry args={[shape]} />
+        <meshBasicMaterial
+          color="#07111f"
+          depthTest={false}
+          depthWrite={false}
+          side={DoubleSide}
+        />
+      </mesh>
+      <mesh renderOrder={21} scale={[190, 190, 190]}>
+        <shapeGeometry args={[shape]} />
+        <meshBasicMaterial
+          color="#f8fafc"
+          depthTest={false}
+          depthWrite={false}
+          side={DoubleSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function GoalDisc({ active, opacity }: { active: boolean; opacity: number }) {
+  const mesh = useRef<Mesh>(null);
+  const { camera } = useThree();
+  useFrame(() => mesh.current?.quaternion.copy(camera.quaternion));
+  return (
+    <mesh ref={mesh} renderOrder={4}>
+      <circleGeometry args={[active ? 145 : 110, 32]} />
+      <meshBasicMaterial
+        color="#facc15"
+        depthWrite={false}
+        opacity={opacity}
+        side={DoubleSide}
+        transparent
+      />
+    </mesh>
+  );
+}
+
+function FiftyMarker({
   point,
   active,
-  onActivate,
+  contextual,
+  opacity,
 }: {
   point: SpatialEventPoint;
   active: boolean;
+  contextual: boolean;
+  opacity: number;
+}) {
+  const radius = active || contextual ? 180 : 91.25;
+  const teams = [...new Set(point.actors.map((actor) => actor.teamNumber))]
+    .sort((first, second) => first - second)
+    .slice(0, 2);
+  const colors = [teamColor(teams[0] ?? 0), teamColor(teams[1] ?? 1)];
+  return (
+    <>
+      {colors.map((color, index) => (
+        <mesh key={`${index}:${color}`}>
+          <sphereGeometry args={[radius, 20, 14, index * Math.PI, Math.PI]} />
+          <meshStandardMaterial
+            color={new Color(color)}
+            depthWrite={opacity === 1}
+            emissive={active ? color : '#000000'}
+            emissiveIntensity={active ? 0.28 : 0}
+            opacity={opacity}
+            roughness={0.38}
+            transparent={opacity < 1}
+          />
+        </mesh>
+      ))}
+      {point.isScoringTouch && (
+        <mesh>
+          <octahedronGeometry args={[radius * 1.42, 0]} />
+          <meshBasicMaterial
+            color={teamColor(point.scoringTeamNumber ?? 0)}
+            depthWrite={false}
+            opacity={opacity}
+            transparent
+            wireframe
+          />
+        </mesh>
+      )}
+    </>
+  );
+}
+
+/**
+ * Chooses semantic geometry for one marker while keeping pointer behavior,
+ * fading, neighbor arrows, and active height guidance consistent.
+ */
+function Marker({
+  profile,
+  point,
+  active,
+  muted,
+  arrow,
+  onActivate,
+}: {
+  profile: ArenaProfile;
+  point: SpatialEventPoint;
+  active: boolean;
+  muted: boolean;
+  arrow?: 'left' | 'right';
   onActivate(id?: string): void;
 }) {
-  const position = gameToScene(point);
+  const position =
+    point.kind === 'goal'
+      ? goalMarkerPosition(profile, point)
+      : gameToScene(point);
   const team = point.actors[0]?.teamNumber;
-  const color = point.kind === 'goal' ? '#facc15' : teamColor(team ?? 0);
+  const color = teamColor(point.scoringTeamNumber ?? team ?? 0);
+  const opacity = muted ? 0.25 : 1;
   const activate = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
     onActivate(point.id);
   };
   return (
     <group>
-      <mesh
+      <group
         position={[position.x, position.y, position.z]}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={activate}
@@ -274,18 +403,44 @@ function Marker({
         }}
       >
         {point.kind === 'goal' ? (
-          <octahedronGeometry args={[active ? 150 : 115, 0]} />
+          <GoalDisc active={active} opacity={opacity} />
+        ) : point.kind === 'fifty' ? (
+          <FiftyMarker
+            active={active}
+            contextual={!!arrow}
+            opacity={opacity}
+            point={point}
+          />
+        ) : point.isScoringTouch ? (
+          <mesh>
+            <octahedronGeometry args={[active || arrow ? 190 : 115, 0]} />
+            <meshStandardMaterial
+              color={new Color(color)}
+              depthWrite={opacity === 1}
+              emissive={active ? color : '#000000'}
+              emissiveIntensity={active ? 0.28 : 0}
+              opacity={opacity}
+              roughness={0.38}
+              transparent={opacity < 1}
+            />
+          </mesh>
         ) : (
-          <sphereGeometry args={[active ? 125 : 91.25, 20, 14]} />
+          <mesh>
+            <sphereGeometry args={[active || arrow ? 180 : 91.25, 20, 14]} />
+            <meshStandardMaterial
+              color={new Color(color)}
+              depthWrite={opacity === 1}
+              emissive={active ? color : '#000000'}
+              emissiveIntensity={active ? 0.28 : 0}
+              opacity={opacity}
+              roughness={0.38}
+              transparent={opacity < 1}
+            />
+          </mesh>
         )}
-        <meshStandardMaterial
-          color={new Color(color)}
-          emissive={active ? color : '#000000'}
-          emissiveIntensity={active ? 0.28 : 0}
-          roughness={0.38}
-        />
-      </mesh>
-      {active && <ActiveGuide point={point} />}
+        {arrow && <NeighborArrow direction={arrow} />}
+      </group>
+      {active && point.kind !== 'goal' && <ActiveGuide point={point} />}
     </group>
   );
 }
@@ -295,6 +450,9 @@ function Scene({
   points,
   cameraState,
   activeId,
+  emphasizedIds,
+  previousId,
+  nextId,
   onActivate,
 }: BallTouchSceneProps) {
   return (
@@ -306,8 +464,17 @@ function Scene({
       {points.map((point) => (
         <Marker
           key={point.id}
+          profile={profile}
           point={point}
           active={point.id === activeId}
+          muted={!!activeId && !emphasizedIds.includes(point.id)}
+          arrow={
+            point.id === previousId
+              ? 'left'
+              : point.id === nextId
+                ? 'right'
+                : undefined
+          }
           onActivate={onActivate}
         />
       ))}
@@ -321,6 +488,9 @@ export interface BallTouchSceneProps {
   points: SpatialEventPoint[];
   cameraState: TouchMapCameraState;
   activeId?: string;
+  emphasizedIds: string[];
+  previousId?: string;
+  nextId?: string;
   onActivate(id?: string): void;
 }
 
