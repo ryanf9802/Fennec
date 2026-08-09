@@ -104,93 +104,93 @@ export function ProfilePage() {
             Choose a player to personalize your Fennec view.
           </p>
         )}
-        <div className="relative mt-5 max-w-2xl">
-          <Search className="text-muted pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <input
-            className="control control-with-leading-icon"
-            type="search"
-            role="combobox"
-            aria-label="Search players"
-            aria-autocomplete="list"
-            aria-controls="player-results"
-            aria-expanded={open && hasPlayers}
-            aria-activedescendant={
-              open && players[activeIndex]
-                ? `player-option-${activeIndex}`
-                : undefined
-            }
-            placeholder={
-              availablePlayersQuery.isLoading
-                ? 'Loading players…'
-                : hasPlayers
-                  ? 'Search players by display name'
-                  : 'Play a match to discover players'
-            }
-            disabled={!hasPlayers && !availablePlayersQuery.isLoading}
-            value={search}
-            onFocus={() => setOpen(true)}
-            onBlur={() => setOpen(false)}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setSelected('');
-              setActiveIndex(0);
-              setSaved(false);
-              setOpen(true);
-            }}
-            onKeyDown={(event) => {
-              if (!open || !players.length) return;
-              if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                setActiveIndex((value) =>
-                  Math.min(value + 1, players.length - 1),
-                );
-              } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                setActiveIndex((value) => Math.max(value - 1, 0));
-              } else if (event.key === 'Enter') {
-                event.preventDefault();
-                choose(players[activeIndex]!);
-              } else if (event.key === 'Escape') setOpen(false);
-            }}
-          />
-          {open && hasPlayers && (
-            <div
-              id="player-results"
-              role="listbox"
-              className="surface absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl p-1 shadow-2xl"
-            >
-              {players.length ? (
-                players.map((player, index) => (
-                  <button
-                    id={`player-option-${index}`}
-                    key={player.primaryId}
-                    type="button"
-                    role="option"
-                    aria-selected={selected === player.primaryId}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left ${index === activeIndex ? 'bg-cyan-400/12 text-fennec-cyan' : 'hover-surface'}`}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => choose(player)}
-                  >
-                    <span className="min-w-0 truncate font-bold">
-                      {player.displayName}
-                    </span>
-                    <span className="text-muted ml-3 text-xs">
-                      {player.primaryId.split('|')[0]}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <p className="text-muted px-3 py-4 text-sm">
-                  No players match “{search}”.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="mt-3 flex max-w-2xl justify-end">
+        <div className="mt-5 flex max-w-2xl items-start gap-3">
+          <div className="relative min-w-0 flex-1">
+            <Search className="text-muted pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <input
+              className="control control-with-leading-icon"
+              type="search"
+              role="combobox"
+              aria-label="Search players"
+              aria-autocomplete="list"
+              aria-controls="player-results"
+              aria-expanded={open && hasPlayers}
+              aria-activedescendant={
+                open && players[activeIndex]
+                  ? `player-option-${activeIndex}`
+                  : undefined
+              }
+              placeholder={
+                availablePlayersQuery.isLoading
+                  ? 'Loading players…'
+                  : hasPlayers
+                    ? 'Search players by display name'
+                    : 'Play a match to discover players'
+              }
+              disabled={!hasPlayers && !availablePlayersQuery.isLoading}
+              value={search}
+              onFocus={() => setOpen(true)}
+              onBlur={() => setOpen(false)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setSelected('');
+                setActiveIndex(0);
+                setSaved(false);
+                setOpen(true);
+              }}
+              onKeyDown={(event) => {
+                if (!open || !players.length) return;
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setActiveIndex((value) =>
+                    Math.min(value + 1, players.length - 1),
+                  );
+                } else if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setActiveIndex((value) => Math.max(value - 1, 0));
+                } else if (event.key === 'Enter') {
+                  event.preventDefault();
+                  choose(players[activeIndex]!);
+                } else if (event.key === 'Escape') setOpen(false);
+              }}
+            />
+            {open && hasPlayers && (
+              <div
+                id="player-results"
+                role="listbox"
+                className="surface absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl p-1 shadow-2xl"
+              >
+                {players.length ? (
+                  players.map((player, index) => (
+                    <button
+                      id={`player-option-${index}`}
+                      key={player.primaryId}
+                      type="button"
+                      role="option"
+                      aria-selected={selected === player.primaryId}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left ${index === activeIndex ? 'bg-cyan-400/12 text-fennec-cyan' : 'hover-surface'}`}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onClick={() => choose(player)}
+                    >
+                      <span className="min-w-0 truncate font-bold">
+                        {player.displayName}
+                      </span>
+                      <span className="text-muted ml-3 text-xs">
+                        {player.primaryId.split('|')[0]}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-muted px-3 py-4 text-sm">
+                    No players match “{search}”.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
           <button
-            className="button-primary"
+            className="button-primary shrink-0"
             disabled={!hasSelectionChange}
             onClick={saveSelection}
           >

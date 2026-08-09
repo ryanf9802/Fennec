@@ -628,6 +628,10 @@ test('profile player selection is searchable and explicit', async ({
   );
   const usePlayer = page.getByRole('button', { name: 'Use player' });
   await expect(usePlayer).toBeDisabled();
+  const searchBox = (await search.boundingBox())!;
+  const usePlayerBox = (await usePlayer.boundingBox())!;
+  expect(usePlayerBox.x).toBeGreaterThan(searchBox.x + searchBox.width);
+  expect(usePlayerBox.y).toBeCloseTo(searchBox.y, 0);
 
   await search.fill('Lu');
   await expect(page.getByRole('option', { name: /Luna/ })).toBeVisible();
