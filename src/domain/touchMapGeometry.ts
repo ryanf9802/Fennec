@@ -190,13 +190,10 @@ export function cameraDistanceBounds(profile: ArenaProfile): {
   return { min: extent * 0.64, default: extent * 1.28, max: extent * 1.4 };
 }
 
-export function defaultCameraState(
-  profile: ArenaProfile,
-  yaw = 0,
-): TouchMapCameraState {
+export function defaultCameraState(profile: ArenaProfile): TouchMapCameraState {
   return {
     pitch: 0,
-    yaw,
+    yaw: 0,
     targetX: 0,
     targetZ: 0,
     distance: cameraDistanceBounds(profile).default,
@@ -211,7 +208,7 @@ export function constrainCameraState(
   const distances = cameraDistanceBounds(profile);
   return {
     pitch: Math.max(0, Math.min(90, state.pitch)),
-    yaw: Math.max(0, Math.min(180, state.yaw)),
+    yaw: Math.max(-90, Math.min(90, state.yaw)),
     targetX: target.x,
     targetZ: target.z,
     distance: Math.max(distances.min, Math.min(distances.max, state.distance)),

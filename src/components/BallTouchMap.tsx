@@ -73,15 +73,6 @@ function isTouchMarker(point: SpatialEventPoint): boolean {
   return point.kind === 'touch' || point.kind === 'fifty';
 }
 
-function goalBadgePosition(teamNumber: number, yaw: number) {
-  const radians = (yaw * Math.PI) / 180;
-  const direction = teamNumber === 0 ? -1 : 1;
-  return {
-    left: `${50 + direction * Math.cos(radians) * 38}%`,
-    top: `${50 + direction * Math.sin(radians) * 35}%`,
-  };
-}
-
 function matchesFilter(
   point: SpatialEventPoint,
   filter: Filter,
@@ -155,7 +146,7 @@ export function BallTouchMap({
     touchPoints.some((point) =>
       point.actors.some((actor) => actor.primaryId === profileId),
     );
-  const defaultYaw = profilePlayer?.teamNumber === 1 ? 180 : 0;
+  const orientationYaw = profilePlayer?.teamNumber === 1 ? 180 : 0;
   const leftTeamNumber = profilePlayer?.teamNumber ?? 0;
   const rightTeamNumber = leftTeamNumber === 0 ? 1 : 0;
   const teamName = (teamNumber: number) =>
@@ -166,8 +157,26 @@ export function BallTouchMap({
   );
   const [active, setActive] = useState<string>();
   const arena = arenaProfile(match);
+  const goalLabels = arena.goal
+    ? [
+        {
+          teamNumber: leftTeamNumber,
+          label: profilePlayer
+            ? 'Your goal'
+            : `${teamName(leftTeamNumber)} goal`,
+          teamName: teamName(leftTeamNumber),
+        },
+        {
+          teamNumber: rightTeamNumber,
+          label: profilePlayer
+            ? 'Opponent goal'
+            : `${teamName(rightTeamNumber)} goal`,
+          teamName: teamName(rightTeamNumber),
+        },
+      ]
+    : [];
   const [camera, setCamera] = useState<TouchMapCameraState>(() =>
-    defaultCameraState(arena, defaultYaw),
+    defaultCameraState(arena),
   );
   const viewport = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number } | undefined>(undefined);
@@ -370,6 +379,8 @@ export function BallTouchMap({
             profile={arena}
             points={visible}
             cameraState={camera}
+            goalLabels={goalLabels}
+            orientationYaw={orientationYaw}
             activeId={active}
             emphasizedIds={[...emphasizedIds]}
             onActivate={setActive}
@@ -379,51 +390,6 @@ export function BallTouchMap({
         <div className="surface-strong text-muted pointer-events-none absolute left-3 top-3 rounded-lg px-3 py-2 text-xs shadow-xl">
           Left drag to pan · right drag to rotate · scroll or pinch to zoom
         </div>
-
-        {arena.goal && (
-          <>
-            <div
-              className="surface-strong pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs shadow-xl"
-              style={goalBadgePosition(leftTeamNumber, camera.yaw)}
-            >
-              <span className="font-bold">
-                {profilePlayer
-                  ? 'Your goal'
-                  : `${teamName(leftTeamNumber)} goal`}
-              </span>
-              <span
-                className={
-                  leftTeamNumber === 0
-                    ? 'text-fennec-cyan'
-                    : 'text-fennec-orange'
-                }
-              >
-                {' · '}
-                {teamName(leftTeamNumber)}
-              </span>
-            </div>
-            <div
-              className="surface-strong pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-right text-xs shadow-xl"
-              style={goalBadgePosition(rightTeamNumber, camera.yaw)}
-            >
-              <span className="font-bold">
-                {profilePlayer
-                  ? 'Opponent goal'
-                  : `${teamName(rightTeamNumber)} goal`}
-              </span>
-              <span
-                className={
-                  rightTeamNumber === 0
-                    ? 'text-fennec-cyan'
-                    : 'text-fennec-orange'
-                }
-              >
-                {' · '}
-                {teamName(rightTeamNumber)}
-              </span>
-            </div>
-          </>
-        )}
 
         <div
           className="absolute right-3 top-3 flex items-start drop-shadow-xl"
@@ -437,8 +403,8 @@ export function BallTouchMap({
               aria-label="Field rotation"
               aria-valuetext={`${Math.round(camera.yaw)} degrees`}
               type="range"
-              min="0"
-              max="180"
+              min="-90"
+              max="90"
               step="1"
               value={camera.yaw}
               onChange={(event) =>
@@ -456,7 +422,7 @@ export function BallTouchMap({
               aria-label="Reset 3D touch map view"
               title="Reset view"
               className="text-muted hover:text-fennec-cyan grid size-9 place-items-center rounded-lg transition"
-              onClick={() => setCamera(defaultCameraState(arena, defaultYaw))}
+              onClick={() => setCamera(defaultCameraState(arena))}
             >
               <RotateCcw className="size-4" />
             </button>

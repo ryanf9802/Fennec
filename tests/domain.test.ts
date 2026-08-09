@@ -1022,16 +1022,16 @@ describe('Stats API domain', () => {
         targetZ: 0,
         distance: Number.POSITIVE_INFINITY,
       }),
-    ).toMatchObject({ pitch: 90, yaw: 180, targetX: 5600, targetZ: 0 });
+    ).toMatchObject({ pitch: 90, yaw: 90, targetX: 5600, targetZ: 0 });
     const besideGoal = constrainCameraState(profile, {
       pitch: -20,
-      yaw: -40,
+      yaw: -140,
       targetX: 5800,
       targetZ: 3000,
       distance: 0,
     });
     expect(besideGoal.pitch).toBe(0);
-    expect(besideGoal.yaw).toBe(0);
+    expect(besideGoal.yaw).toBe(-90);
     expect(besideGoal.targetX).toBeLessThanOrEqual(5120);
     const distances = cameraDistanceBounds(profile);
     expect(besideGoal.distance).toBe(distances.min);

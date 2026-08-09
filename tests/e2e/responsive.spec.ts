@@ -144,8 +144,10 @@ test('3D touch map controls and preference persist across matches', async ({
   ).toBeVisible();
   await expect(page.getByText('● Blue touch')).toHaveCount(0);
   await expect(page.getByText('■ Blue goal')).toHaveCount(0);
-  await expect(viewport.getByText('Your goal')).toBeVisible();
-  await expect(viewport.getByText('Opponent goal')).toBeVisible();
+  await expect(
+    page.getByRole('img', { name: /Your goal Blue, Opponent goal Orange/i }),
+  ).toBeVisible();
+  await expect(viewport.getByText('Your goal')).toHaveCount(0);
 
   const goalPoint = page.getByRole('button', {
     name: /You · Goal #1 scored, at 2:00/,
@@ -163,18 +165,14 @@ test('3D touch map controls and preference persist across matches', async ({
 
   const pitch = page.getByRole('slider', { name: 'Field pitch' });
   const rotation = page.getByRole('slider', { name: 'Field rotation' });
-  const yourGoal = viewport.getByText('Your goal');
-  const opponentGoal = viewport.getByText('Opponent goal');
   await expect(pitch).toHaveValue('0');
   await expect(rotation).toHaveValue('0');
-  expect((await yourGoal.boundingBox())!.x).toBeLessThan(
-    (await opponentGoal.boundingBox())!.x,
-  );
-  await rotation.fill('180');
-  await expect(viewport).toHaveAttribute('data-camera-yaw', '180');
-  expect((await yourGoal.boundingBox())!.x).toBeGreaterThan(
-    (await opponentGoal.boundingBox())!.x,
-  );
+  await expect(rotation).toHaveAttribute('min', '-90');
+  await expect(rotation).toHaveAttribute('max', '90');
+  await rotation.fill('-90');
+  await expect(viewport).toHaveAttribute('data-camera-yaw', '-90');
+  await rotation.fill('90');
+  await expect(viewport).toHaveAttribute('data-camera-yaw', '90');
   await page.getByRole('button', { name: /reset 3d touch map view/i }).click();
   await expect(rotation).toHaveValue('0');
   await pitch.fill('45');

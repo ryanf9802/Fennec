@@ -7,13 +7,16 @@ import {
 import { useEffect, useMemo, useRef } from 'react';
 import {
   BufferGeometry,
+  CanvasTexture,
   Color,
   DoubleSide,
   Float32BufferAttribute,
   LineBasicMaterial,
   LineSegments,
+  LinearFilter,
   type Mesh,
   Shape,
+  SRGBColorSpace,
   Vector3,
 } from 'three';
 import type { SpatialEventPoint } from '../domain/analytics';
@@ -39,11 +42,17 @@ function litMarkerColor(color: string, opacity: number): Color {
   return result;
 }
 
-function CameraRig({ state }: { state: TouchMapCameraState }) {
+function CameraRig({
+  state,
+  orientationYaw,
+}: {
+  state: TouchMapCameraState;
+  orientationYaw: number;
+}) {
   const { camera, invalidate, size } = useThree();
   useEffect(() => {
     const pitch = (state.pitch * Math.PI) / 180;
-    const yaw = (state.yaw * Math.PI) / 180;
+    const yaw = ((orientationYaw + state.yaw) * Math.PI) / 180;
     const framedDistance =
       state.distance *
       Math.max(1, size.height / Math.max(1, size.width)) *
@@ -62,8 +71,76 @@ function CameraRig({ state }: { state: TouchMapCameraState }) {
     );
     camera.lookAt(target);
     invalidate();
-  }, [camera, invalidate, size, state]);
+  }, [camera, invalidate, orientationYaw, size, state]);
   return null;
+}
+
+export interface GoalLabel {
+  teamNumber: number;
+  label: string;
+  teamName: string;
+}
+
+function GoalLabelSprite({
+  goal,
+  position,
+}: {
+  goal: GoalLabel;
+  position: [number, number, number];
+}) {
+  const color = teamColor(goal.teamNumber);
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 160;
+    const context = canvas.getContext('2d');
+    if (!context) return new CanvasTexture(canvas);
+    const radius = 24;
+    context.beginPath();
+    context.moveTo(radius, 4);
+    context.lineTo(canvas.width - radius, 4);
+    context.quadraticCurveTo(canvas.width - 4, 4, canvas.width - 4, radius);
+    context.lineTo(canvas.width - 4, canvas.height - radius);
+    context.quadraticCurveTo(
+      canvas.width - 4,
+      canvas.height - 4,
+      canvas.width - radius,
+      canvas.height - 4,
+    );
+    context.lineTo(radius, canvas.height - 4);
+    context.quadraticCurveTo(4, canvas.height - 4, 4, canvas.height - radius);
+    context.lineTo(4, radius);
+    context.quadraticCurveTo(4, 4, radius, 4);
+    context.closePath();
+    context.fillStyle = 'rgba(7, 17, 31, 0.92)';
+    context.fill();
+    context.lineWidth = 6;
+    context.strokeStyle = color;
+    context.stroke();
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = '#f8fafc';
+    context.font = '800 42px "Segoe UI", sans-serif';
+    context.fillText(goal.label.toUpperCase(), canvas.width / 2, 57);
+    context.fillStyle = color;
+    context.font = '700 32px "Segoe UI", sans-serif';
+    context.fillText(goal.teamName.toUpperCase(), canvas.width / 2, 113);
+    const result = new CanvasTexture(canvas);
+    result.colorSpace = SRGBColorSpace;
+    result.minFilter = LinearFilter;
+    return result;
+  }, [color, goal.label, goal.teamName]);
+  useEffect(() => () => texture.dispose(), [texture]);
+  return (
+    <sprite position={position} renderOrder={30} scale={[2100, 650, 1]}>
+      <spriteMaterial
+        map={texture}
+        depthTest={false}
+        depthWrite={false}
+        transparent
+      />
+    </sprite>
+  );
 }
 
 function Floor({ profile }: { profile: ArenaProfile }) {
@@ -130,7 +207,13 @@ function WallPanel({
   );
 }
 
-function GoalTunnels({ profile }: { profile: ArenaProfile }) {
+function GoalTunnels({
+  profile,
+  labels,
+}: {
+  profile: ArenaProfile;
+  labels: GoalLabel[];
+}) {
   if (!profile.goal) return null;
   const { halfWidth, height, depth } = profile.goal;
   return (
@@ -140,6 +223,8 @@ function GoalTunnels({ profile }: { profile: ArenaProfile }) {
         const centerX = wallY + side * (depth / 2);
         const backX = wallY + side * depth;
         const color = teamColor(side < 0 ? 0 : 1);
+        const teamNumber = side < 0 ? 0 : 1;
+        const label = labels.find((value) => value.teamNumber === teamNumber);
         return (
           <group key={side}>
             <mesh position={[centerX, -8, 0]}>
@@ -189,6 +274,12 @@ function GoalTunnels({ profile }: { profile: ArenaProfile }) {
                 depthWrite={false}
               />
             </mesh>
+            {label && (
+              <GoalLabelSprite
+                goal={label}
+                position={[centerX, height + 650, 0]}
+              />
+            )}
           </group>
         );
       })}
@@ -221,14 +312,20 @@ function Hoops({ profile }: { profile: ArenaProfile }) {
   );
 }
 
-function Field({ profile }: { profile: ArenaProfile }) {
+function Field({
+  profile,
+  goalLabels,
+}: {
+  profile: ArenaProfile;
+  goalLabels: GoalLabel[];
+}) {
   return (
     <group>
       <Floor profile={profile} />
       {arenaWallPanels(profile).map((panel, index) => (
         <WallPanel key={index} {...panel} />
       ))}
-      <GoalTunnels profile={profile} />
+      <GoalTunnels labels={goalLabels} profile={profile} />
       <Hoops profile={profile} />
     </group>
   );
@@ -411,6 +508,8 @@ function Scene({
   profile,
   points,
   cameraState,
+  goalLabels,
+  orientationYaw,
   activeId,
   emphasizedIds,
   onActivate,
@@ -420,7 +519,7 @@ function Scene({
       <color attach="background" args={['#0d1726']} />
       <ambientLight intensity={1.35} />
       <directionalLight position={[-5000, 9000, 3500]} intensity={2.2} />
-      <Field profile={profile} />
+      <Field goalLabels={goalLabels} profile={profile} />
       {points.map((point) => (
         <Marker
           key={point.id}
@@ -431,7 +530,7 @@ function Scene({
           onActivate={onActivate}
         />
       ))}
-      <CameraRig state={cameraState} />
+      <CameraRig orientationYaw={orientationYaw} state={cameraState} />
     </>
   );
 }
@@ -440,16 +539,21 @@ export interface BallTouchSceneProps {
   profile: ArenaProfile;
   points: SpatialEventPoint[];
   cameraState: TouchMapCameraState;
+  goalLabels: GoalLabel[];
+  orientationYaw: number;
   activeId?: string;
   emphasizedIds: string[];
   onActivate(id?: string): void;
 }
 
 export function BallTouchScene(props: BallTouchSceneProps) {
+  const goalOrientation = props.goalLabels
+    .map((goal) => `${goal.label} ${goal.teamName}`)
+    .join(', ');
   return (
     <Canvas
       role="img"
-      aria-label={`${props.profile.label} 3D ball touch map`}
+      aria-label={`${props.profile.label} 3D ball touch map${goalOrientation ? `. ${goalOrientation}` : ''}`}
       frameloop="demand"
       dpr={[1, 1.5]}
       camera={{ fov: 42, near: 10, far: 100_000 }}

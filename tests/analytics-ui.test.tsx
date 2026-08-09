@@ -135,9 +135,12 @@ describe('ball touch map', () => {
     expect(screen.getByTestId('ball-touch-map-viewport')).toContainElement(
       hint,
     );
-    expect(screen.getByText('Your goal')).toBeInTheDocument();
-    expect(screen.getByText('Opponent goal')).toBeInTheDocument();
     expect(scene.props?.cameraState.yaw).toBe(0);
+    expect(scene.props?.orientationYaw).toBe(0);
+    expect(scene.props?.goalLabels).toEqual([
+      { teamNumber: 0, label: 'Your goal', teamName: 'Blue' },
+      { teamNumber: 1, label: 'Opponent goal', teamName: 'Orange' },
+    ]);
     for (const keyLabel of [
       '● Blue touch',
       '● Orange touch',
@@ -257,13 +260,12 @@ describe('ball touch map', () => {
       />,
     );
 
-    expect(scene.props?.cameraState.yaw).toBe(180);
-    expect(screen.getByText('Your goal').parentElement).toHaveTextContent(
-      'Your goal · Orange',
-    );
-    expect(screen.getByText('Opponent goal').parentElement).toHaveTextContent(
-      'Opponent goal · Blue',
-    );
+    expect(scene.props?.cameraState.yaw).toBe(0);
+    expect(scene.props?.orientationYaw).toBe(180);
+    expect(scene.props?.goalLabels).toEqual([
+      { teamNumber: 1, label: 'Your goal', teamName: 'Orange' },
+      { teamNumber: 0, label: 'Opponent goal', teamName: 'Blue' },
+    ]);
   });
 
   it('combines a scoring 50 and reveals its filtered goal association', () => {
