@@ -58,7 +58,7 @@ export default defineConfig({
       includeAssets: ['assets/brand/*.svg', 'icons/*.png'],
       manifest: {
         id: '/',
-        name: 'Fennec — Rocket League Stats',
+        name: 'Fennec',
         short_name: 'Fennec',
         description: 'A local-first Rocket League session dashboard.',
         start_url: '/',

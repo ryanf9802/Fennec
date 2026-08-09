@@ -398,6 +398,11 @@ test('settings show installation-relative Stats API instructions', async ({
   ).toBeVisible();
 });
 
+test('PWA identity uses only the Fennec name', async ({ page }) => {
+  await page.goto('/?demo=1');
+  await expect(page).toHaveTitle('Fennec');
+});
+
 test('setup starts with a centered route choice and expands after selection', async ({
   page,
 }) => {
