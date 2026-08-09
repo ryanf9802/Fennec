@@ -119,6 +119,80 @@ const match: MatchState = {
 };
 
 describe('ball touch map', () => {
+  it('uses extra-mode profiles and corrected goal locations', () => {
+    render(
+      <BallTouchMap
+        match={{
+          ...match,
+          playlistId: 6,
+          playlistName: 'Private Match',
+          playlistCategory: 'private',
+          arena: 'HoopsStadium_P',
+          events: [
+            ...match.events,
+            {
+              id: 'map:4',
+              matchId: 'map',
+              sequence: 4,
+              eventName: 'GoalScored',
+              receivedAt: '2026-08-08T00:04:00Z',
+              matchClockSeconds: 60,
+              elapsedSeconds: 240,
+              payload: {
+                MatchGuid: 'hoops-match',
+                Scorer: { Name: 'Me', Shortcut: 1, TeamNum: 0 },
+                GoalSpeed: 58.968,
+                GoalTime: 30,
+                ImpactLocation: { X: -2423, Y: 1013, Z: -219 },
+              },
+            },
+            {
+              id: 'map:5',
+              matchId: 'map',
+              sequence: 5,
+              eventName: 'GoalReplayStart',
+              receivedAt: '2026-08-08T00:04:00Z',
+              matchClockSeconds: 60,
+              elapsedSeconds: 240,
+              payload: { MatchGuid: 'hoops-match' },
+            },
+            {
+              id: 'map:6',
+              matchId: 'map',
+              sequence: 6,
+              eventName: 'GoalScored',
+              receivedAt: '2026-08-08T00:04:00Z',
+              matchClockSeconds: 60,
+              elapsedSeconds: 240,
+              payload: {
+                MatchGuid: 'hoops-match',
+                Scorer: { Name: '', Shortcut: 0, TeamNum: 0 },
+                GoalSpeed: 0,
+                GoalTime: 0,
+                ImpactLocation: { X: 462, Y: 2578, Z: 241 },
+              },
+            },
+          ],
+        }}
+        profileId="Steam|1|0"
+      />,
+    );
+
+    expect(scene.props?.profile).toMatchObject({
+      kind: 'hoops',
+      hoop: { centerY: 2969, height: 364, radius: 655, tubeRadius: 21 },
+    });
+    expect(
+      scene.props?.points.find((point) => point.kind === 'goal'),
+    ).toMatchObject({
+      id: 'map:4',
+      sourceEventIds: ['map:4', 'map:6'],
+      x: 462,
+      y: 2578,
+      z: 241,
+    });
+  });
+
   it('passes normalized custom team palettes into the 3D scene', () => {
     render(
       <BallTouchMap

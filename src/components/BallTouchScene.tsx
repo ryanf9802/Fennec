@@ -9,6 +9,7 @@ import {
   BufferGeometry,
   CanvasTexture,
   Color,
+  Curve,
   DoubleSide,
   Float32BufferAttribute,
   LineBasicMaterial,
@@ -20,16 +21,32 @@ import {
   Vector3,
 } from 'three';
 import type { SpatialEventPoint } from '../domain/analytics';
-import type { ArenaProfile } from '../domain/arenaProfiles';
+import type { ArenaHoop, ArenaProfile } from '../domain/arenaProfiles';
 import type { TeamPresentation } from '../domain/teamPresentation';
 import {
   arenaWallPanels,
   gameToScene,
   goalMarkerPosition,
+  hoopArcScenePoint,
   type TouchMapCameraState,
 } from '../domain/touchMapGeometry';
 
 const fieldColor = '#64748b';
+
+class HoopArcCurve extends Curve<Vector3> {
+  constructor(
+    private readonly hoop: ArenaHoop,
+    private readonly side: -1 | 1,
+  ) {
+    super();
+  }
+
+  getPoint(amount: number, target = new Vector3()): Vector3 {
+    const point = hoopArcScenePoint(this.hoop, this.side, amount);
+    return target.set(point.x, point.y, point.z);
+  }
+}
+
 function teamColor(
   teams: TeamPresentation[],
   teamNumber: number,
@@ -317,26 +334,44 @@ function Hoops({
   profile: ArenaProfile;
   teams: TeamPresentation[];
 }) {
-  if (profile.kind !== 'hoops') return null;
+  if (profile.kind !== 'hoops' || !profile.hoop) return null;
+  const { centerY, height, radius, tubeRadius } = profile.hoop;
   return (
     <>
       {([-1, 1] as const).map((side) => {
         const teamNumber = side < 0 ? 0 : 1;
         const primary = teamColor(teams, teamNumber);
         const secondary = teamColor(teams, teamNumber, 'secondaryColor');
+        const arc = new HoopArcCurve(profile.hoop!, side);
+        const railLength = profile.yMax - centerY;
+        const railCenterX = side * (centerY + railLength / 2);
         return (
-          <mesh
-            key={side}
-            position={[side * (profile.yMax - 180), 650, 0]}
-            rotation={[Math.PI / 2, 0, 0]}
-          >
-            <torusGeometry args={[360, 24, 12, 48]} />
-            <meshStandardMaterial
-              color={primary}
-              emissive={secondary}
-              emissiveIntensity={0.25}
-            />
-          </mesh>
+          <group key={side}>
+            <mesh>
+              <tubeGeometry args={[arc, 48, tubeRadius, 12, false]} />
+              <meshStandardMaterial
+                color={primary}
+                emissive={secondary}
+                emissiveIntensity={0.25}
+              />
+            </mesh>
+            {([-1, 1] as const).map((goalSide) => (
+              <mesh
+                key={goalSide}
+                position={[railCenterX, height, goalSide * radius]}
+                rotation={[0, 0, Math.PI / 2]}
+              >
+                <cylinderGeometry
+                  args={[tubeRadius, tubeRadius, railLength, 12]}
+                />
+                <meshStandardMaterial
+                  color={primary}
+                  emissive={secondary}
+                  emissiveIntensity={0.25}
+                />
+              </mesh>
+            ))}
+          </group>
         );
       })}
     </>
@@ -399,17 +434,24 @@ function GoalDisc({
   opacity,
   primary,
   secondary,
+  floorAligned,
 }: {
   active: boolean;
   opacity: number;
   primary: string;
   secondary: string;
+  floorAligned: boolean;
 }) {
   const group = useRef<Group>(null);
   const { camera } = useThree();
-  useFrame(() => group.current?.quaternion.copy(camera.quaternion));
+  useFrame(() => {
+    if (!floorAligned) group.current?.quaternion.copy(camera.quaternion);
+  });
   return (
-    <group ref={group}>
+    <group
+      ref={group}
+      rotation={floorAligned ? [-Math.PI / 2, 0, 0] : undefined}
+    >
       <mesh renderOrder={4}>
         <circleGeometry args={[active ? 145 : 110, 32]} />
         <meshBasicMaterial
@@ -547,6 +589,7 @@ function Marker({
             opacity={opacity}
             primary={primary}
             secondary={secondary}
+            floorAligned={profile.kind === 'dropshot'}
           />
         ) : point.kind === 'fifty' ? (
           <FiftyMarker

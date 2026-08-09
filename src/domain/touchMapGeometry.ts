@@ -1,5 +1,5 @@
 import type { SpatialEventPoint } from './analytics';
-import type { ArenaPoint, ArenaProfile } from './arenaProfiles';
+import type { ArenaHoop, ArenaPoint, ArenaProfile } from './arenaProfiles';
 
 export interface ScenePoint {
   x: number;
@@ -42,10 +42,27 @@ export function gameToScene(
   return { x: point.y, y: point.z, z: point.x };
 }
 
+export function hoopArcScenePoint(
+  hoop: ArenaHoop,
+  side: -1 | 1,
+  amount: number,
+): ScenePoint {
+  const angle = Math.PI * (1 - amount);
+  return {
+    x: side * hoop.centerY - side * hoop.radius * Math.sin(angle),
+    y: hoop.height,
+    z: hoop.radius * Math.cos(angle),
+  };
+}
+
 export function goalMarkerPosition(
   profile: ArenaProfile,
   point: Pick<SpatialEventPoint, 'x' | 'y' | 'z'>,
 ): ScenePoint {
+  if (profile.kind === 'dropshot') {
+    const position = gameToScene(point);
+    return { ...position, y: 12 };
+  }
   if (!profile.goal) return gameToScene(point);
   const wallY = point.y < 0 ? profile.yMin : profile.yMax;
   return {

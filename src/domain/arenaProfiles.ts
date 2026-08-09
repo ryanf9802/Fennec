@@ -9,6 +9,13 @@ export interface ArenaGoal {
   depth: number;
 }
 
+export interface ArenaHoop {
+  centerY: number;
+  height: number;
+  radius: number;
+  tubeRadius: number;
+}
+
 export interface ArenaProfile {
   kind: ArenaProfileKind;
   label: string;
@@ -19,6 +26,7 @@ export interface ArenaProfile {
   zMax: number;
   footprint: readonly ArenaPoint[];
   goal?: ArenaGoal;
+  hoop?: ArenaHoop;
 }
 
 const soccarFootprint: readonly ArenaPoint[] = [
@@ -32,28 +40,11 @@ const soccarFootprint: readonly ArenaPoint[] = [
   [-4096, -3968],
 ];
 
-const roundedFootprint = (
-  xExtent: number,
-  yExtent: number,
-  radius: number,
-): readonly ArenaPoint[] => {
-  const points: ArenaPoint[] = [];
-  for (const [cx, cy, start] of [
-    [xExtent - radius, yExtent - radius, 0],
-    [-xExtent + radius, yExtent - radius, 90],
-    [-xExtent + radius, -yExtent + radius, 180],
-    [xExtent - radius, -yExtent + radius, 270],
-  ] as const) {
-    for (let step = 0; step <= 4; step++) {
-      const angle = ((start + step * 22.5) * Math.PI) / 180;
-      points.push([
-        cx + Math.cos(angle) * radius,
-        cy + Math.sin(angle) * radius,
-      ]);
-    }
-  }
-  return points;
-};
+const hoopsSideWall = 2966.67;
+const hoopsBackWall = 3581;
+const hoopsDiagonalIntercept = 5782;
+const hoopsBackCornerX = hoopsDiagonalIntercept - hoopsBackWall;
+const hoopsSideCornerY = hoopsDiagonalIntercept - hoopsSideWall;
 
 const profiles: Record<ArenaProfileKind, ArenaProfile> = {
   soccar: {
@@ -70,28 +61,38 @@ const profiles: Record<ArenaProfileKind, ArenaProfile> = {
   hoops: {
     kind: 'hoops',
     label: 'Hoops',
-    xMin: -2967,
-    xMax: 2967,
-    yMin: -3581,
-    yMax: 3581,
+    xMin: -hoopsSideWall,
+    xMax: hoopsSideWall,
+    yMin: -hoopsBackWall,
+    yMax: hoopsBackWall,
     zMax: 1820,
-    footprint: roundedFootprint(2967, 3581, 720),
+    footprint: [
+      [-hoopsBackCornerX, -hoopsBackWall],
+      [hoopsBackCornerX, -hoopsBackWall],
+      [hoopsSideWall, -hoopsSideCornerY],
+      [hoopsSideWall, hoopsSideCornerY],
+      [hoopsBackCornerX, hoopsBackWall],
+      [-hoopsBackCornerX, hoopsBackWall],
+      [-hoopsSideWall, hoopsSideCornerY],
+      [-hoopsSideWall, -hoopsSideCornerY],
+    ],
+    hoop: { centerY: 2969, height: 364, radius: 655, tubeRadius: 21 },
   },
   dropshot: {
     kind: 'dropshot',
     label: 'Dropshot',
-    xMin: -4555,
-    xMax: 4555,
-    yMin: -5026,
-    yMax: 5026,
+    xMin: -5026,
+    xMax: 5026,
+    yMin: -4555,
+    yMax: 4555,
     zMax: 1986,
     footprint: [
-      [-4555, -2513],
-      [0, -5026],
-      [4555, -2513],
-      [4555, 2513],
-      [0, 5026],
-      [-4555, 2513],
+      [-2513, -4555],
+      [2513, -4555],
+      [5026, 0],
+      [2513, 4555],
+      [-2513, 4555],
+      [-5026, 0],
     ],
   },
   generic: {
@@ -117,7 +118,12 @@ function profileKind(match: MatchState): ArenaProfileKind {
   if (soccarPlaylists.has(match.playlistId)) return 'soccar';
   const arena = match.arena.toLowerCase();
   if (arena.includes('hoop') || arena.includes('basket')) return 'hoops';
-  if (arena.includes('drop')) return 'dropshot';
+  if (
+    arena.includes('drop') ||
+    arena.includes('shattershot') ||
+    arena.includes('core707')
+  )
+    return 'dropshot';
   return 'generic';
 }
 

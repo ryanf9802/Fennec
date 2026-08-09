@@ -61,6 +61,26 @@ function isScoredGoal(event: TimelineEvent): boolean {
   );
 }
 
+function sameMatchGuid(first: TimelineEvent, second: TimelineEvent): boolean {
+  const firstGuid = first.payload.MatchGuid;
+  const secondGuid = second.payload.MatchGuid;
+  return (
+    typeof firstGuid !== 'string' ||
+    typeof secondGuid !== 'string' ||
+    firstGuid === secondGuid
+  );
+}
+
+function isGoalLocationCompanion(event: TimelineEvent): boolean {
+  const scorer = record(event.payload.Scorer);
+  return (
+    event.eventName === 'GoalScored' &&
+    finite(event.payload.GoalSpeed) === 0 &&
+    finite(event.payload.GoalTime) === 0 &&
+    scorer?.Name === ''
+  );
+}
+
 function vector(
   value: unknown,
 ): { x: number; y: number; z: number } | undefined {
@@ -139,6 +159,7 @@ function eventPoint(
   match: MatchState,
   event: TimelineEvent,
   goalNumber?: number,
+  goalLocationEvent?: TimelineEvent,
 ): SpatialEventPoint | undefined {
   if (event.eventName === 'BallHit') {
     const ball = record(event.payload.Ball);
@@ -163,14 +184,18 @@ function eventPoint(
   }
   if (event.eventName === 'GoalScored') {
     if (!isScoredGoal(event)) return undefined;
-    const location = vector(event.payload.ImpactLocation);
+    const location = vector(
+      (goalLocationEvent ?? event).payload.ImpactLocation,
+    );
     if (!location) return undefined;
     const scorer = actor(match, event.payload.Scorer);
     return {
       id: event.id,
       kind: 'goal',
       sequence: event.sequence,
-      sourceEventIds: [event.id],
+      sourceEventIds: goalLocationEvent
+        ? [event.id, goalLocationEvent.id]
+        : [event.id],
       goalNumber,
       ...location,
       elapsedSeconds: event.elapsedSeconds ?? event.matchClockSeconds,
@@ -197,6 +222,32 @@ function eventPoint(
   return undefined;
 }
 
+/**
+ * The Stats API can emit a scored-goal record with stale coordinates followed
+ * by a zeroed companion record containing the actual impact location.
+ */
+function goalLocationEvents(match: MatchState): Map<string, TimelineEvent> {
+  const events = [...match.events].sort(
+    (first, second) => first.sequence - second.sequence,
+  );
+  const result = new Map<string, TimelineEvent>();
+  for (const event of events) {
+    if (!isScoredGoal(event)) continue;
+    const companion = events.find(
+      (candidate) =>
+        candidate.sequence > event.sequence &&
+        candidate.sequence - event.sequence <= 4 &&
+        event.matchClockSeconds !== undefined &&
+        candidate.matchClockSeconds === event.matchClockSeconds &&
+        isGoalLocationCompanion(candidate) &&
+        sameMatchGuid(event, candidate) &&
+        !!vector(candidate.payload.ImpactLocation),
+    );
+    if (companion) result.set(event.id, companion);
+  }
+  return result;
+}
+
 function goalNumbers(match: MatchState): Map<string, number> {
   return new Map(
     match.events
@@ -208,8 +259,11 @@ function goalNumbers(match: MatchState): Map<string, number> {
 
 function rawSpatialEventPoints(match: MatchState): SpatialEventPoint[] {
   const numbers = goalNumbers(match);
+  const locations = goalLocationEvents(match);
   return match.events
-    .map((event) => eventPoint(match, event, numbers.get(event.id)))
+    .map((event) =>
+      eventPoint(match, event, numbers.get(event.id), locations.get(event.id)),
+    )
     .filter((value): value is SpatialEventPoint => !!value);
 }
 

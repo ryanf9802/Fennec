@@ -23,6 +23,7 @@ import {
   constrainCameraState,
   gameToScene,
   goalMarkerPosition,
+  hoopArcScenePoint,
   viewRelativePanDelta,
 } from '../src/domain/touchMapGeometry';
 import { derivedFiftyFacts } from '../src/domain/passes';
@@ -956,6 +957,88 @@ describe('Stats API domain', () => {
     ]);
   });
 
+  it('uses the zeroed goal companion as the actual goal location', () => {
+    const value = match(
+      'companion-goal-location',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.participants = [{ ...player('Me', 'Steam|1|0', 0), shortcut: 1 }];
+    value.events = [
+      {
+        id: 'companion-goal-location:1',
+        matchId: value.id,
+        sequence: 1,
+        eventName: 'BallHit',
+        receivedAt: value.startedAt,
+        matchClockSeconds: 43,
+        payload: {
+          MatchGuid: 'match-guid',
+          Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+          Ball: { Location: { X: -3400, Y: -900, Z: 300 } },
+        },
+      },
+      {
+        id: 'companion-goal-location:2',
+        matchId: value.id,
+        sequence: 2,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        matchClockSeconds: 43,
+        payload: {
+          MatchGuid: 'match-guid',
+          Scorer: { Name: 'Me', Shortcut: 1, TeamNum: 0 },
+          GoalSpeed: 52.74,
+          GoalTime: 50,
+          ImpactLocation: { X: 462, Y: 2578, Z: 241 },
+        },
+      },
+      {
+        id: 'companion-goal-location:3',
+        matchId: value.id,
+        sequence: 3,
+        eventName: 'GoalReplayStart',
+        receivedAt: value.startedAt,
+        matchClockSeconds: 43,
+        payload: { MatchGuid: 'match-guid' },
+      },
+      {
+        id: 'companion-goal-location:4',
+        matchId: value.id,
+        sequence: 4,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        matchClockSeconds: 43,
+        payload: {
+          MatchGuid: 'match-guid',
+          Scorer: { Name: '', Shortcut: 0, TeamNum: 0 },
+          GoalSpeed: 0,
+          GoalTime: 0,
+          ImpactLocation: { X: -262, Y: -2695, Z: 265 },
+        },
+      },
+    ];
+
+    const points = spatialEventPoints(value);
+    expect(points.find((point) => point.kind === 'goal')).toMatchObject({
+      id: 'companion-goal-location:2',
+      sourceEventIds: [
+        'companion-goal-location:2',
+        'companion-goal-location:4',
+      ],
+      x: -262,
+      y: -2695,
+      z: 265,
+      speed: 52.74,
+      actors: [expect.objectContaining({ name: 'Me' })],
+    });
+    expect(points.find((point) => point.kind === 'touch')).toMatchObject({
+      id: 'companion-goal-location:1',
+      isScoringTouch: true,
+      associatedPointId: 'companion-goal-location:2',
+    });
+  });
+
   it('projects goal markers onto the modeled goal mouth', () => {
     const value = match(
       'goal-position',
@@ -980,9 +1063,56 @@ describe('Stats API domain', () => {
       '2026-08-08T00:05:00Z',
     );
     value.playlistId = 27;
-    expect(arenaProfile(value).kind).toBe('hoops');
+    const hoops = arenaProfile(value);
+    expect(hoops).toMatchObject({
+      kind: 'hoops',
+      xMin: -2966.67,
+      xMax: 2966.67,
+      yMin: -3581,
+      yMax: 3581,
+      hoop: { centerY: 2969, height: 364, radius: 655, tubeRadius: 21 },
+    });
+    expect(hoops.footprint).toContainEqual([2201, -3581]);
+    expect(hoopArcScenePoint(hoops.hoop!, 1, 0)).toEqual({
+      x: 2969,
+      y: 364,
+      z: -655,
+    });
+    expect(hoopArcScenePoint(hoops.hoop!, 1, 0.5)).toEqual({
+      x: 2314,
+      y: 364,
+      z: expect.closeTo(0),
+    });
+    expect(hoopArcScenePoint(hoops.hoop!, 1, 1)).toEqual({
+      x: 2969,
+      y: 364,
+      z: 655,
+    });
     value.playlistId = 29;
+    const dropshot = arenaProfile(value);
+    expect(dropshot).toMatchObject({
+      kind: 'dropshot',
+      xMin: -5026,
+      xMax: 5026,
+      yMin: -4555,
+      yMax: 4555,
+    });
+    expect(dropshot.footprint).toEqual([
+      [-2513, -4555],
+      [2513, -4555],
+      [5026, 0],
+      [2513, 4555],
+      [-2513, 4555],
+      [-5026, 0],
+    ]);
+    expect(
+      goalMarkerPosition(dropshot, { x: -2423, y: 1013, z: -219 }),
+    ).toEqual({ x: 1013, y: 12, z: -2423 });
+    value.playlistId = 6;
+    value.arena = 'ShatterShot_P';
     expect(arenaProfile(value).kind).toBe('dropshot');
+    value.arena = 'HoopsStadium_P';
+    expect(arenaProfile(value).kind).toBe('hoops');
     value.playlistId = 11;
     const profile = arenaProfile(value);
     expect(profile).toMatchObject({
