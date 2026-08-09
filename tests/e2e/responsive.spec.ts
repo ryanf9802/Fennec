@@ -487,6 +487,36 @@ test('PWA identity uses only the Fennec name', async ({ page }) => {
   await expect(page).toHaveTitle('Fennec');
 });
 
+test('fresh launches are cinematic while refreshes use a minimal handoff', async ({
+  page,
+}) => {
+  await page.goto('/?demo=1', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance',
+    'cinematic',
+  );
+  await expect(
+    page.getByRole('heading', { name: 'Game timeline' }),
+  ).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance',
+    'minimal',
+  );
+  await expect(
+    page.getByRole('heading', { name: 'Game timeline' }),
+  ).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+});
+
 test('setup starts with a centered route choice and expands after selection', async ({
   page,
 }) => {

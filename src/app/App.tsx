@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Navigate,
   Route,
@@ -7,6 +7,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { AppEntrance } from '../components/AppEntrance';
 import { LocalAccessModal } from '../components/LocalAccessModal';
 import { GamesPage } from '../pages/GamesPage';
 import { MatchPage } from '../pages/MatchPage';
@@ -17,6 +18,7 @@ import { PwaLifecycle } from '../pwa/PwaLifecycle';
 import { ProfilePage } from '../pages/ProfilePage';
 import { SessionPage } from '../pages/SessionPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { resolveAppEntranceMode } from './appEntranceMode';
 import { useFennec } from './FennecContext';
 import { matchBelongsToProfile } from '../domain/profileScope';
 
@@ -30,6 +32,7 @@ export function App() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const opened = useRef<string | undefined>(undefined);
+  const [entranceMode] = useState(resolveAppEntranceMode);
   useEffect(() => {
     if (
       settings.autoOpenLiveMatch &&
@@ -58,18 +61,8 @@ export function App() {
         </section>
       </div>
     );
-  if (!ready)
-    return (
-      <div className="app-backdrop flex min-h-screen items-center justify-center">
-        <img
-          src="/assets/brand/fennec-a-mark-primary.svg"
-          alt=""
-          className="size-16 animate-pulse"
-        />
-      </div>
-    );
   return (
-    <>
+    <AppEntrance mode={entranceMode} ready={ready}>
       <LiveWakeLock />
       <PwaLifecycle />
       <AppShell>
@@ -98,6 +91,6 @@ export function App() {
         </Routes>
       </AppShell>
       {!localAccess.satisfied && pathname !== '/setup' && <LocalAccessModal />}
-    </>
+    </AppEntrance>
   );
 }

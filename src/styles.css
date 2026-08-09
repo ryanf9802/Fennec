@@ -109,6 +109,68 @@ textarea:focus-visible {
     ),
     var(--background);
 }
+.app-entrance-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+}
+.app-entrance-mark {
+  position: relative;
+  z-index: 1;
+  width: 4rem;
+  height: 4rem;
+  animation: app-entrance-breathe 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 1rem rgba(101, 217, 238, 0.18));
+  will-change: transform, opacity, filter;
+}
+.app-entrance-bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9rem;
+  height: 9rem;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    rgba(101, 217, 238, 0.42) 0%,
+    rgba(54, 215, 255, 0.14) 34%,
+    rgba(255, 138, 61, 0.1) 52%,
+    transparent 72%
+  );
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.25);
+  will-change: transform, opacity;
+}
+.app-entrance-overlay--cinematic {
+  animation: app-entrance-cinematic-overlay 720ms
+    cubic-bezier(0.22, 0.72, 0.18, 1) forwards;
+}
+.app-entrance-overlay--cinematic .app-entrance-mark {
+  animation: app-entrance-cinematic-mark 720ms cubic-bezier(0.22, 0.72, 0.18, 1)
+    forwards;
+}
+.app-entrance-overlay--cinematic .app-entrance-bloom {
+  animation: app-entrance-cinematic-bloom 720ms
+    cubic-bezier(0.22, 0.72, 0.18, 1) forwards;
+}
+.app-entrance-content--cinematic {
+  animation: app-entrance-cinematic-content 720ms
+    cubic-bezier(0.22, 0.72, 0.18, 1) both;
+  transform-origin: center;
+}
+.app-entrance-overlay--minimal {
+  animation: app-entrance-minimal-overlay 140ms ease-out forwards;
+}
+.app-entrance-overlay--minimal .app-entrance-mark {
+  animation: none;
+}
+.app-entrance-content--minimal {
+  animation: app-entrance-minimal-content 140ms ease-out both;
+}
 .surface {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -293,6 +355,89 @@ textarea:focus-visible {
     box-shadow: 0 0 0 0 rgba(54, 215, 255, 0);
   }
 }
+@keyframes app-entrance-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+@keyframes app-entrance-cinematic-overlay {
+  0%,
+  34% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes app-entrance-cinematic-mark {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  18% {
+    transform: scale(0.92);
+    filter: drop-shadow(0 0 0.8rem rgba(101, 217, 238, 0.25));
+  }
+  48% {
+    transform: scale(1.16);
+    opacity: 1;
+    filter: brightness(1.18) drop-shadow(0 0 1.6rem rgba(101, 217, 238, 0.62))
+      drop-shadow(0 0 0.7rem rgba(255, 138, 61, 0.28));
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+    filter: blur(4px) brightness(1.3)
+      drop-shadow(0 0 2rem rgba(101, 217, 238, 0.48));
+  }
+}
+@keyframes app-entrance-cinematic-bloom {
+  0%,
+  12% {
+    transform: translate(-50%, -50%) scale(0.25);
+    opacity: 0;
+  }
+  52% {
+    transform: translate(-50%, -50%) scale(2.1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(7);
+    opacity: 0;
+  }
+}
+@keyframes app-entrance-cinematic-content {
+  0%,
+  28% {
+    transform: scale(0.992);
+    opacity: 0.32;
+    filter: blur(6px);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@keyframes app-entrance-minimal-overlay {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes app-entrance-minimal-content {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 1;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -301,5 +446,8 @@ textarea:focus-visible {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+  .app-entrance-bloom {
+    display: none;
   }
 }
