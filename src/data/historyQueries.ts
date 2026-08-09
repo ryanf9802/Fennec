@@ -19,6 +19,18 @@ export const historyKeys = {
     playerKey?: string,
     filters?: Omit<MatchHistoryQuery, 'profileKey' | 'playerKey' | 'cursor'>,
   ) => ['history', 'player', profileKey, playerKey, filters] as const,
+  playerHistoryAvailability: (
+    profileKey?: string,
+    playerKeys: string[] = [],
+    excludingMatchId?: string,
+  ) =>
+    [
+      'history',
+      'player-availability',
+      profileKey,
+      [...playerKeys].sort(),
+      excludingMatchId,
+    ] as const,
   overview: ['history', 'overview'] as const,
   catalog: ['history', 'catalog'] as const,
   storage: ['history', 'storage'] as const,
@@ -85,6 +97,27 @@ export function usePlayerHistory(
       }),
     getNextPageParam: (page) => page.matches.nextCursor,
     enabled: !!profileKey && !!playerKey && profileKey !== playerKey,
+  });
+}
+
+export function usePlayerHistoryAvailability(
+  profileKey?: string,
+  playerKeys: string[] = [],
+  excludingMatchId?: string,
+) {
+  return useQuery({
+    queryKey: historyKeys.playerHistoryAvailability(
+      profileKey,
+      playerKeys,
+      excludingMatchId,
+    ),
+    queryFn: () =>
+      historyRepository.listPlayerKeysWithHistory(
+        profileKey!,
+        playerKeys,
+        excludingMatchId!,
+      ),
+    enabled: !!profileKey && !!excludingMatchId && playerKeys.length > 0,
   });
 }
 

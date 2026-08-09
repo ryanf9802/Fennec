@@ -74,6 +74,12 @@ export interface HistoryRepository {
     playerKey: string,
     query?: Omit<MatchHistoryQuery, 'profileKey' | 'playerKey'>,
   ): Promise<PlayerHistoryResult>;
+  /** Finds players with a profile-relative match other than the excluded one. */
+  listPlayerKeysWithHistory(
+    profileKey: string,
+    playerKeys: string[],
+    excludingMatchId: string,
+  ): Promise<string[]>;
   getTimelineCatalog(): Promise<Record<string, string[]>>;
   iterateMatches(pageSize?: number): AsyncIterable<MatchState>;
   saveMatch(match: MatchState, sessionGapMinutes: number): Promise<void>;

@@ -245,6 +245,44 @@ describe('IndexedDB storage', () => {
     expect(second.matches.nextCursor).toBeUndefined();
   });
 
+  it('finds player history only when another shared match exists', async () => {
+    const first = playedMatch('first', '2026-08-01T00:00:00Z', true, true);
+    await saveMatch(first);
+
+    expect(
+      await historyRepository.listPlayerKeysWithHistory(
+        'id:Steam|you|0',
+        ['id:Epic|other|0'],
+        first.id,
+      ),
+    ).toEqual([]);
+
+    const live = playedMatch('live', '2026-08-02T00:00:00Z', false, false);
+    live.lifecycle = 'live';
+    delete live.endedAt;
+    await saveMatch(live);
+    expect(
+      await historyRepository.listPlayerKeysWithHistory(
+        'id:Steam|you|0',
+        ['id:Epic|other|0'],
+        live.id,
+      ),
+    ).toEqual(['id:Epic|other|0']);
+
+    await saveMatch({
+      ...live,
+      lifecycle: 'completed',
+      endedAt: live.lastEventAt,
+    });
+    expect(
+      await historyRepository.listPlayerKeysWithHistory(
+        'id:Steam|you|0',
+        ['id:Epic|other|0'],
+        live.id,
+      ),
+    ).toEqual(['id:Epic|other|0']);
+  });
+
   it('deletes a match and repairs every affected history projection', async () => {
     await saveSettings({ ...defaultSettings, sessionGapMinutes: 30 });
     await saveProfile({ primaryId: 'Steam|you|0', displayName: 'You' });
@@ -364,6 +402,13 @@ describe('IndexedDB storage', () => {
       'bot-two',
       'bot-one',
     ]);
+    expect(
+      await historyRepository.listPlayerKeysWithHistory(
+        'id:Steam|you|0',
+        ['name:boomer'],
+        second.id,
+      ),
+    ).toEqual(['name:boomer']);
     expect(
       (await historyRepository.getMatch('bot-one'))?.participants.filter(
         (item) => item.name === 'Boomer',

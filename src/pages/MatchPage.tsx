@@ -21,7 +21,7 @@ import {
   type TeamPresentation,
 } from '../domain/teamPresentation';
 import type { MatchState, ParticipantState } from '../domain/types';
-import { useMatch } from '../data/historyQueries';
+import { useMatch, usePlayerHistoryAvailability } from '../data/historyQueries';
 
 const stats: Array<{
   key: keyof ParticipantState;
@@ -43,16 +43,18 @@ function PlayerRow({
   player,
   team,
   profileId,
+  hasHistory,
   onInspect,
 }: {
   player: ParticipantState;
   team: TeamPresentation;
   profileId?: string;
+  hasHistory: boolean;
   onInspect(playerKey: string, playerName: string): void;
 }) {
   const playerKey = playerKeyFor(player);
   const inspectable =
-    !!playerKey && playerKey !== playerKeyForPrimaryId(profileId);
+    hasHistory && !!playerKey && playerKey !== playerKeyForPrimaryId(profileId);
   const bot = playerIdentityKind(playerKey) === 'name';
   const profileLabel = `View profile for ${player.name}${player.isPresent === false ? ' (no longer in match)' : ''}`;
   return (
@@ -200,6 +202,16 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
   const [deleteError, setDeleteError] = useState<string>();
   const matchQuery = useMatch(supplied ? undefined : matchId);
   const match = supplied ?? matchQuery.data;
+  const profileKey = playerKeyForPrimaryId(profile?.primaryId);
+  const scoreboardPlayerKeys = (match?.participants ?? [])
+    .map(playerKeyFor)
+    .filter((playerKey): playerKey is string => !!playerKey);
+  const historyAvailabilityQuery = usePlayerHistoryAvailability(
+    profileKey,
+    scoreboardPlayerKeys,
+    match?.id,
+  );
+  const playersWithHistory = new Set(historyAvailabilityQuery.data ?? []);
   if (!supplied && matchQuery.isLoading)
     return <div className="surface rounded-3xl p-8">Loading match…</div>;
   if (!supplied && matchQuery.isError)
@@ -358,6 +370,9 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
                           player.teamNumber,
                         )}
                         profileId={profile?.primaryId}
+                        hasHistory={playersWithHistory.has(
+                          playerKeyFor(player) ?? '',
+                        )}
                         onInspect={(key, name) =>
                           setProfilePlayer({ key, name })
                         }

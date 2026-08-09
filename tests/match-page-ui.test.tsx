@@ -24,6 +24,7 @@ vi.mock('../src/app/FennecContext', () => ({
 }));
 vi.mock('../src/data/historyQueries', () => ({
   useMatch: () => mocks.matchQuery,
+  usePlayerHistoryAvailability: () => ({ data: [] }),
 }));
 vi.mock('../src/components/MatchAnalytics', () => ({
   MatchAnalytics: () => null,

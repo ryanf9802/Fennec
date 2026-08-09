@@ -1558,6 +1558,31 @@ export const historyRepository: HistoryRepository = {
       matches: await listPlayerMatches({ ...query, profileKey, playerKey }),
     };
   },
+  async listPlayerKeysWithHistory(profileKey, playerKeys, excludingMatchId) {
+    const candidates = [...new Set(playerKeys)].filter(
+      (playerKey) => playerKey !== profileKey,
+    );
+    if (!candidates.length) return [];
+    const pairs = candidates.map((playerKey): [string, string] =>
+      profileKey.localeCompare(playerKey) <= 0
+        ? [profileKey, playerKey]
+        : [playerKey, profileKey],
+    );
+    return db.transaction('r', db.relationships, db.pairs, async () => {
+      const [relationships, excludedPairs] = await Promise.all([
+        db.relationships.bulkGet(pairs.map(([a, b]) => `${a}\u0000${b}`)),
+        db.pairs.bulkGet(
+          pairs.map(([a, b]) => `${a}\u0000${b}\u0000${excludingMatchId}`),
+        ),
+      ]);
+      return candidates.filter((_, index) => {
+        const relationship = relationships[index];
+        if (!relationship) return false;
+        const meetings = relationship.gamesTogether + relationship.gamesOpposed;
+        return meetings - (excludedPairs[index] ? 1 : 0) > 0;
+      });
+    });
+  },
   async getTimelineCatalog() {
     return ((await db.metadata.get('eventCatalog'))?.value ?? {}) as Record<
       string,

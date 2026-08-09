@@ -62,6 +62,21 @@ const botMatch: MatchState = {
       demos: 0,
       isPresent: false,
     },
+    {
+      name: 'Solo',
+      primaryId: 'Epic|solo|0',
+      shortcut: 3,
+      teamNumber: 1,
+      score: 25,
+      goals: 0,
+      assists: 0,
+      passes: 0,
+      fifties: 0,
+      saves: 0,
+      shots: 0,
+      touches: 2,
+      demos: 0,
+    },
   ],
   events: [],
 };
@@ -97,6 +112,7 @@ vi.mock('../src/data/historyQueries', () => ({
     isFetchingNextPage: false,
     fetchNextPage: vi.fn(),
   }),
+  usePlayerHistoryAvailability: () => ({ data: ['name:boomer'] }),
   usePlayers: () => ({
     data: [
       {
@@ -159,6 +175,18 @@ describe('player profile UI', () => {
       'items-center',
       'leading-none',
     );
+    expect(
+      screen.queryByRole('button', { name: 'View profile for Solo' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Solo').closest('th')?.querySelector('.lucide-history'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen
+        .getByText('Boomer')
+        .closest('th')
+        ?.querySelector('.lucide-history'),
+    ).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', {
         name: 'View profile for Boomer (no longer in match)',
