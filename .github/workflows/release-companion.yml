@@ -71,7 +71,7 @@ jobs:
             [Convert]::FromBase64String($signing.privateKeyBase64)
           )
           Write-Output "::add-mask::$($signing.password)"
-          "TAURI_SIGNING_PRIVATE_KEY_PATH=$keyPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TAURI_SIGNING_PRIVATE_KEY=$keyPath" | Out-File -FilePath $env:GITHUB_ENV -Append
           "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$($signing.password)" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Build and publish signed companion
         uses: tauri-apps/tauri-action@v1

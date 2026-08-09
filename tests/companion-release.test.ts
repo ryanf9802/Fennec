@@ -32,6 +32,8 @@ describe('companion release workflow', () => {
     );
     expect(workflow).toContain('updaterJsonPreferNsis: true');
     expect(workflow).toContain('/fennec/companion/updater-signing');
+    expect(workflow).toContain('TAURI_SIGNING_PRIVATE_KEY=$keyPath');
+    expect(workflow).not.toContain('TAURI_SIGNING_PRIVATE_KEY_PATH');
   });
 
   it('builds the frontend before compiling Tauri tests', () => {
