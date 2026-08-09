@@ -66,4 +66,31 @@ describe('settings CSV export', () => {
     ).toBeInTheDocument();
     expect(mocks.loadMatches).not.toHaveBeenCalled();
   });
+
+  it('floats the save action only after a setting changes', () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Save settings' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('WebSocket port'), {
+      target: { value: '49125' },
+    });
+
+    expect(screen.getByRole('button', { name: 'Save settings' })).toHaveClass(
+      'settings-save-fab',
+    );
+
+    fireEvent.change(screen.getByLabelText('WebSocket port'), {
+      target: { value: String(defaultSettings.webSocketPort) },
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Save settings' }),
+    ).not.toBeInTheDocument();
+  });
 });

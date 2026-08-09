@@ -38,6 +38,7 @@ export function SettingsPage() {
   } = context;
   const [draft, setDraft] = useState(settings);
   const [message, setMessage] = useState<string>();
+  const hasUnsavedChanges = JSON.stringify(draft) !== JSON.stringify(settings);
   const fileInput = useRef<HTMLInputElement>(null);
   const catalog = useTimelineCatalog().data ?? {};
   const storageQuery = useStorageStatistics();
@@ -445,16 +446,21 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-muted mr-auto text-sm">{message}</span>
-        <button className="button-primary" onClick={() => void saveDraft()}>
-          <Save className="size-4" />
-          Save settings
-        </button>
         {message === 'Settings saved.' && (
           <Check className="size-5 text-fennec-cyan" />
         )}
       </div>
+      {hasUnsavedChanges && (
+        <button
+          className="settings-save-fab button-primary shadow-2xl shadow-black/40"
+          onClick={() => void saveDraft()}
+        >
+          <Save className="size-4" />
+          Save settings
+        </button>
+      )}
     </div>
   );
 }

@@ -132,15 +132,6 @@ vi.mock('../src/data/historyQueries', () => ({
         lastSeen: botMatch.startedAt,
       },
       {
-        playerKey: 'id:Epic|teammate|0',
-        primaryId: 'Epic|teammate|0',
-        identityKind: 'platform',
-        latestName: 'Teammate',
-        normalizedName: 'teammate',
-        firstSeen: botMatch.startedAt,
-        lastSeen: botMatch.startedAt,
-      },
-      {
         playerKey: 'name:boomer',
         identityKind: 'name',
         latestName: 'Boomer',
@@ -253,24 +244,8 @@ describe('player profile UI', () => {
     expect(
       screen.queryByRole('option', { name: /Boomer/ }),
     ).not.toBeInTheDocument();
-  });
-
-  it('floats the profile save action only when the selection changes', () => {
-    render(
-      <MemoryRouter>
-        <ProfilePage />
-      </MemoryRouter>,
-    );
-
-    expect(
-      screen.queryByRole('button', { name: 'Save profile' }),
-    ).not.toBeInTheDocument();
-
-    fireEvent.focus(screen.getByRole('combobox', { name: 'Search players' }));
-    fireEvent.click(screen.getByRole('option', { name: /Teammate/ }));
-
-    expect(screen.getByRole('button', { name: 'Save profile' })).toHaveClass(
-      'profile-save-fab',
+    expect(screen.getByRole('button', { name: 'Use player' })).not.toHaveClass(
+      'settings-save-fab',
     );
   });
 

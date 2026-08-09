@@ -183,19 +183,19 @@ textarea:focus-visible {
   cursor: not-allowed;
   opacity: 0.6;
 }
-.profile-save-fab {
+.settings-save-fab {
   position: fixed;
   right: max(1rem, env(safe-area-inset-right));
   bottom: calc(6rem + env(safe-area-inset-bottom));
   z-index: 40;
 }
 @media (min-width: 640px) {
-  .profile-save-fab {
+  .settings-save-fab {
     right: max(1.5rem, env(safe-area-inset-right));
   }
 }
 @media (min-width: 768px) {
-  .profile-save-fab {
+  .settings-save-fab {
     right: max(2rem, env(safe-area-inset-right));
     bottom: max(2rem, env(safe-area-inset-bottom));
   }

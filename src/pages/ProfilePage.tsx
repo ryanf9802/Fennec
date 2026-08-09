@@ -27,8 +27,6 @@ export function ProfilePage() {
     }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
   const hasPlayers = availablePlayers.length > 0;
-  const hasUnsavedChanges =
-    selected.length > 0 && selected !== (profile?.primaryId ?? '');
 
   const choose = (player: (typeof players)[number]) => {
     setSelected(player.primaryId);
@@ -187,6 +185,16 @@ export function ProfilePage() {
               )}
             </div>
           )}
+          <div className="mt-3 flex justify-end">
+            <button
+              className="button-primary"
+              disabled={!selected}
+              onClick={saveSelection}
+            >
+              <Check className="size-4" />
+              Use player
+            </button>
+          </div>
         </div>
         {!hasPlayers && !availablePlayersQuery.isLoading && (
           <p className="text-muted mt-3 text-sm">
@@ -203,15 +211,6 @@ export function ProfilePage() {
           </p>
         )}
       </section>
-      {hasUnsavedChanges && (
-        <button
-          className="profile-save-fab button-primary shadow-2xl shadow-black/40"
-          onClick={saveSelection}
-        >
-          <Check className="size-4" />
-          Save profile
-        </button>
-      )}
     </div>
   );
 }

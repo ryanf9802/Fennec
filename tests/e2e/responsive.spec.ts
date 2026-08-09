@@ -621,10 +621,8 @@ test('profile player selection is searchable and explicit', async ({
   await search.fill('Lu');
   await expect(page.getByRole('option', { name: /Luna/ })).toBeVisible();
   await page.getByRole('option', { name: /Luna/ }).click();
-  await expect(
-    page.getByRole('button', { name: 'Save profile' }),
-  ).toBeEnabled();
-  await page.getByRole('button', { name: 'Save profile' }).click();
+  await expect(page.getByRole('button', { name: 'Use player' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Use player' }).click();
   await expect(
     page.getByText('Profile updated.', { exact: true }),
   ).toBeVisible();
@@ -679,20 +677,18 @@ test('primary pages use the same full content width', async ({ page }) => {
   }
 });
 
-test('profile save action floats above mobile navigation while dirty', async ({
+test('settings save action floats above mobile navigation while dirty', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 760 });
-  await page.goto('/profile?demo=1');
-  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+  await page.goto('/settings?demo=1');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save settings' })).toHaveCount(
+    0,
+  );
+  await page.getByLabel('New session after idle minutes').fill('31');
 
-  const playerSelect = page.getByRole('combobox', {
-    name: 'Search players',
-  });
-  await playerSelect.fill('Lu');
-  await page.getByRole('option', { name: /Luna/ }).click();
-
-  const save = page.getByRole('button', { name: 'Save profile' });
+  const save = page.getByRole('button', { name: 'Save settings' });
   await expect(save).toBeVisible();
   await expect(save).toHaveCSS('position', 'fixed');
   const saveBox = (await save.boundingBox())!;
@@ -714,7 +710,7 @@ test('profile save action floats above mobile navigation while dirty', async ({
   await save.click();
   await expect(save).toHaveCount(0);
   await expect(
-    page.getByText('Profile updated.', { exact: true }),
+    page.getByText('Settings saved.', { exact: true }),
   ).toBeVisible();
 });
 
