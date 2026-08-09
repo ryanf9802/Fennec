@@ -19,6 +19,7 @@ import {
   useTimelineCatalog,
 } from '../data/historyQueries';
 import type { FennecSettings } from '../domain/types';
+import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 
 /**
  * Manages validated settings drafts, timeline preferences, backup transfer,
@@ -118,7 +119,7 @@ export function SettingsPage() {
       setMessage('Select a player profile before exporting CSV.');
       return;
     }
-    const matches = await loadMatches();
+    const matches = await loadMatches(playerKeyForPrimaryId(profile.primaryId));
     downloadText(
       `fennec-matches-${new Date().toISOString().slice(0, 10)}.csv`,
       matchesCsv(matches, profile.primaryId),

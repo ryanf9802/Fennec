@@ -193,6 +193,8 @@ export function FennecProvider({
       onEnvelope: async (envelope) => {
         const previous = activeRef.current;
         const result = reduceStatsEnvelope(previous, envelope);
+        if (!result.current.observedByPrimaryId && profileRef.current)
+          result.current.observedByPrimaryId = profileRef.current.primaryId;
         activeRef.current = result.current;
         setActiveMatch(
           result.current.lifecycle === 'live' ? result.current : undefined,

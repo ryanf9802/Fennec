@@ -4,12 +4,16 @@ import { useFennec } from '../app/FennecContext';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
 import { sessionMetrics } from '../domain/metrics';
+import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 import { useSession } from '../data/historyQueries';
 
 export function SessionPage() {
   const { sessionId } = useParams();
   const { profile } = useFennec();
-  const sessionQuery = useSession(sessionId);
+  const sessionQuery = useSession(
+    sessionId,
+    playerKeyForPrimaryId(profile?.primaryId),
+  );
   const session = sessionQuery.data;
   if (sessionQuery.isLoading)
     return <div className="surface rounded-3xl p-8">Loading session…</div>;

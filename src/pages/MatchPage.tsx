@@ -200,9 +200,9 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
-  const matchQuery = useMatch(supplied ? undefined : matchId);
-  const match = supplied ?? matchQuery.data;
   const profileKey = playerKeyForPrimaryId(profile?.primaryId);
+  const matchQuery = useMatch(supplied ? undefined : matchId, profileKey);
+  const match = supplied ?? matchQuery.data;
   const scoreboardPlayerKeys = (match?.participants ?? [])
     .map(playerKeyFor)
     .filter((playerKey): playerKey is string => !!playerKey);

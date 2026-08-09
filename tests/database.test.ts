@@ -283,6 +283,57 @@ describe('IndexedDB storage', () => {
     ).toEqual(['id:Epic|other|0']);
   });
 
+  it('scopes history to matches the profile played or observed', async () => {
+    const played = playedMatch('played', '2026-08-01T00:00:00Z', false, true);
+    const observed = playedMatch(
+      'observed',
+      '2026-08-01T00:10:00Z',
+      false,
+      false,
+    );
+    observed.participants = [
+      player('Someone else', 'Epic|someone|0', 0),
+      player('Opponent', 'Epic|opponent|0', 1),
+    ];
+    observed.observedByPrimaryId = 'Steam|you|0';
+    const unrelated = {
+      ...observed,
+      id: 'unrelated',
+      matchGuid: 'unrelated',
+      startedAt: '2026-08-01T00:20:00Z',
+      lastEventAt: '2026-08-01T00:20:00Z',
+      endedAt: '2026-08-01T00:20:00Z',
+      observedByPrimaryId: 'Steam|other-viewer|0',
+      events: [],
+    };
+    await saveMatch(played);
+    await saveMatch(observed);
+    await saveMatch(unrelated);
+
+    const profileKey = 'id:Steam|you|0';
+    expect(await historyRepository.countMatches(profileKey)).toBe(2);
+    expect(await historyRepository.countSessions(profileKey)).toBe(1);
+    expect(
+      (await historyRepository.listMatches({ profileKey })).items.map(
+        (item) => item.id,
+      ),
+    ).toEqual(['observed', 'played']);
+    expect(
+      (await historyRepository.listSessions(profileKey)).items[0]?.matches.map(
+        (item) => item.id,
+      ),
+    ).toEqual(['played', 'observed']);
+    expect(
+      await historyRepository.getMatch('observed', profileKey),
+    ).toBeDefined();
+    expect(
+      await historyRepository.getMatch('unrelated', profileKey),
+    ).toBeUndefined();
+    expect(
+      await historyRepository.getMatch('played', profileKey),
+    ).toBeDefined();
+  });
+
   it('deletes a match and repairs every affected history projection', async () => {
     await saveSettings({ ...defaultSettings, sessionGapMinutes: 30 });
     await saveProfile({ primaryId: 'Steam|you|0', displayName: 'You' });
@@ -347,9 +398,10 @@ describe('IndexedDB storage', () => {
         db.events.where('matchId').equals('bridge').count(),
         db.rawEvents.where('matchId').equals('bridge').count(),
         db.appearances.where('matchId').equals('bridge').count(),
+        db.profileMatches.where('matchId').equals('bridge').count(),
         db.pairs.where('matchId').equals('bridge').count(),
       ]),
-    ).toEqual([0, 0, 0, 0]);
+    ).toEqual([0, 0, 0, 0, 0]);
     const exported: string[] = [];
     for await (const item of historyRepository.iterateMatches())
       exported.push(item.id);

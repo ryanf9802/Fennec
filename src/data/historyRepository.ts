@@ -56,19 +56,27 @@ export interface StorageStatistics {
 
 export interface HistoryRepository {
   initialize(): Promise<void>;
-  countMatches(): Promise<number>;
-  countSessions(): Promise<number>;
-  firstMatchStartedAt(): Promise<string | undefined>;
+  countMatches(profileKey?: string): Promise<number>;
+  countSessions(profileKey?: string): Promise<number>;
+  firstMatchStartedAt(profileKey?: string): Promise<string | undefined>;
   listSessions(
+    profileKey?: string,
     cursor?: string,
     limit?: number,
   ): Promise<HistoryPage<SessionGroup>>;
-  getSession(id: string): Promise<SessionGroup | undefined>;
+  getSession(
+    id: string,
+    profileKey?: string,
+  ): Promise<SessionGroup | undefined>;
   listMatches(query?: MatchHistoryQuery): Promise<HistoryPage<MatchState>>;
-  getMatch(id: string): Promise<MatchState | undefined>;
+  getMatch(id: string, profileKey?: string): Promise<MatchState | undefined>;
   loadLatestMatch(): Promise<MatchState | undefined>;
   loadLiveMatches(): Promise<MatchState[]>;
-  searchPlayers(query?: string, limit?: number): Promise<PlayerRecord[]>;
+  searchPlayers(
+    query?: string,
+    limit?: number,
+    identityKind?: PlayerIdentityKind,
+  ): Promise<PlayerRecord[]>;
   getPlayerHistory(
     profileKey: string,
     playerKey: string,
@@ -81,7 +89,10 @@ export interface HistoryRepository {
     excludingMatchId: string,
   ): Promise<string[]>;
   getTimelineCatalog(): Promise<Record<string, string[]>>;
-  iterateMatches(pageSize?: number): AsyncIterable<MatchState>;
+  iterateMatches(
+    pageSize?: number,
+    profileKey?: string,
+  ): AsyncIterable<MatchState>;
   saveMatch(match: MatchState, sessionGapMinutes: number): Promise<void>;
   deleteMatch(id: string): Promise<boolean>;
   endCurrentSession(activeMatchId?: string): Promise<EndSessionResult>;

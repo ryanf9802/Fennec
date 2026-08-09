@@ -18,9 +18,14 @@ import { ProfilePage } from '../pages/ProfilePage';
 import { SessionPage } from '../pages/SessionPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { useFennec } from './FennecContext';
+import { matchBelongsToProfile } from '../domain/profileScope';
 
 export function App() {
-  const { activeMatch, settings, ready, diagnostic } = useFennec();
+  const { activeMatch, profile, settings, ready, diagnostic } = useFennec();
+  const visibleActiveMatch =
+    activeMatch && matchBelongsToProfile(activeMatch, profile?.primaryId)
+      ? activeMatch
+      : undefined;
   const localAccess = useLocalAccess();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -28,13 +33,13 @@ export function App() {
   useEffect(() => {
     if (
       settings.autoOpenLiveMatch &&
-      activeMatch &&
-      opened.current !== activeMatch.id
+      visibleActiveMatch &&
+      opened.current !== visibleActiveMatch.id
     ) {
-      opened.current = activeMatch.id;
+      opened.current = visibleActiveMatch.id;
       navigate('/live');
     }
-  }, [activeMatch, navigate, settings.autoOpenLiveMatch]);
+  }, [navigate, settings.autoOpenLiveMatch, visibleActiveMatch]);
 
   if (!ready && diagnostic)
     return (
@@ -73,8 +78,8 @@ export function App() {
           <Route
             path="/live"
             element={
-              activeMatch ? (
-                <MatchPage match={activeMatch} />
+              visibleActiveMatch ? (
+                <MatchPage match={visibleActiveMatch} />
               ) : (
                 <Navigate to="/" replace />
               )

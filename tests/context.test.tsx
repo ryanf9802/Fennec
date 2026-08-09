@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   pendingSaves: [] as Array<() => void>,
   savedMatches: [] as MatchState[],
   latestMatch: undefined as MatchState | undefined,
+  profile: undefined as { primaryId: string; displayName: string } | undefined,
   endCurrentSession: vi.fn(async () => 'ended' as const),
 }));
 
@@ -21,7 +22,7 @@ vi.mock('../src/data/database', () => ({
     loadLatestMatch: vi.fn(async () => mocks.latestMatch),
     loadLiveMatches: vi.fn(async () => []),
   },
-  loadProfile: vi.fn(async () => undefined),
+  loadProfile: vi.fn(async () => mocks.profile),
   loadSettings: vi.fn(async () => ({
     webSocketPort: 49124,
     sessionGapMinutes: 30,
@@ -85,6 +86,22 @@ function EndSessionProbe() {
   return <button onClick={() => void endSession()}>End session</button>;
 }
 
+function ProfileSwitchProbe() {
+  const { selectProfile } = useFennec();
+  return (
+    <button
+      onClick={() =>
+        void selectProfile({
+          primaryId: 'Epic|replacement|0',
+          displayName: 'Replacement',
+        })
+      }
+    >
+      Switch profile
+    </button>
+  );
+}
+
 function clockUpdate(timeSeconds: number): StatsEnvelope {
   return {
     event: 'ClockUpdatedSeconds',
@@ -101,6 +118,7 @@ describe('Fennec live state', () => {
     for (const resolve of mocks.pendingSaves.splice(0)) resolve();
     mocks.savedMatches.length = 0;
     mocks.latestMatch = undefined;
+    mocks.profile = undefined;
     mocks.handlers = undefined;
     mocks.endCurrentSession.mockClear();
   });
@@ -120,6 +138,29 @@ describe('Fennec live state', () => {
 
     expect(screen.getByText('13')).toBeInTheDocument();
     expect(mocks.pendingSaves).toHaveLength(2);
+  });
+
+  it('attributes a new match once to the profile observing it', async () => {
+    mocks.profile = { primaryId: 'Steam|viewer|0', displayName: 'Viewer' };
+    render(
+      <FennecProvider>
+        <ClockProbe />
+        <ProfileSwitchProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    act(() => {
+      void mocks.handlers!.onEnvelope(clockUpdate(12));
+    });
+    act(() => screen.getByRole('button', { name: 'Switch profile' }).click());
+    act(() => {
+      void mocks.handlers!.onEnvelope(clockUpdate(11));
+    });
+
+    expect(mocks.savedMatches.at(-1)?.observedByPrimaryId).toBe(
+      'Steam|viewer|0',
+    );
   });
 
   it('returns to Connected as soon as the active match ends', async () => {

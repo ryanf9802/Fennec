@@ -1,29 +1,51 @@
-import { Check, UserRound } from 'lucide-react';
+import { Check, Search, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { useFennec } from '../app/FennecContext';
+import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 import { useOverview, usePlayers } from '../data/historyQueries';
 
 /**
- * Lists trackable platform identities, shows overview statistics, and persists
- * the profile whose perspective drives match and relationship summaries.
+ * Lists trackable platform identities, shows profile-scoped statistics, and
+ * persists the player whose perspective drives the rest of Fennec.
  */
 export function ProfilePage() {
   const { profile, selectProfile } = useFennec();
-  const playersQuery = usePlayers();
-  const overviewQuery = useOverview();
+  const [search, setSearch] = useState(profile?.displayName ?? '');
+  const [selected, setSelected] = useState(profile?.primaryId ?? '');
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [saved, setSaved] = useState(false);
+  const availablePlayersQuery = usePlayers('', true);
+  const playersQuery = usePlayers(search, true);
+  const overviewQuery = useOverview(playerKeyForPrimaryId(profile?.primaryId));
+  const availablePlayers = availablePlayersQuery.data ?? [];
   const players = (playersQuery.data ?? [])
-    .filter(
-      (player) => player.identityKind === 'platform' && !!player.primaryId,
-    )
+    .filter((player) => !!player.primaryId)
     .map((player) => ({
       primaryId: player.primaryId!,
       displayName: player.latestName,
     }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  const [selected, setSelected] = useState(profile?.primaryId ?? '');
-  const [saved, setSaved] = useState(false);
+  const hasPlayers = availablePlayers.length > 0;
   const hasUnsavedChanges =
     selected.length > 0 && selected !== (profile?.primaryId ?? '');
+
+  const choose = (player: (typeof players)[number]) => {
+    setSelected(player.primaryId);
+    setSearch(player.displayName);
+    setOpen(false);
+    setSaved(false);
+  };
+  const saveSelection = () => {
+    const next = [...availablePlayers, ...(playersQuery.data ?? [])].find(
+      (item) => item.primaryId === selected,
+    );
+    if (next?.primaryId)
+      void selectProfile({
+        primaryId: next.primaryId,
+        displayName: next.latestName,
+      }).then(() => setSaved(true));
+  };
   const trackingSince = overviewQuery.data?.firstMatchStartedAt
     ? new Date(overviewQuery.data.firstMatchStartedAt).toLocaleDateString(
         undefined,
@@ -35,8 +57,8 @@ export function ProfilePage() {
       <header>
         <h1 className="text-3xl font-black sm:text-4xl">Profile</h1>
         <p className="text-muted mt-2">
-          Choose your stable platform ID once; Fennec follows display-name
-          changes automatically.
+          Choose your stable platform ID; Fennec follows display-name changes
+          automatically.
         </p>
       </header>
       <section className="surface rounded-3xl p-5 sm:p-7">
@@ -68,32 +90,113 @@ export function ProfilePage() {
           ))}
         </div>
       </section>
-      <section className="surface-flat rounded-3xl p-5 sm:p-7">
+      <section
+        id="player-selection"
+        className={`rounded-3xl p-5 sm:p-7 ${profile ? 'surface-flat' : 'surface border-cyan-300/30 bg-cyan-400/5 ring-2 ring-cyan-400/40'}`}
+      >
         <h2 className="text-xl font-extrabold">Select your player</h2>
         <p className="text-muted mt-2 max-w-2xl">
           Players appear after Fennec receives a match. Changing this selection
-          recalculates every existing summary without altering history.
+          updates games, sessions, and summaries without altering local history.
         </p>
-        <div className="mt-5 max-w-2xl">
-          <select
-            className="control flex-1"
-            value={selected}
+        {!profile && (
+          <p className="mt-3 max-w-2xl font-bold text-fennec-cyan">
+            Choose a player to personalize your Fennec view.
+          </p>
+        )}
+        <div className="relative mt-5 max-w-2xl">
+          <Search className="text-muted pointer-events-none absolute left-3 top-3.5 size-4" />
+          <input
+            className="control pl-10"
+            type="search"
+            role="combobox"
+            aria-label="Search players"
+            aria-autocomplete="list"
+            aria-controls="player-results"
+            aria-expanded={open && hasPlayers}
+            aria-activedescendant={
+              open && players[activeIndex]
+                ? `player-option-${activeIndex}`
+                : undefined
+            }
+            placeholder={
+              availablePlayersQuery.isLoading
+                ? 'Loading players…'
+                : hasPlayers
+                  ? 'Search players by display name'
+                  : 'Play a match to discover players'
+            }
+            disabled={!hasPlayers && !availablePlayersQuery.isLoading}
+            value={search}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
             onChange={(event) => {
-              setSelected(event.target.value);
+              setSearch(event.target.value);
+              setSelected('');
+              setActiveIndex(0);
               setSaved(false);
+              setOpen(true);
             }}
-          >
-            <option value="">Play a match to discover players</option>
-            {players.map((player) => (
-              <option key={player.primaryId} value={player.primaryId}>
-                {player.displayName} · {player.primaryId.split('|')[0]}
-              </option>
-            ))}
-          </select>
+            onKeyDown={(event) => {
+              if (!open || !players.length) return;
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                setActiveIndex((value) =>
+                  Math.min(value + 1, players.length - 1),
+                );
+              } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                setActiveIndex((value) => Math.max(value - 1, 0));
+              } else if (event.key === 'Enter') {
+                event.preventDefault();
+                choose(players[activeIndex]!);
+              } else if (event.key === 'Escape') setOpen(false);
+            }}
+          />
+          {open && hasPlayers && (
+            <div
+              id="player-results"
+              role="listbox"
+              className="surface absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl p-1 shadow-2xl"
+            >
+              {players.length ? (
+                players.map((player, index) => (
+                  <button
+                    id={`player-option-${index}`}
+                    key={player.primaryId}
+                    type="button"
+                    role="option"
+                    aria-selected={selected === player.primaryId}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left ${index === activeIndex ? 'bg-cyan-400/12 text-fennec-cyan' : 'hover-surface'}`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => choose(player)}
+                  >
+                    <span className="min-w-0 truncate font-bold">
+                      {player.displayName}
+                    </span>
+                    <span className="text-muted ml-3 text-xs">
+                      {player.primaryId.split('|')[0]}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="text-muted px-3 py-4 text-sm">
+                  No players match “{search}”.
+                </p>
+              )}
+            </div>
+          )}
         </div>
+        {!hasPlayers && !availablePlayersQuery.isLoading && (
+          <p className="text-muted mt-3 text-sm">
+            Play a match to discover players.
+          </p>
+        )}
         {saved && (
           <p
             className="mt-3 text-sm font-bold text-fennec-cyan"
+            role="status"
             aria-live="polite"
           >
             Profile updated.
@@ -103,10 +206,7 @@ export function ProfilePage() {
       {hasUnsavedChanges && (
         <button
           className="profile-save-fab button-primary shadow-2xl shadow-black/40"
-          onClick={() => {
-            const next = players.find((item) => item.primaryId === selected);
-            if (next) void selectProfile(next).then(() => setSaved(true));
-          }}
+          onClick={saveSelection}
         >
           <Check className="size-4" />
           Save profile

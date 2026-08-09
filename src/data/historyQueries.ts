@@ -10,10 +10,14 @@ export const queryClient = new QueryClient({
 
 export const historyKeys = {
   all: ['history'] as const,
-  sessions: ['history', 'sessions'] as const,
-  session: (id?: string) => ['history', 'session', id] as const,
-  match: (id?: string) => ['history', 'match', id] as const,
-  players: (query = '') => ['history', 'players', query] as const,
+  sessions: (profileKey?: string) =>
+    ['history', 'sessions', profileKey] as const,
+  session: (id?: string, profileKey?: string) =>
+    ['history', 'session', id, profileKey] as const,
+  match: (id?: string, profileKey?: string) =>
+    ['history', 'match', id, profileKey] as const,
+  players: (query = '', platformOnly = false) =>
+    ['history', 'players', query, platformOnly] as const,
   playerHistory: (
     profileKey?: string,
     playerKey?: string,
@@ -31,54 +35,64 @@ export const historyKeys = {
       [...playerKeys].sort(),
       excludingMatchId,
     ] as const,
-  overview: ['history', 'overview'] as const,
+  overview: (profileKey?: string) =>
+    ['history', 'overview', profileKey] as const,
   catalog: ['history', 'catalog'] as const,
   storage: ['history', 'storage'] as const,
 };
 
-export function useSessions() {
+export function useSessions(profileKey?: string) {
   return useInfiniteQuery({
-    queryKey: historyKeys.sessions,
+    queryKey: historyKeys.sessions(profileKey),
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => historyRepository.listSessions(pageParam),
+    queryFn: ({ pageParam }) =>
+      historyRepository.listSessions(profileKey, pageParam),
     getNextPageParam: (page) => page.nextCursor,
+    enabled: !!profileKey,
   });
 }
 
-export function useSession(id?: string) {
+export function useSession(id?: string, profileKey?: string) {
   return useQuery({
-    queryKey: historyKeys.session(id),
-    queryFn: () => historyRepository.getSession(id!),
-    enabled: !!id,
+    queryKey: historyKeys.session(id, profileKey),
+    queryFn: () => historyRepository.getSession(id!, profileKey),
+    enabled: !!id && !!profileKey,
   });
 }
 
-export function useMatch(id?: string) {
+export function useMatch(id?: string, profileKey?: string) {
   return useQuery({
-    queryKey: historyKeys.match(id),
-    queryFn: async () => (await historyRepository.getMatch(id!)) ?? null,
-    enabled: !!id,
+    queryKey: historyKeys.match(id, profileKey),
+    queryFn: async () =>
+      (await historyRepository.getMatch(id!, profileKey)) ?? null,
+    enabled: !!id && !!profileKey,
   });
 }
 
-export function usePlayers(query = '') {
+export function usePlayers(query = '', platformOnly = false) {
   return useQuery({
-    queryKey: historyKeys.players(query),
-    queryFn: () => historyRepository.searchPlayers(query),
+    queryKey: historyKeys.players(query, platformOnly),
+    queryFn: () =>
+      historyRepository.searchPlayers(
+        query,
+        100,
+        platformOnly ? 'platform' : undefined,
+      ),
   });
 }
 
-export function useOverview() {
+export function useOverview(profileKey?: string) {
   return useQuery({
-    queryKey: historyKeys.overview,
+    queryKey: historyKeys.overview(profileKey),
     queryFn: async () => {
       const [matches, sessions, firstMatchStartedAt] = await Promise.all([
-        historyRepository.countMatches(),
-        historyRepository.countSessions(),
-        historyRepository.firstMatchStartedAt(),
+        historyRepository.countMatches(profileKey),
+        historyRepository.countSessions(profileKey),
+        historyRepository.firstMatchStartedAt(profileKey),
       ]);
       return { matches, sessions, firstMatchStartedAt };
     },
+    enabled: !!profileKey,
   });
 }
 

@@ -1,4 +1,10 @@
-import { ArrowUpRight, CalendarDays, Radio, Square } from 'lucide-react';
+import {
+  ArrowUpRight,
+  CalendarDays,
+  Radio,
+  Square,
+  UserRound,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
@@ -10,6 +16,8 @@ import { sessionMetrics } from '../domain/metrics';
 import { sessionIdleGapElapsed } from '../domain/sessions';
 import { formatClock, matchElapsedSeconds } from '../domain/timeline';
 import { formatTeamScore, profileTeamNumber } from '../domain/teamPresentation';
+import { playerKeyForPrimaryId } from '../domain/playerIdentity';
+import { matchBelongsToProfile } from '../domain/profileScope';
 import { useSessions } from '../data/historyQueries';
 
 function sessionTitle(startedAt: string): string {
@@ -33,7 +41,12 @@ export function GamesPage() {
   const [endingSession, setEndingSession] = useState(false);
   const [sessionMessage, setSessionMessage] = useState<string>();
   const [deadlineClock, setDeadlineClock] = useState(() => Date.now());
-  const sessionsQuery = useSessions();
+  const profileKey = playerKeyForPrimaryId(profile?.primaryId);
+  const sessionsQuery = useSessions(profileKey);
+  const visibleActiveMatch =
+    activeMatch && matchBelongsToProfile(activeMatch, profile?.primaryId)
+      ? activeMatch
+      : undefined;
   const orderedSessions =
     sessionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const current = orderedSessions[0];
@@ -42,7 +55,7 @@ export function GamesPage() {
     : undefined;
   useEffect(() => {
     if (
-      activeMatch ||
+      visibleActiveMatch ||
       !current ||
       current.endedManually ||
       idleDeadline === undefined
@@ -54,10 +67,10 @@ export function GamesPage() {
       remaining > 0 ? remaining + 25 : 0,
     );
     return () => window.clearTimeout(timer);
-  }, [activeMatch, current, idleDeadline]);
+  }, [visibleActiveMatch, current, idleDeadline]);
   const currentIsClosed = Boolean(
     current &&
-    !activeMatch &&
+    !visibleActiveMatch &&
     (current.endedManually ||
       sessionIdleGapElapsed(
         current,
@@ -79,7 +92,7 @@ export function GamesPage() {
           ? 'New session started for the live game.'
           : result === 'ended'
             ? 'Session ended. The next game will start a new session.'
-            : activeMatch
+            : visibleActiveMatch
               ? 'This live game already starts a new session.'
               : 'Session is already ended.',
       );
@@ -108,13 +121,29 @@ export function GamesPage() {
         />
       </header>
 
-      {sessionsQuery.isError && (
+      {!profile && (
+        <section className="surface rounded-3xl border-cyan-300/30 px-6 py-12 text-center ring-2 ring-cyan-400/40">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-cyan-400/15 text-fennec-cyan">
+            <UserRound className="size-7" />
+          </div>
+          <h2 className="mt-5 text-xl font-extrabold">Choose your player</h2>
+          <p className="text-muted mx-auto mt-2 max-w-md">
+            Select the player whose games and spectated matches you want Fennec
+            to show.
+          </p>
+          <Link className="button-primary mt-6" to="/profile#player-selection">
+            Select your player
+          </Link>
+        </section>
+      )}
+
+      {profile && sessionsQuery.isError && (
         <div className="surface-flat text-fennec-orange rounded-2xl p-5">
           Match history could not be loaded.
         </div>
       )}
 
-      {activeMatch && (
+      {visibleActiveMatch && (
         <Link
           to="/live"
           className="surface group relative block overflow-hidden rounded-3xl border-cyan-300/30 p-5 sm:p-6"
@@ -128,10 +157,10 @@ export function GamesPage() {
               <div>
                 <div className="eyebrow text-fennec-cyan">Live now</div>
                 <h2 className="mt-0.5 text-xl font-extrabold sm:text-2xl">
-                  {activeMatch.playlistName}
+                  {visibleActiveMatch.playlistName}
                 </h2>
                 <p className="text-muted mt-1 text-sm">
-                  {activeMatch.arena || 'Waiting for match state'}
+                  {visibleActiveMatch.arena || 'Waiting for match state'}
                 </p>
               </div>
             </div>
@@ -139,12 +168,12 @@ export function GamesPage() {
               <div className="text-right">
                 <div className="text-3xl font-black">
                   {formatTeamScore(
-                    activeMatch.teams,
-                    profileTeamNumber(activeMatch, profile?.primaryId),
+                    visibleActiveMatch.teams,
+                    profileTeamNumber(visibleActiveMatch, profile?.primaryId),
                   )}
                 </div>
                 <div className="text-fennec-orange text-sm font-bold">
-                  {formatClock(matchElapsedSeconds(activeMatch))}
+                  {formatClock(matchElapsedSeconds(visibleActiveMatch))}
                 </div>
               </div>
               <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -153,9 +182,13 @@ export function GamesPage() {
         </Link>
       )}
 
-      {!sessionsQuery.isLoading && !orderedSessions.length && !activeMatch ? (
+      {profile &&
+      !sessionsQuery.isLoading &&
+      !orderedSessions.length &&
+      !visibleActiveMatch ? (
         <EmptyState />
       ) : (
+        profile &&
         focusedSession && (
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">

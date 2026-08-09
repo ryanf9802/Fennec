@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
+import { matchBelongsToProfile } from '../domain/profileScope';
 import { ConnectionStatus } from './ConnectionStatus';
 
 const navigation = [
@@ -19,9 +20,23 @@ const navigation = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
+/**
+ * Renders responsive navigation and exposes live-match navigation only when
+ * the active match belongs to the currently selected player profile.
+ */
 export function AppShell({ children }: { children: ReactNode }) {
-  const { activeMatch, connection, demoMode, settings, updateSettings } =
-    useFennec();
+  const {
+    activeMatch,
+    connection,
+    demoMode,
+    profile,
+    settings,
+    updateSettings,
+  } = useFennec();
+  const visibleActiveMatch =
+    activeMatch && matchBelongsToProfile(activeMatch, profile?.primaryId)
+      ? activeMatch
+      : undefined;
   const collapsed = settings.sidebarCollapsed;
   return (
     <div className="app-backdrop flex min-h-screen min-w-0">
@@ -85,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {!collapsed && <span className="hidden lg:inline">{label}</span>}
             </NavLink>
           ))}
-          {activeMatch && (
+          {visibleActiveMatch && (
             <NavLink
               to="/live"
               aria-label="Live match"

@@ -48,10 +48,12 @@ function session(endedManually = false): SessionGroup {
   };
 }
 
-function renderPage(value = session()) {
+function renderPage(value = session(), withProfile = true) {
   mocks.fennec = {
     activeMatch: undefined,
-    profile: undefined,
+    profile: withProfile
+      ? { primaryId: 'Steam|you|0', displayName: 'You' }
+      : undefined,
     connection: 'waiting',
     endSession: vi.fn(),
     settings: defaultSettings,
@@ -95,6 +97,19 @@ describe('closed session presentation', () => {
       screen.getByRole('link', { name: /Earlier today.*1 game/ }),
     ).toBeInTheDocument();
     expect(screen.queryByText('In focus')).not.toBeInTheDocument();
+  });
+
+  it('prompts for a player instead of showing unscoped history', () => {
+    renderPage(session(), false);
+    expect(
+      screen.getByRole('heading', { name: 'Choose your player' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Select your player' }),
+    ).toHaveAttribute('href', '/profile#player-selection');
+    expect(
+      screen.queryByRole('heading', { name: 'Current session' }),
+    ).not.toBeInTheDocument();
   });
 
   it('transitions to the between-sessions panel at the idle deadline', () => {

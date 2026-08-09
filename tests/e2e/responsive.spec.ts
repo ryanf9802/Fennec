@@ -604,6 +604,33 @@ test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
   await expect(page.getByText(/Select your profile/)).toHaveCount(0);
 });
 
+test('profile player selection is searchable and explicit', async ({
+  page,
+}) => {
+  await page.goto('/profile?demo=1');
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+  const search = page.getByRole('combobox', { name: 'Search players' });
+  await expect(search).toHaveAttribute(
+    'placeholder',
+    'Search players by display name',
+  );
+  await expect(page.getByText('Play a match to discover players.')).toHaveCount(
+    0,
+  );
+
+  await search.fill('Lu');
+  await expect(page.getByRole('option', { name: /Luna/ })).toBeVisible();
+  await page.getByRole('option', { name: /Luna/ }).click();
+  await expect(
+    page.getByRole('button', { name: 'Save profile' }),
+  ).toBeEnabled();
+  await page.getByRole('button', { name: 'Save profile' }).click();
+  await expect(
+    page.getByText('Profile updated.', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Luna', { exact: true }).first()).toBeVisible();
+});
+
 test('dashboard abbreviates GFA while session detail uses the full label', async ({
   page,
 }) => {
@@ -659,11 +686,11 @@ test('profile save action floats above mobile navigation while dirty', async ({
   await page.goto('/profile?demo=1');
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
 
-  const playerSelect = page.getByRole('combobox');
-  await expect
-    .poll(() => playerSelect.locator('option').count())
-    .toBeGreaterThan(1);
-  await playerSelect.selectOption('Epic|demo-luna|0');
+  const playerSelect = page.getByRole('combobox', {
+    name: 'Search players',
+  });
+  await playerSelect.fill('Lu');
+  await page.getByRole('option', { name: /Luna/ }).click();
 
   const save = page.getByRole('button', { name: 'Save profile' });
   await expect(save).toBeVisible();
@@ -686,7 +713,9 @@ test('profile save action floats above mobile navigation while dirty', async ({
 
   await save.click();
   await expect(save).toHaveCount(0);
-  await expect(page.getByText('Profile updated.')).toBeVisible();
+  await expect(
+    page.getByText('Profile updated.', { exact: true }),
+  ).toBeVisible();
 });
 
 test('primary pages reserve a stable root scrollbar gutter', async ({

@@ -4,9 +4,16 @@ import { MatchPage } from '../src/pages/MatchPage';
 import { ProfilePage } from '../src/pages/ProfilePage';
 import { defaultSettings, type MatchState } from '../src/domain/types';
 
+const mocks = vi.hoisted(() => ({
+  profile: {
+    primaryId: 'Steam|you|0',
+    displayName: 'You',
+  } as { primaryId: string; displayName: string } | undefined,
+}));
+
 vi.mock('../src/app/FennecContext', () => ({
   useFennec: () => ({
-    profile: { primaryId: 'Steam|you|0', displayName: 'You' },
+    profile: mocks.profile,
     settings: defaultSettings,
     selectProfile: vi.fn(),
   }),
@@ -113,7 +120,7 @@ vi.mock('../src/data/historyQueries', () => ({
     fetchNextPage: vi.fn(),
   }),
   usePlayerHistoryAvailability: () => ({ data: ['name:boomer'] }),
-  usePlayers: () => ({
+  usePlayers: (_query: string, platformOnly: boolean) => ({
     data: [
       {
         playerKey: 'id:Steam|you|0',
@@ -141,7 +148,7 @@ vi.mock('../src/data/historyQueries', () => ({
         firstSeen: botMatch.startedAt,
         lastSeen: botMatch.startedAt,
       },
-    ],
+    ].filter((player) => !platformOnly || player.identityKind === 'platform'),
   }),
   useOverview: () => ({
     data: { matches: 1, sessions: 1, firstMatchStartedAt: botMatch.startedAt },
@@ -153,6 +160,9 @@ function LocationProbe() {
 }
 
 describe('player profile UI', () => {
+  beforeEach(() => {
+    mocks.profile = { primaryId: 'Steam|you|0', displayName: 'You' };
+  });
   it('opens a player profile over the match without changing location', () => {
     render(
       <MemoryRouter initialEntries={['/matches/bots']}>
@@ -238,6 +248,7 @@ describe('player profile UI', () => {
       </MemoryRouter>,
     );
 
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Search players' }));
     expect(screen.getByRole('option', { name: /You/ })).toBeInTheDocument();
     expect(
       screen.queryByRole('option', { name: /Boomer/ }),
@@ -255,12 +266,28 @@ describe('player profile UI', () => {
       screen.queryByRole('button', { name: 'Save profile' }),
     ).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole('combobox'), {
-      target: { value: 'Epic|teammate|0' },
-    });
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Search players' }));
+    fireEvent.click(screen.getByRole('option', { name: /Teammate/ }));
 
     expect(screen.getByRole('button', { name: 'Save profile' })).toHaveClass(
       'profile-save-fab',
     );
+  });
+
+  it('highlights player selection until a profile is chosen', () => {
+    mocks.profile = undefined;
+    render(
+      <MemoryRouter>
+        <ProfilePage />
+      </MemoryRouter>,
+    );
+
+    const section = screen
+      .getByRole('heading', { name: 'Select your player' })
+      .closest('section');
+    expect(section).toHaveClass('ring-2', 'ring-cyan-400/40');
+    expect(
+      screen.getByText('Choose a player to personalize your Fennec view.'),
+    ).toBeInTheDocument();
   });
 });

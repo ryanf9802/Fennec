@@ -98,6 +98,8 @@ export interface MatchState {
   winnerName?: string;
   ball?: BallState;
   viewTarget?: PlayerReference;
+  /** Stable platform identity selected when Fennec first observed the match. */
+  observedByPrimaryId?: string;
   capture?: MatchCapture;
   winnerTeamNumber?: number;
   teams: TeamState[];
