@@ -791,6 +791,10 @@ test('primary pages use the same full content width', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'Game timeline' }),
   ).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
   await expect(page.getByText('Second-monitor dashboard')).toHaveCount(0);
   const gamesWidth = (await page.locator('main > div').first().boundingBox())!
     .width;
@@ -803,6 +807,10 @@ test('primary pages use the same full content width', async ({ page }) => {
     if (path.startsWith('/setup'))
       await page.getByRole('button', { name: /With companion/ }).click();
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute(
+      'data-app-entrance-state',
+      'complete',
+    );
     if (removedEyebrow)
       await expect(page.getByText(removedEyebrow, { exact: true })).toHaveCount(
         0,
@@ -819,6 +827,10 @@ test('settings save action floats above mobile navigation while dirty', async ({
   await page.setViewportSize({ width: 375, height: 760 });
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
   await expect(page.getByRole('button', { name: 'Save settings' })).toHaveCount(
     0,
   );
@@ -1031,7 +1043,7 @@ test('wide split-layout scoreboards preserve readable player names', async ({
   ).toBeVisible();
   await expect
     .poll(async () => (await page.locator('aside').boundingBox())?.width)
-    .toBeLessThan(90);
+    .toBeCloseTo(76, 0);
   await expectScoreboardToFit();
 });
 

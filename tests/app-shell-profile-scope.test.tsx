@@ -30,6 +30,9 @@ function liveMatch(primaryId: string): MatchState {
     playlistName: 'Private Match',
     playlistCategory: 'private',
     arena: 'DFH Stadium',
+    timeSeconds: 0,
+    isOvertime: false,
+    isReplay: false,
     teams: [],
     participants: [
       {
@@ -43,6 +46,8 @@ function liveMatch(primaryId: string): MatchState {
         shots: 0,
         touches: 0,
         demos: 0,
+        passes: 0,
+        fifties: 0,
       },
     ],
     events: [],
