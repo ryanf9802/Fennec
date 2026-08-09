@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GamesPage } from '../src/pages/GamesPage';
 import {
@@ -37,6 +37,52 @@ const match: MatchState = {
   participants: [],
   events: [],
 };
+
+function participant(name: string, primaryId: string, teamNumber: number) {
+  return {
+    name,
+    primaryId,
+    teamNumber,
+    score: 0,
+    goals: 0,
+    assists: 0,
+    passes: 0,
+    fifties: 0,
+    saves: 0,
+    shots: 0,
+    touches: 0,
+    demos: 0,
+  };
+}
+
+function recurringSession(endedManually = false): SessionGroup {
+  const teammates = [
+    ['Alpha', 'Epic|alpha|0'],
+    ['Bravo', 'Epic|bravo|0'],
+    ['Charlie', 'Epic|charlie|0'],
+  ] as const;
+  const matches = [0, 1, 2].map((index) => ({
+    ...match,
+    id: `match-${index}`,
+    startedAt: `2026-08-08T00:${index}0:00Z`,
+    lastEventAt: `2026-08-08T00:${index}5:00Z`,
+    endedAt: `2026-08-08T00:${index}5:00Z`,
+    participants: [
+      participant('You', 'Steam|you|0', 0),
+      ...teammates
+        .filter(([name]) => name !== 'Charlie' || index > 0)
+        .map(([name, id]) => participant(name, id, 0)),
+      ...(index === 0 ? [participant('One game', 'Epic|once|0', 0)] : []),
+    ],
+  }));
+  return {
+    id: 'recurring-session',
+    startedAt: matches[0]!.startedAt,
+    endedAt: matches.at(-1)!.endedAt!,
+    matches,
+    endedManually,
+  };
+}
 
 function session(endedManually = false): SessionGroup {
   return {
@@ -101,6 +147,7 @@ describe('closed session presentation', () => {
       screen.getByRole('link', { name: /Earlier today.*1 game/ }),
     ).toBeInTheDocument();
     expect(screen.queryByText('In focus')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recurring teammates')).not.toBeInTheDocument();
   });
 
   it('labels live training and explains that it is not saved', () => {
@@ -154,4 +201,20 @@ describe('closed session presentation', () => {
       screen.getByRole('link', { name: /Earlier today.*1 game/ }),
     ).toBeInTheDocument();
   });
+
+  it.each([
+    ['current', false],
+    ['past', true],
+  ])(
+    'shows only the top two recurring teammates for a %s session',
+    (_, ended) => {
+      renderPage(recurringSession(ended));
+
+      const recurring = screen.getByText('Recurring teammates').parentElement!;
+      expect(within(recurring).getByText('Alpha')).toBeInTheDocument();
+      expect(within(recurring).getByText('Bravo')).toBeInTheDocument();
+      expect(within(recurring).queryByText('Charlie')).not.toBeInTheDocument();
+      expect(within(recurring).queryByText('One game')).not.toBeInTheDocument();
+    },
+  );
 });

@@ -29,9 +29,16 @@ export function calculateEncounters(
     const profileWon =
       match.lifecycle === 'completed' &&
       match.winnerTeamNumber === profile.teamNumber;
+    const countedPlayerKeys = new Set<string>();
     for (const player of match.participants) {
       const playerKey = playerKeyFor(player);
-      if (!playerKey || playerKey === profileKey) continue;
+      if (
+        !playerKey ||
+        playerKey === profileKey ||
+        countedPlayerKeys.has(playerKey)
+      )
+        continue;
+      countedPlayerKeys.add(playerKey);
       const current = values.get(playerKey) ?? {
         playerKey,
         primaryId: playerPrimaryId(playerKey),
@@ -67,4 +74,22 @@ export function calculateEncounters(
   return [...values.values()].sort((a, b) =>
     b.lastSeen.localeCompare(a.lastSeen),
   );
+}
+
+/**
+ * Selects session teammates who shared at least two distinct persisted games
+ * with the profile, ordered by the number of games played together.
+ */
+export function recurringTeammates(
+  matches: MatchState[],
+  profilePrimaryId?: string,
+): EncounterSummary[] {
+  return calculateEncounters(matches, profilePrimaryId)
+    .filter((encounter) => encounter.gamesTogether > 1)
+    .sort(
+      (a, b) =>
+        b.gamesTogether - a.gamesTogether ||
+        a.latestName.localeCompare(b.latestName) ||
+        a.playerKey.localeCompare(b.playerKey),
+    );
 }

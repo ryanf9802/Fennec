@@ -630,6 +630,34 @@ test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
   await expect(page.getByText(/Select your profile/)).toHaveCount(0);
 });
 
+test('session summaries expose recurring teammates and full history in place', async ({
+  page,
+}) => {
+  await page.goto('/?demo=1');
+  const currentSession = page.locator('section').filter({
+    has: page.getByRole('heading', { name: 'Current session' }),
+  });
+  const recurringTeammates = currentSession
+    .getByText('Recurring teammates', { exact: true })
+    .locator('..');
+  await expect(recurringTeammates).toBeVisible();
+  await expect(
+    recurringTeammates.getByText('Luna', { exact: true }),
+  ).toBeVisible();
+
+  await currentSession.getByRole('link', { name: /Full session/ }).click();
+  const sessionUrl = page.url();
+  await expect(
+    page.getByText('Recurring teammates', { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'View profile for Luna' }).click();
+  await expect(page).toHaveURL(sessionUrl);
+  await expect(page.getByRole('dialog', { name: 'Luna' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close player profile' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(sessionUrl);
+});
+
 test('profile player selection is searchable and explicit', async ({
   page,
 }) => {

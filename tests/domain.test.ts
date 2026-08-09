@@ -1,4 +1,7 @@
-import { calculateEncounters } from '../src/domain/encounters';
+import {
+  calculateEncounters,
+  recurringTeammates,
+} from '../src/domain/encounters';
 import { parseEnvelope } from '../src/domain/envelope';
 import {
   calculatePlayerHistory,
@@ -1551,6 +1554,41 @@ describe('Stats API domain', () => {
       encounter.winsTogether,
       encounter.winsAgainst,
     ]).toEqual([1, 1, 1, 1]);
+  });
+
+  it('selects recurring session teammates by distinct games together', () => {
+    const games = [
+      match('one', '2026-08-08T00:00:00Z', '2026-08-08T00:05:00Z'),
+      match('two', '2026-08-08T00:10:00Z', '2026-08-08T00:15:00Z'),
+      match('three', '2026-08-08T00:20:00Z', '2026-08-08T00:25:00Z'),
+    ];
+    games[0]!.participants = [
+      player('Me', 'Steam|1|0', 0),
+      player('Alpha', 'Epic|alpha|0', 0),
+      player('Alpha duplicate', 'Epic|alpha|0', 0),
+      player('Only once', 'Epic|once|0', 0),
+    ];
+    games[1]!.participants = [
+      player('Me', 'Steam|1|0', 0),
+      player('Alpha', 'Epic|alpha|0', 0),
+      player('Bravo', 'Epic|bravo|0', 0),
+    ];
+    games[2]!.participants = [
+      player('Me', 'Steam|1|0', 0),
+      player('Alpha', 'Epic|alpha|0', 1),
+      player('Bravo', 'Epic|bravo|0', 0),
+    ];
+
+    expect(
+      recurringTeammates(games, 'Steam|1|0').map((teammate) => [
+        teammate.latestName,
+        teammate.gamesTogether,
+        teammate.gamesOpposed,
+      ]),
+    ).toEqual([
+      ['Alpha', 2, 1],
+      ['Bravo', 2, 0],
+    ]);
   });
 
   it('discovers nested and unknown timeline attributes', () => {

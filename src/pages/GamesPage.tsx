@@ -12,6 +12,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ConnectionStatus } from '../components/ConnectionStatus';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
+import { RecurringTeammates } from '../components/RecurringTeammates';
 import { sessionMetrics } from '../domain/metrics';
 import { sessionIdleGapElapsed } from '../domain/sessions';
 import { formatClock, matchElapsedSeconds } from '../domain/timeline';
@@ -239,6 +240,12 @@ export function GamesPage() {
                 )}
                 abbreviateGoalsForAgainst
               />
+              <RecurringTeammates
+                className="mt-5 border-t border-ui pt-5"
+                matches={focusedSession.matches}
+                profileId={profile?.primaryId}
+                limit={2}
+              />
             </div>
             <div className="space-y-2">
               {[...focusedSession.matches].reverse().map((match) => (
@@ -302,6 +309,12 @@ export function GamesPage() {
                     </div>
                     <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                   </div>
+                  <RecurringTeammates
+                    className="mt-4 border-t border-ui pt-4"
+                    matches={session.matches}
+                    profileId={profile?.primaryId}
+                    limit={2}
+                  />
                   <div className="mt-4">
                     <MetricsGrid
                       metrics={metrics}

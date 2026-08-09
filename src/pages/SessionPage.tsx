@@ -1,8 +1,14 @@
 import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { MatchRow } from '../components/MatchRow';
 import { MetricsGrid } from '../components/MetricsGrid';
+import { PlayerProfileDialog } from '../components/PlayerProfileDialog';
+import {
+  RecurringTeammates,
+  type RecurringTeammateSelection,
+} from '../components/RecurringTeammates';
 import { sessionMetrics } from '../domain/metrics';
 import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 import { useSession } from '../data/historyQueries';
@@ -10,6 +16,8 @@ import { useSession } from '../data/historyQueries';
 export function SessionPage() {
   const { sessionId } = useParams();
   const { profile } = useFennec();
+  const [profilePlayer, setProfilePlayer] =
+    useState<RecurringTeammateSelection>();
   const sessionQuery = useSession(
     sessionId,
     playerKeyForPrimaryId(profile?.primaryId),
@@ -68,6 +76,12 @@ export function SessionPage() {
           metrics={sessionMetrics(session.matches, profile?.primaryId)}
         />
       </div>
+      <RecurringTeammates
+        className="surface rounded-3xl p-5 sm:p-6"
+        matches={session.matches}
+        profileId={profile?.primaryId}
+        onSelect={setProfilePlayer}
+      />
       <section className="space-y-3">
         <h2 className="text-xl font-extrabold">Games</h2>
         {[...session.matches].reverse().map((match) => (
@@ -78,6 +92,13 @@ export function SessionPage() {
           />
         ))}
       </section>
+      {profilePlayer && (
+        <PlayerProfileDialog
+          playerKey={profilePlayer.playerKey}
+          playerName={profilePlayer.playerName}
+          onClose={() => setProfilePlayer(undefined)}
+        />
+      )}
     </div>
   );
 }
