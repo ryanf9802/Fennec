@@ -14,13 +14,14 @@ import {
   LineBasicMaterial,
   LineSegments,
   LinearFilter,
-  type Mesh,
+  type Group,
   Shape,
   SRGBColorSpace,
   Vector3,
 } from 'three';
 import type { SpatialEventPoint } from '../domain/analytics';
 import type { ArenaProfile } from '../domain/arenaProfiles';
+import type { TeamPresentation } from '../domain/teamPresentation';
 import {
   arenaWallPanels,
   gameToScene,
@@ -29,11 +30,22 @@ import {
 } from '../domain/touchMapGeometry';
 
 const fieldColor = '#64748b';
-const blueTeamColor = '#22d3ee';
-const orangeTeamColor = '#fb923c';
-
-function teamColor(teamNumber: number): string {
-  return teamNumber === 1 ? orangeTeamColor : blueTeamColor;
+function teamColor(
+  teams: TeamPresentation[],
+  teamNumber: number,
+  kind: 'primaryColor' | 'secondaryColor' = 'primaryColor',
+): string {
+  const configured = teams.find((team) => team.teamNumber === teamNumber)?.[
+    kind
+  ];
+  if (configured) return configured;
+  return teamNumber === 1
+    ? kind === 'primaryColor'
+      ? '#ff8a3d'
+      : '#c2410c'
+    : kind === 'primaryColor'
+      ? '#36d7ff'
+      : '#2563eb';
 }
 
 function litMarkerColor(color: string, opacity: number): Color {
@@ -79,6 +91,8 @@ export interface GoalLabel {
   teamNumber: number;
   label: string;
   teamName: string;
+  primaryColor: string;
+  secondaryColor: string;
 }
 
 function GoalLabelSprite({
@@ -88,7 +102,6 @@ function GoalLabelSprite({
   goal: GoalLabel;
   position: [number, number, number];
 }) {
-  const color = teamColor(goal.teamNumber);
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -115,21 +128,27 @@ function GoalLabelSprite({
     context.fillStyle = 'rgba(7, 17, 31, 0.68)';
     context.fill();
     context.lineWidth = 4;
-    context.strokeStyle = color;
+    context.strokeStyle = goal.secondaryColor;
+    context.stroke();
+    context.lineWidth = 8;
+    context.strokeStyle = goal.primaryColor;
+    context.beginPath();
+    context.moveTo(36, canvas.height - 22);
+    context.lineTo(canvas.width - 36, canvas.height - 22);
     context.stroke();
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillStyle = 'rgba(248, 250, 252, 0.9)';
     context.font = '800 42px "Segoe UI", sans-serif';
     context.fillText(goal.label.toUpperCase(), canvas.width / 2, 57);
-    context.fillStyle = color;
+    context.fillStyle = 'rgba(248, 250, 252, 0.9)';
     context.font = '700 32px "Segoe UI", sans-serif';
     context.fillText(goal.teamName.toUpperCase(), canvas.width / 2, 113);
     const result = new CanvasTexture(canvas);
     result.colorSpace = SRGBColorSpace;
     result.minFilter = LinearFilter;
     return result;
-  }, [color, goal.label, goal.teamName]);
+  }, [goal.label, goal.primaryColor, goal.secondaryColor, goal.teamName]);
   useEffect(() => () => texture.dispose(), [texture]);
   return (
     <sprite position={position} renderOrder={-1} scale={[1650, 510, 1]}>
@@ -211,9 +230,11 @@ function WallPanel({
 function GoalTunnels({
   profile,
   labels,
+  teams,
 }: {
   profile: ArenaProfile;
   labels: GoalLabel[];
+  teams: TeamPresentation[];
 }) {
   if (!profile.goal) return null;
   const { halfWidth, height, depth } = profile.goal;
@@ -223,16 +244,17 @@ function GoalTunnels({
         const wallY = side < 0 ? profile.yMin : profile.yMax;
         const centerX = wallY + side * (depth / 2);
         const backX = wallY + side * depth;
-        const color = teamColor(side < 0 ? 0 : 1);
         const teamNumber = side < 0 ? 0 : 1;
+        const primary = teamColor(teams, teamNumber);
+        const secondary = teamColor(teams, teamNumber, 'secondaryColor');
         const label = labels.find((value) => value.teamNumber === teamNumber);
         return (
           <group key={side}>
             <mesh position={[centerX, -8, 0]}>
               <boxGeometry args={[depth, 16, halfWidth * 2]} />
               <meshStandardMaterial
-                color={color}
-                emissive={color}
+                color={primary}
+                emissive={secondary}
                 emissiveIntensity={0.08}
                 roughness={0.82}
               />
@@ -244,8 +266,8 @@ function GoalTunnels({
               >
                 <boxGeometry args={[depth, height, 18]} />
                 <meshStandardMaterial
-                  color={color}
-                  emissive={color}
+                  color={secondary}
+                  emissive={primary}
                   emissiveIntensity={0.12}
                   transparent
                   opacity={0.42}
@@ -256,8 +278,8 @@ function GoalTunnels({
             <mesh position={[backX, height / 2, 0]}>
               <boxGeometry args={[18, height, halfWidth * 2]} />
               <meshStandardMaterial
-                color={color}
-                emissive={color}
+                color={secondary}
+                emissive={primary}
                 emissiveIntensity={0.12}
                 transparent
                 opacity={0.42}
@@ -267,8 +289,8 @@ function GoalTunnels({
             <mesh position={[centerX, height, 0]}>
               <boxGeometry args={[depth, 18, halfWidth * 2]} />
               <meshStandardMaterial
-                color={color}
-                emissive={color}
+                color={secondary}
+                emissive={primary}
                 emissiveIntensity={0.12}
                 transparent
                 opacity={0.42}
@@ -288,12 +310,20 @@ function GoalTunnels({
   );
 }
 
-function Hoops({ profile }: { profile: ArenaProfile }) {
+function Hoops({
+  profile,
+  teams,
+}: {
+  profile: ArenaProfile;
+  teams: TeamPresentation[];
+}) {
   if (profile.kind !== 'hoops') return null;
   return (
     <>
       {([-1, 1] as const).map((side) => {
-        const color = teamColor(side < 0 ? 0 : 1);
+        const teamNumber = side < 0 ? 0 : 1;
+        const primary = teamColor(teams, teamNumber);
+        const secondary = teamColor(teams, teamNumber, 'secondaryColor');
         return (
           <mesh
             key={side}
@@ -302,8 +332,8 @@ function Hoops({ profile }: { profile: ArenaProfile }) {
           >
             <torusGeometry args={[360, 24, 12, 48]} />
             <meshStandardMaterial
-              color={color}
-              emissive={color}
+              color={primary}
+              emissive={secondary}
               emissiveIntensity={0.25}
             />
           </mesh>
@@ -316,9 +346,11 @@ function Hoops({ profile }: { profile: ArenaProfile }) {
 function Field({
   profile,
   goalLabels,
+  teams,
 }: {
   profile: ArenaProfile;
   goalLabels: GoalLabel[];
+  teams: TeamPresentation[];
 }) {
   return (
     <group>
@@ -326,8 +358,8 @@ function Field({
       {arenaWallPanels(profile).map((panel, index) => (
         <WallPanel key={index} {...panel} />
       ))}
-      <GoalTunnels labels={goalLabels} profile={profile} />
-      <Hoops profile={profile} />
+      <GoalTunnels labels={goalLabels} profile={profile} teams={teams} />
+      <Hoops profile={profile} teams={teams} />
     </group>
   );
 }
@@ -362,38 +394,67 @@ function ActiveGuide({ point }: { point: SpatialEventPoint }) {
   return <primitive object={object} />;
 }
 
-function GoalDisc({ active, opacity }: { active: boolean; opacity: number }) {
-  const mesh = useRef<Mesh>(null);
+function GoalDisc({
+  active,
+  opacity,
+  primary,
+  secondary,
+}: {
+  active: boolean;
+  opacity: number;
+  primary: string;
+  secondary: string;
+}) {
+  const group = useRef<Group>(null);
   const { camera } = useThree();
-  useFrame(() => mesh.current?.quaternion.copy(camera.quaternion));
+  useFrame(() => group.current?.quaternion.copy(camera.quaternion));
   return (
-    <mesh ref={mesh} renderOrder={4}>
-      <circleGeometry args={[active ? 145 : 110, 32]} />
-      <meshBasicMaterial
-        color="#facc15"
-        depthWrite={false}
-        opacity={opacity}
-        side={DoubleSide}
-        transparent
-      />
-    </mesh>
+    <group ref={group}>
+      <mesh renderOrder={4}>
+        <circleGeometry args={[active ? 145 : 110, 32]} />
+        <meshBasicMaterial
+          color={secondary}
+          depthWrite={false}
+          opacity={opacity}
+          side={DoubleSide}
+          transparent
+        />
+      </mesh>
+      <mesh position={[0, 0, 1]} renderOrder={5}>
+        <circleGeometry args={[active ? 112 : 84, 32]} />
+        <meshBasicMaterial
+          color={primary}
+          depthWrite={false}
+          opacity={opacity}
+          side={DoubleSide}
+          transparent
+        />
+      </mesh>
+    </group>
   );
 }
 
 function FiftyMarker({
   point,
+  teams,
   active,
   opacity,
 }: {
   point: SpatialEventPoint;
   active: boolean;
   opacity: number;
+  teams: TeamPresentation[];
 }) {
   const radius = active ? 125 : 91.25;
-  const teams = [...new Set(point.actors.map((actor) => actor.teamNumber))]
+  const teamNumbers = [
+    ...new Set(point.actors.map((actor) => actor.teamNumber)),
+  ]
     .sort((first, second) => first - second)
     .slice(0, 2);
-  const colors = [teamColor(teams[0] ?? 0), teamColor(teams[1] ?? 1)];
+  const colors = [
+    teamColor(teams, teamNumbers[0] ?? 0),
+    teamColor(teams, teamNumbers[1] ?? 1),
+  ];
   return (
     <>
       {colors.map((color, index) => (
@@ -418,7 +479,11 @@ function FiftyMarker({
         <mesh renderOrder={5}>
           <octahedronGeometry args={[radius * 1.42, 0]} />
           <meshBasicMaterial
-            color={teamColor(point.scoringTeamNumber ?? 0)}
+            color={teamColor(
+              teams,
+              point.scoringTeamNumber ?? 0,
+              'secondaryColor',
+            )}
             depthWrite={false}
             opacity={opacity}
             transparent
@@ -439,12 +504,14 @@ function Marker({
   point,
   active,
   muted,
+  teams,
   onActivate,
 }: {
   profile: ArenaProfile;
   point: SpatialEventPoint;
   active: boolean;
   muted: boolean;
+  teams: TeamPresentation[];
   onActivate(id?: string): void;
 }) {
   const position =
@@ -452,7 +519,9 @@ function Marker({
       ? goalMarkerPosition(profile, point)
       : gameToScene(point);
   const team = point.actors[0]?.teamNumber;
-  const color = teamColor(point.scoringTeamNumber ?? team ?? 0);
+  const teamNumber = point.scoringTeamNumber ?? team ?? 0;
+  const primary = teamColor(teams, teamNumber);
+  const secondary = teamColor(teams, teamNumber, 'secondaryColor');
   const opacity = muted ? 0.12 : 1;
   const activate = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
@@ -473,16 +542,26 @@ function Marker({
         }}
       >
         {point.kind === 'goal' ? (
-          <GoalDisc active={active} opacity={opacity} />
+          <GoalDisc
+            active={active}
+            opacity={opacity}
+            primary={primary}
+            secondary={secondary}
+          />
         ) : point.kind === 'fifty' ? (
-          <FiftyMarker active={active} opacity={opacity} point={point} />
+          <FiftyMarker
+            active={active}
+            opacity={opacity}
+            point={point}
+            teams={teams}
+          />
         ) : point.isScoringTouch ? (
           <mesh renderOrder={4}>
             <octahedronGeometry args={[active ? 150 : 115, 0]} />
             <meshStandardMaterial
-              color={litMarkerColor(color, opacity)}
+              color={litMarkerColor(primary, opacity)}
               depthWrite={opacity === 1}
-              emissive={active ? color : '#000000'}
+              emissive={active ? secondary : '#000000'}
               emissiveIntensity={active ? 0.28 : 0}
               opacity={opacity}
               roughness={0.38}
@@ -493,9 +572,9 @@ function Marker({
           <mesh renderOrder={4}>
             <sphereGeometry args={[active ? 125 : 91.25, 20, 14]} />
             <meshStandardMaterial
-              color={litMarkerColor(color, opacity)}
+              color={litMarkerColor(primary, opacity)}
               depthWrite={opacity === 1}
-              emissive={active ? color : '#000000'}
+              emissive={active ? secondary : '#000000'}
               emissiveIntensity={active ? 0.28 : 0}
               opacity={opacity}
               roughness={0.38}
@@ -511,6 +590,7 @@ function Marker({
 
 function Scene({
   profile,
+  teams,
   points,
   cameraState,
   goalLabels,
@@ -524,7 +604,7 @@ function Scene({
       <color attach="background" args={['#0d1726']} />
       <ambientLight intensity={1.35} />
       <directionalLight position={[-5000, 9000, 3500]} intensity={2.2} />
-      <Field goalLabels={goalLabels} profile={profile} />
+      <Field goalLabels={goalLabels} profile={profile} teams={teams} />
       {points.map((point) => (
         <Marker
           key={point.id}
@@ -532,6 +612,7 @@ function Scene({
           point={point}
           active={point.id === activeId}
           muted={!!activeId && !emphasizedIds.includes(point.id)}
+          teams={teams}
           onActivate={onActivate}
         />
       ))}
@@ -542,6 +623,7 @@ function Scene({
 
 export interface BallTouchSceneProps {
   profile: ArenaProfile;
+  teams: TeamPresentation[];
   points: SpatialEventPoint[];
   cameraState: TouchMapCameraState;
   goalLabels: GoalLabel[];

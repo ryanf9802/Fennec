@@ -1,8 +1,13 @@
 import { ChevronRight, Radio } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { isWin } from '../domain/metrics';
-import { formatTeamScore, profileTeamNumber } from '../domain/teamPresentation';
+import {
+  formatTeamScore,
+  profileTeamNumber,
+  resolveTeamPresentation,
+} from '../domain/teamPresentation';
 import type { MatchState } from '../domain/types';
+import { TeamSwatch } from './TeamSwatch';
 
 function formatWhen(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -23,6 +28,10 @@ function Roster({
     (item) => item.primaryId === profileId,
   );
   if (profile) {
+    const profileTeam = resolveTeamPresentation(
+      match.teams,
+      profile.teamNumber,
+    );
     const teammates = match.participants.filter(
       (player) =>
         player.primaryId !== profileId &&
@@ -31,15 +40,25 @@ function Roster({
     const opponents = match.participants.filter(
       (player) => player.teamNumber !== profile.teamNumber,
     );
+    const opponentTeam = resolveTeamPresentation(
+      match.teams,
+      opponents[0]?.teamNumber ?? (profile.teamNumber === 0 ? 1 : 0),
+    );
     return (
       <div className="text-muted mt-1 truncate text-sm">
-        <span>Teammates: </span>
-        <span className="text-fennec-cyan font-bold">
+        <span className="inline-flex items-center gap-2">
+          <TeamSwatch team={profileTeam} />
+          <span>Teammates:</span>
+        </span>{' '}
+        <span className="text-main font-bold">
           {teammates.map((player) => player.name).join(', ') || '—'}
         </span>
         <span className="mx-2">·</span>
-        <span>Opponents: </span>
-        <span className="text-fennec-orange font-bold">
+        <span className="inline-flex items-center gap-2">
+          <TeamSwatch team={opponentTeam} />
+          <span>Opponents:</span>
+        </span>{' '}
+        <span className="text-main font-bold">
           {opponents.map((player) => player.name).join(', ') || '—'}
         </span>
       </div>
@@ -54,18 +73,15 @@ function Roster({
   return (
     <div className="text-muted mt-1 truncate text-sm">
       {teamNumbers.map((teamNumber, index) => {
-        const team = match.teams.find((item) => item.teamNumber === teamNumber);
+        const presentation = resolveTeamPresentation(match.teams, teamNumber);
         return (
           <span key={teamNumber}>
             {index > 0 && <span className="mx-2">·</span>}
-            <span>{team?.name || `Team ${teamNumber + 1}`}: </span>
-            <span
-              className={
-                teamNumber === 0
-                  ? 'text-fennec-cyan font-bold'
-                  : 'text-fennec-orange font-bold'
-              }
-            >
+            <span className="inline-flex items-center gap-2">
+              <TeamSwatch team={presentation} />
+              <span>{presentation.name}:</span>
+            </span>{' '}
+            <span className="text-main font-bold">
               {match.participants
                 .filter((player) => player.teamNumber === teamNumber)
                 .map((player) => player.name)

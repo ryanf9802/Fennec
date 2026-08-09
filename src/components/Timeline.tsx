@@ -1,5 +1,6 @@
 import { formatClock, timelineDisplayItems } from '../domain/timeline';
 import type { FennecSettings, MatchState } from '../domain/types';
+import { resolveTeamPresentation } from '../domain/teamPresentation';
 import { PlayerName } from './PlayerName';
 
 export function Timeline({
@@ -32,7 +33,10 @@ export function Timeline({
                   <PlayerName
                     key={`${part.text}:${index}`}
                     name={part.player.name}
-                    teamNumber={part.player.teamNumber}
+                    team={resolveTeamPresentation(
+                      match.teams,
+                      part.player.teamNumber,
+                    )}
                   />
                 ) : (
                   <span key={`${part.text}:${index}`}>{part.text}</span>

@@ -1,10 +1,13 @@
+import type { TeamPresentation } from '../domain/teamPresentation';
+import { TeamSwatch } from './TeamSwatch';
+
 /**
  * Renders a participant name with team-aware styling and optional indicators
  * for the tracked profile and bot players.
  */
 export function PlayerName({
   name,
-  teamNumber,
+  team,
   present = true,
   you = false,
   bot = false,
@@ -12,29 +15,26 @@ export function PlayerName({
   fill = false,
 }: {
   name: string;
-  teamNumber?: number;
+  team?: TeamPresentation;
   present?: boolean;
   you?: boolean;
   bot?: boolean;
   nameWeight?: 'medium' | 'bold';
   fill?: boolean;
 }) {
-  const teamName =
-    teamNumber === 0
-      ? 'Blue team'
-      : teamNumber === 1
-        ? 'Orange team'
-        : 'Team unknown';
+  const teamName = team ? `${team.name} team` : 'Team unknown';
   const playerStatus = present ? teamName : `${teamName}, no longer in match`;
   return (
     <span
       className={`${fill ? 'flex w-full' : 'inline-flex'} max-w-full min-w-0 items-center gap-2`}
     >
-      <span
-        aria-label={playerStatus}
-        title={playerStatus}
-        className={`inline-block size-2.5 shrink-0 rounded-full ${!present ? 'bg-slate-400' : teamNumber === 0 ? 'bg-fennec-cyan' : teamNumber === 1 ? 'bg-fennec-orange' : 'bg-slate-400'}`}
-      />
+      <span aria-label={playerStatus} title={playerStatus}>
+        {team ? (
+          <TeamSwatch team={team} present={present} />
+        ) : (
+          <span className="inline-block size-2.5 shrink-0 rounded-full bg-slate-400" />
+        )}
+      </span>
       <strong
         title={name}
         className={`min-w-0 truncate ${nameWeight === 'medium' ? 'font-medium' : ''}`}

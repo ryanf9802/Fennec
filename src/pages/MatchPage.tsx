@@ -7,6 +7,7 @@ import { PlayerProfileDialog } from '../components/PlayerProfileDialog';
 import { Timeline } from '../components/Timeline';
 import { formatClock, matchElapsedSeconds } from '../domain/timeline';
 import { MatchAnalytics } from '../components/MatchAnalytics';
+import { TeamSwatch } from '../components/TeamSwatch';
 import {
   playerIdentityKind,
   playerKeyFor,
@@ -16,6 +17,8 @@ import {
   formatTeamScore,
   orderedTeams,
   profileTeamNumber,
+  resolveTeamPresentation,
+  type TeamPresentation,
 } from '../domain/teamPresentation';
 import type { MatchState, ParticipantState } from '../domain/types';
 import { useMatch } from '../data/historyQueries';
@@ -38,10 +41,12 @@ const stats: Array<{
 
 function PlayerRow({
   player,
+  team,
   profileId,
   onInspect,
 }: {
   player: ParticipantState;
+  team: TeamPresentation;
   profileId?: string;
   onInspect(playerKey: string, playerName: string): void;
 }) {
@@ -66,7 +71,7 @@ function PlayerRow({
             <span className="min-w-0 flex-1">
               <PlayerName
                 name={player.name}
-                teamNumber={player.teamNumber}
+                team={team}
                 present={player.isPresent !== false}
                 bot={bot}
                 nameWeight="medium"
@@ -81,7 +86,7 @@ function PlayerRow({
         ) : (
           <PlayerName
             name={player.name}
-            teamNumber={player.teamNumber}
+            team={team}
             present={player.isPresent !== false}
             you={player.primaryId === profileId}
             bot={bot}
@@ -325,10 +330,17 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
                       colSpan={stats.length + 1}
                       className="px-3 py-2 text-left text-sm font-black uppercase tracking-wider"
                     >
-                      <span
-                        className={`mr-2 inline-block size-2.5 rounded-full ${team.teamNumber === 0 ? 'bg-fennec-cyan' : 'bg-fennec-orange'}`}
+                      <TeamSwatch
+                        team={resolveTeamPresentation(
+                          match.teams,
+                          team.teamNumber,
+                        )}
+                        className="mr-2"
                       />
-                      {team.name || `Team ${team.teamNumber + 1}`}
+                      {
+                        resolveTeamPresentation(match.teams, team.teamNumber)
+                          .name
+                      }
                       {match.winnerTeamNumber === team.teamNumber && (
                         <Trophy className="ml-2 inline size-4 text-amber-400" />
                       )}
@@ -341,6 +353,10 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
                       <PlayerRow
                         key={`${player.shortcut ?? playerKeyFor(player) ?? player.name}:${index}`}
                         player={player}
+                        team={resolveTeamPresentation(
+                          match.teams,
+                          player.teamNumber,
+                        )}
                         profileId={profile?.primaryId}
                         onInspect={(key, name) =>
                           setProfilePlayer({ key, name })

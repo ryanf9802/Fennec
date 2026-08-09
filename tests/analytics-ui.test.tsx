@@ -119,6 +119,64 @@ const match: MatchState = {
 };
 
 describe('ball touch map', () => {
+  it('passes normalized custom team palettes into the 3D scene', () => {
+    render(
+      <BallTouchMap
+        match={{
+          ...match,
+          teams: [
+            {
+              teamNumber: 0,
+              name: 'Neon Foxes',
+              score: 2,
+              colorPrimary: '65D9EE',
+              colorSecondary: '2563EB',
+            },
+            {
+              teamNumber: 1,
+              name: 'Solar Flare',
+              score: 1,
+              colorPrimary: 'FACC15',
+              colorSecondary: 'EF4444',
+            },
+          ],
+        }}
+        profileId="Steam|1|0"
+      />,
+    );
+
+    expect(scene.props?.teams).toEqual([
+      {
+        teamNumber: 0,
+        name: 'Neon Foxes',
+        primaryColor: '#65d9ee',
+        secondaryColor: '#2563eb',
+      },
+      {
+        teamNumber: 1,
+        name: 'Solar Flare',
+        primaryColor: '#facc15',
+        secondaryColor: '#ef4444',
+      },
+    ]);
+    expect(scene.props?.goalLabels).toEqual([
+      {
+        teamNumber: 0,
+        label: 'Your goal',
+        teamName: 'Neon Foxes',
+        primaryColor: '#65d9ee',
+        secondaryColor: '#2563eb',
+      },
+      {
+        teamNumber: 1,
+        label: 'Opponent goal',
+        teamName: 'Solar Flare',
+        primaryColor: '#facc15',
+        secondaryColor: '#ef4444',
+      },
+    ]);
+  });
+
   it('defaults to the selected player and supports all-touch filtering', () => {
     render(<BallTouchMap match={match} profileId="Steam|1|0" />);
     const map = screen.getByRole('img', { name: /soccar 3d ball touch map/i });
@@ -138,8 +196,20 @@ describe('ball touch map', () => {
     expect(scene.props?.cameraState.yaw).toBe(0);
     expect(scene.props?.orientationYaw).toBe(0);
     expect(scene.props?.goalLabels).toEqual([
-      { teamNumber: 0, label: 'Your goal', teamName: 'Blue' },
-      { teamNumber: 1, label: 'Opponent goal', teamName: 'Orange' },
+      {
+        teamNumber: 0,
+        label: 'Your goal',
+        teamName: 'Blue',
+        primaryColor: '#36d7ff',
+        secondaryColor: '#2563eb',
+      },
+      {
+        teamNumber: 1,
+        label: 'Opponent goal',
+        teamName: 'Orange',
+        primaryColor: '#ff8a3d',
+        secondaryColor: '#c2410c',
+      },
     ]);
     for (const keyLabel of [
       '● Blue touch',
@@ -263,8 +333,20 @@ describe('ball touch map', () => {
     expect(scene.props?.cameraState.yaw).toBe(0);
     expect(scene.props?.orientationYaw).toBe(180);
     expect(scene.props?.goalLabels).toEqual([
-      { teamNumber: 1, label: 'Your goal', teamName: 'Orange' },
-      { teamNumber: 0, label: 'Opponent goal', teamName: 'Blue' },
+      {
+        teamNumber: 1,
+        label: 'Your goal',
+        teamName: 'Orange',
+        primaryColor: '#ff8a3d',
+        secondaryColor: '#c2410c',
+      },
+      {
+        teamNumber: 0,
+        label: 'Opponent goal',
+        teamName: 'Blue',
+        primaryColor: '#36d7ff',
+        secondaryColor: '#2563eb',
+      },
     ]);
   });
 

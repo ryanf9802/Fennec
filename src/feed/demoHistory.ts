@@ -60,6 +60,42 @@ function event(
   };
 }
 
+function demoTeams(id: string, blueScore: number, orangeScore: number) {
+  if (id === 'demo-history-1')
+    return [
+      {
+        teamNumber: 0,
+        name: 'Neon Foxes',
+        score: blueScore,
+        colorPrimary: '65D9EE',
+        colorSecondary: '2563EB',
+      },
+      {
+        teamNumber: 1,
+        name: 'Solar Flare',
+        score: orangeScore,
+        colorPrimary: 'FACC15',
+        colorSecondary: 'EF4444',
+      },
+    ];
+  return [
+    {
+      teamNumber: 0,
+      name: 'Blue',
+      score: blueScore,
+      colorPrimary: '42d9ff',
+      colorSecondary: '2563eb',
+    },
+    {
+      teamNumber: 1,
+      name: 'Orange',
+      score: orangeScore,
+      colorPrimary: 'ff8a3d',
+      colorSecondary: 'c2410c',
+    },
+  ];
+}
+
 function demoMatch(
   id: string,
   startedAt: Date,
@@ -87,15 +123,7 @@ function demoMatch(
     isOvertime: false,
     isReplay: false,
     winnerTeamNumber: won ? youTeam : 1,
-    teams: [
-      { teamNumber: 0, name: 'Blue', score: blueScore, colorPrimary: '42d9ff' },
-      {
-        teamNumber: 1,
-        name: 'Orange',
-        score: orangeScore,
-        colorPrimary: 'ff8a3d',
-      },
-    ],
+    teams: demoTeams(id, blueScore, orangeScore),
     participants: teammates
       ? [
           player('you', 0, Math.max(1, blueScore - 1), 510),

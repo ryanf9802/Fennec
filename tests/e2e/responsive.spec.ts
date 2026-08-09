@@ -255,6 +255,55 @@ test('3D touch map controls and preference persist across matches', async ({
   ).toBeVisible();
 });
 
+test('custom team identity uses exact accents and theme-colored text', async ({
+  page,
+}) => {
+  await page.goto('/matches/demo-history-1?demo=1');
+  const neonHeader = page
+    .locator('.scoreboard-table th')
+    .filter({ hasText: 'Neon Foxes' });
+  const solarHeader = page
+    .locator('.scoreboard-table th')
+    .filter({ hasText: 'Solar Flare' });
+  await expect(neonHeader).toBeVisible();
+  await expect(solarHeader).toBeVisible();
+
+  const teamStyles = await page
+    .locator('.scoreboard-table tbody > tr:first-child [data-team-number]')
+    .evaluateAll((swatches) =>
+      swatches.slice(0, 2).map((swatch) => {
+        const style = getComputedStyle(swatch);
+        return {
+          background: style.backgroundColor,
+          border: style.borderColor,
+        };
+      }),
+    );
+  expect(teamStyles).toEqual([
+    { background: 'rgb(101, 217, 238)', border: 'rgb(37, 99, 235)' },
+    { background: 'rgb(250, 204, 21)', border: 'rgb(239, 68, 68)' },
+  ]);
+  await expect(neonHeader).toHaveCSS('color', 'rgb(244, 248, 255)');
+  await page.getByRole('tab', { name: 'Touch map' }).click();
+  const touchMap = page.getByTestId('ball-touch-map-viewport');
+  const scene = touchMap.getByRole('img', { name: /3d ball touch map/i });
+  await expect(scene).toBeVisible();
+  await expect(touchMap.getByRole('alert')).toHaveCount(0);
+  await expect(scene).toHaveAccessibleName(
+    /Your goal Neon Foxes, Opponent goal Solar Flare/i,
+  );
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = 'light';
+  });
+  await expect(neonHeader).toHaveCSS('color', 'rgb(16, 35, 61)');
+  await expect(
+    page.locator(
+      '.scoreboard-table tbody > tr:first-child [data-team-number="0"]',
+    ),
+  ).toHaveCSS('background-color', 'rgb(101, 217, 238)');
+});
+
 test('completed matches show continuous elapsed time', async ({ page }) => {
   await page.goto('/matches/demo-current-2?demo=1');
   await expect(

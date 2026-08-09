@@ -3,6 +3,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { MatchRow } from '../src/components/MatchRow';
 import { MatchPage } from '../src/pages/MatchPage';
 import { calculatePlayerHistory } from '../src/domain/playerHistory';
+import {
+  normalizeTeamColor,
+  resolveTeamPresentation,
+} from '../src/domain/teamPresentation';
 import { defaultSettings, type MatchState } from '../src/domain/types';
 
 vi.mock('../src/app/FennecContext', () => ({
@@ -68,6 +72,42 @@ const match: MatchState = {
 };
 
 describe('user-first team presentation', () => {
+  it('normalizes API colors and falls back safely for incomplete teams', () => {
+    expect(normalizeTeamColor(' ABC123 ')).toBe('#abc123');
+    expect(normalizeTeamColor('#12abEF')).toBe('#12abef');
+    expect(normalizeTeamColor('transparent')).toBeUndefined();
+    expect(
+      resolveTeamPresentation(
+        [
+          {
+            teamNumber: 0,
+            name: '  Neon Foxes  ',
+            score: 0,
+            colorPrimary: '65D9EE',
+            colorSecondary: '',
+          },
+        ],
+        0,
+      ),
+    ).toEqual({
+      teamNumber: 0,
+      name: 'Neon Foxes',
+      primaryColor: '#65d9ee',
+      secondaryColor: '#65d9ee',
+    });
+    expect(resolveTeamPresentation([], 1)).toEqual({
+      teamNumber: 1,
+      name: 'Orange',
+      primaryColor: '#ff8a3d',
+      secondaryColor: '#c2410c',
+    });
+    expect(resolveTeamPresentation([], 4)).toMatchObject({
+      name: 'Team 5',
+      primaryColor: '#94a3b8',
+      secondaryColor: '#475569',
+    });
+  });
+
   it('shows the user score first in game rows', () => {
     render(
       <MemoryRouter>
@@ -101,6 +141,44 @@ describe('user-first team presentation', () => {
       expect.stringMatching(/^Orange.*You/),
       expect.stringMatching(/^Blue.*Opponent/),
     ]);
+  });
+
+  it('renders custom team names and colors as accents instead of text colors', () => {
+    const custom = {
+      ...match,
+      teams: [
+        {
+          teamNumber: 0,
+          name: 'Solar Flare',
+          score: 0,
+          colorPrimary: 'FACC15',
+          colorSecondary: 'EF4444',
+        },
+        {
+          teamNumber: 1,
+          name: 'Neon Foxes',
+          score: 2,
+          colorPrimary: '65D9EE',
+          colorSecondary: '2563EB',
+        },
+      ],
+    };
+    render(
+      <MemoryRouter>
+        <MatchPage match={custom} />
+      </MemoryRouter>,
+    );
+
+    const teamName = screen.getByText('Neon Foxes');
+    const swatch = teamName.parentElement?.querySelector(
+      '[data-team-number="1"]',
+    );
+    expect(teamName).not.toHaveStyle({ color: '#65d9ee' });
+    expect(swatch).toHaveStyle({
+      backgroundColor: '#65d9ee',
+      borderColor: '#2563eb',
+    });
+    expect(screen.getByLabelText('Neon Foxes team')).toBeInTheDocument();
   });
 
   it('caps and truncates long player names without hiding their full value', () => {

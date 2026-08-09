@@ -20,6 +20,7 @@ import {
   type TouchMapCameraState,
 } from '../domain/touchMapGeometry';
 import type { MatchState } from '../domain/types';
+import { resolveTeamPresentation } from '../domain/teamPresentation';
 import { BallTouchScene } from './BallTouchScene';
 
 type Filter = 'all' | 'self' | 'team' | 'opponents' | `player:${string}`;
@@ -149,9 +150,15 @@ export function BallTouchMap({
   const orientationYaw = profilePlayer?.teamNumber === 1 ? 180 : 0;
   const leftTeamNumber = profilePlayer?.teamNumber ?? 0;
   const rightTeamNumber = leftTeamNumber === 0 ? 1 : 0;
-  const teamName = (teamNumber: number) =>
-    match.teams.find((team) => team.teamNumber === teamNumber)?.name ??
-    (teamNumber === 0 ? 'Blue' : 'Orange');
+  const teamNumbers = [
+    ...new Set([0, 1, ...match.teams.map((team) => team.teamNumber)]),
+  ];
+  const teams = teamNumbers.map((teamNumber) =>
+    resolveTeamPresentation(match.teams, teamNumber),
+  );
+  const teamPresentation = (teamNumber: number) =>
+    teams.find((team) => team.teamNumber === teamNumber) ??
+    resolveTeamPresentation(match.teams, teamNumber);
   const [filter, setFilter] = useState<Filter>(
     hasProfileTouches ? 'self' : 'all',
   );
@@ -163,15 +170,19 @@ export function BallTouchMap({
           teamNumber: leftTeamNumber,
           label: profilePlayer
             ? 'Your goal'
-            : `${teamName(leftTeamNumber)} goal`,
-          teamName: teamName(leftTeamNumber),
+            : `${teamPresentation(leftTeamNumber).name} goal`,
+          teamName: teamPresentation(leftTeamNumber).name,
+          primaryColor: teamPresentation(leftTeamNumber).primaryColor,
+          secondaryColor: teamPresentation(leftTeamNumber).secondaryColor,
         },
         {
           teamNumber: rightTeamNumber,
           label: profilePlayer
             ? 'Opponent goal'
-            : `${teamName(rightTeamNumber)} goal`,
-          teamName: teamName(rightTeamNumber),
+            : `${teamPresentation(rightTeamNumber).name} goal`,
+          teamName: teamPresentation(rightTeamNumber).name,
+          primaryColor: teamPresentation(rightTeamNumber).primaryColor,
+          secondaryColor: teamPresentation(rightTeamNumber).secondaryColor,
         },
       ]
     : [];
@@ -377,6 +388,7 @@ export function BallTouchMap({
         <SceneErrorBoundary>
           <BallTouchScene
             profile={arena}
+            teams={teams}
             points={visible}
             cameraState={camera}
             goalLabels={goalLabels}

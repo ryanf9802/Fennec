@@ -139,8 +139,10 @@ describe('player profile UI', () => {
     expect(screen.getByText('BOT')).toBeInTheDocument();
     expect(screen.getByText('Boomer')).toHaveClass('font-medium');
     expect(
-      screen.getByLabelText('Orange team, no longer in match'),
-    ).toHaveClass('bg-slate-400');
+      screen
+        .getByLabelText('Orange team, no longer in match')
+        .querySelector('[data-team-number="1"]'),
+    ).toHaveStyle({ backgroundColor: '#94a3b8' });
     expect(screen.queryByText('LEFT')).not.toBeInTheDocument();
     expect(screen.getByText('YOU')).toHaveClass(
       'inline-flex',
