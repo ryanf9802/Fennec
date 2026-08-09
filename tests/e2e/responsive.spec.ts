@@ -212,7 +212,7 @@ test('3D touch map controls and preference persist across matches', async ({
       ))!
         .split(',')
         .map(Number);
-      return targetX > 0 && targetZ > 0;
+      return targetX < 0 && targetZ < 0;
     })
     .toBe(true);
   const [pannedTargetX, pannedTargetZ] = (await viewport.getAttribute(
@@ -220,8 +220,8 @@ test('3D touch map controls and preference persist across matches', async ({
   ))!
     .split(',')
     .map(Number);
-  expect(pannedTargetX).toBeGreaterThan(0);
-  expect(pannedTargetZ).toBeGreaterThan(0);
+  expect(pannedTargetX).toBeLessThan(0);
+  expect(pannedTargetZ).toBeLessThan(0);
   await page.mouse.up();
   await expect(viewport).toHaveCSS('cursor', 'grab');
   await expect(viewport).not.toHaveAttribute('data-camera-target', '0,0');

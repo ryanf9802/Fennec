@@ -320,8 +320,8 @@ export function BallTouchMap({
       camera.distance / Math.max(320, event.currentTarget.clientHeight);
     updateCamera((current) => ({
       ...current,
-      targetX: current.targetX + dx * scale,
-      targetZ: current.targetZ + dy * scale,
+      targetX: current.targetX - dx * scale,
+      targetZ: current.targetZ - dy * scale,
     }));
   };
   const stopDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
