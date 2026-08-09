@@ -59,6 +59,7 @@ export interface HistoryRepository {
   countMatches(profileKey?: string): Promise<number>;
   countSessions(profileKey?: string): Promise<number>;
   firstMatchStartedAt(profileKey?: string): Promise<string | undefined>;
+  prepareProfileSessions(profileKey: string): Promise<void>;
   listSessions(
     profileKey?: string,
     cursor?: string,
@@ -95,7 +96,10 @@ export interface HistoryRepository {
   ): AsyncIterable<MatchState>;
   saveMatch(match: MatchState, sessionGapMinutes: number): Promise<void>;
   deleteMatch(id: string): Promise<boolean>;
-  endCurrentSession(activeMatchId?: string): Promise<EndSessionResult>;
+  endCurrentSession(
+    profileKey: string,
+    activeMatchId?: string,
+  ): Promise<EndSessionResult>;
   clearHistory(): Promise<void>;
   replaceAll(
     matches: MatchState[],

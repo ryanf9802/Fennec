@@ -177,6 +177,11 @@ describe('version 4 player-key migration', () => {
         ?.fifties,
     ).toBe(1);
     expect((await db.metadata.get('normalized-v6'))?.value).toBe(true);
+    expect(await db.profileSessionCaches.count()).toBe(0);
+    expect(
+      (await historyRepository.listSessions('id:Steam|you|0')).items,
+    ).toHaveLength(1);
+    expect(await db.profileSessionCaches.count()).toBe(1);
     expect(
       migrated?.events.find((event) => event.eventName === 'GoalScored')
         ?.payload.DebugOnly,

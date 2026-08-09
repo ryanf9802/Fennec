@@ -155,6 +155,7 @@ describe('portable data', () => {
         {
           ...value,
           sessionEndedAfter: true,
+          sessionEndedAfterByPrimaryIds: ['Steam|viewer|0'],
           observedByPrimaryId: 'Steam|viewer|0',
         },
       ],
@@ -167,6 +168,7 @@ describe('portable data', () => {
     expect(parseBackup(JSON.stringify(backup)).matches[0]).toMatchObject({
       id: 'one',
       sessionEndedAfter: true,
+      sessionEndedAfterByPrimaryIds: ['Steam|viewer|0'],
       observedByPrimaryId: 'Steam|viewer|0',
     });
     expect(backup.version).toBe(5);

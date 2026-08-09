@@ -693,6 +693,35 @@ test('profile player selection is searchable and explicit', async ({
 }) => {
   await page.goto('/profile?demo=1');
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+  const readProfileSessionCaches = () =>
+    page.evaluate(async () => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('fennec');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+      try {
+        return await new Promise<Array<{ playerKey: string; stale: number }>>(
+          (resolve, reject) => {
+            const request = database
+              .transaction('profileSessionCaches', 'readonly')
+              .objectStore('profileSessionCaches')
+              .getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          },
+        );
+      } finally {
+        database.close();
+      }
+    });
+  await expect
+    .poll(async () => {
+      const caches = await readProfileSessionCaches();
+      return caches.map(({ playerKey }) => playerKey);
+    })
+    .toEqual(['id:Steam|demo-you|0']);
   const search = page.getByRole('combobox', { name: 'Search players' });
   await expect(search).toHaveAttribute(
     'placeholder',
@@ -726,6 +755,14 @@ test('profile player selection is searchable and explicit', async ({
     page.getByText('Profile updated.', { exact: true }),
   ).toBeVisible();
   await expect(page.getByText('Luna', { exact: true }).first()).toBeVisible();
+  await expect
+    .poll(async () => {
+      const caches = await readProfileSessionCaches();
+      return caches
+        .map(({ playerKey, stale }) => `${playerKey}:${stale}`)
+        .sort();
+    })
+    .toEqual(['id:Epic|demo-luna|0:0', 'id:Steam|demo-you|0:1']);
 });
 
 test('dashboard abbreviates GFA while session detail uses the full label', async ({

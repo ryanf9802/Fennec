@@ -79,12 +79,26 @@ interface ProfileMatchRecord {
   id: string;
   playerKey: string;
   matchId: string;
-  sessionId: string;
+  sessionId?: string;
   startedAt: string;
   playlistId: number;
   playlistCategory: MatchState['playlistCategory'];
   result: 'win' | 'loss' | 'incomplete';
   involvement: 'played' | 'spectated';
+}
+interface ProfileSessionRecord {
+  id: string;
+  playerKey: string;
+  sessionId: string;
+  startedAt: string;
+  endedAt: string;
+  matchIds: string[];
+  endedManually: boolean;
+}
+interface ProfileSessionCacheRecord {
+  playerKey: string;
+  idleMinutes: number;
+  stale: 0 | 1;
 }
 interface PairRecord {
   id: string;
@@ -157,7 +171,7 @@ function appearance(
 
 function profileMatchRecords(
   match: MatchState,
-  sessionId: string,
+  sessionId?: string,
 ): ProfileMatchRecord[] {
   const values = new Map<string, ProfileMatchRecord>();
   for (const player of match.participants) {
@@ -363,6 +377,72 @@ function groupSessionRecords(
   return { records, byMatch };
 }
 
+function profileEndedSession(
+  match: Pick<
+    MatchState,
+    'sessionEndedAfter' | 'sessionEndedAfterByPrimaryIds'
+  >,
+  primaryId?: string,
+): boolean {
+  return (
+    match.sessionEndedAfter === true ||
+    (!!primaryId &&
+      match.sessionEndedAfterByPrimaryIds?.includes(primaryId) === true)
+  );
+}
+
+function groupProfileSessionRecords(
+  playerKey: string,
+  matches: StoredMatch[],
+  idleMinutes: number,
+): {
+  records: ProfileSessionRecord[];
+  byMatch: Map<string, string>;
+} {
+  const ordered = [...matches].sort(
+    (left, right) =>
+      left.startedAt.localeCompare(right.startedAt) ||
+      left.id.localeCompare(right.id),
+  );
+  const primaryId = playerPrimaryId(playerKey);
+  const records: ProfileSessionRecord[] = [];
+  const byMatch = new Map<string, string>();
+  let prior: StoredMatch | undefined;
+  for (const match of ordered) {
+    const beginsSession =
+      !prior ||
+      startsNewSession(
+        {
+          ...prior,
+          sessionEndedAfter: profileEndedSession(prior, primaryId)
+            ? true
+            : undefined,
+        },
+        match,
+        idleMinutes,
+      );
+    if (beginsSession) {
+      const sessionId = sessionIdFor(match);
+      records.push({
+        id: `${playerKey}\u0000${sessionId}`,
+        playerKey,
+        sessionId,
+        startedAt: match.startedAt,
+        endedAt: match.endedAt ?? match.lastEventAt,
+        matchIds: [],
+        endedManually: false,
+      });
+    }
+    const session = records.at(-1)!;
+    session.matchIds.push(match.id);
+    session.endedAt = match.endedAt ?? match.lastEventAt;
+    session.endedManually = profileEndedSession(match, primaryId);
+    byMatch.set(match.id, session.sessionId);
+    prior = match;
+  }
+  return { records, byMatch };
+}
+
 function buildCatalog(events: TimelineEvent[]): Record<string, string[]> {
   const result: Record<string, Set<string>> = {};
   for (const event of events) {
@@ -383,6 +463,8 @@ class FennecDatabase extends Dexie {
   rawEvents!: EntityTable<RawEventRecord, 'id'>;
   appearances!: EntityTable<AppearanceRecord, 'id'>;
   profileMatches!: EntityTable<ProfileMatchRecord, 'id'>;
+  profileSessions!: EntityTable<ProfileSessionRecord, 'id'>;
+  profileSessionCaches!: EntityTable<ProfileSessionCacheRecord, 'playerKey'>;
   players!: EntityTable<StoredPlayerRecord, 'primaryId'>;
   pairs!: EntityTable<PairRecord, 'id'>;
   relationships!: EntityTable<RelationshipRecord, 'id'>;
@@ -508,6 +590,37 @@ class FennecDatabase extends Dexie {
             .table<ProfileMatchRecord>('profileMatches')
             .bulkPut(records);
       });
+    this.version(6)
+      .stores({
+        matches:
+          'id, startedAt, [startedAt+id], lastEventAt, lifecycle, playlistCategory, playlistId, sessionId',
+        events:
+          'id, matchId, sequence, receivedAt, eventName, [matchId+sequence]',
+        rawEvents: 'id, matchId, receivedAt, [receivedAt+id]',
+        appearances:
+          'id, matchId, playerKey, primaryId, [matchId+playerKey], [playerKey+startedAt+matchId], [playerKey+playlistCategory+startedAt+matchId], [playerKey+playlistId+startedAt+matchId], [playerKey+result+startedAt+matchId]',
+        profileMatches:
+          'id, matchId, playerKey, sessionId, [playerKey+sessionId], [playerKey+startedAt+matchId], [playerKey+playlistCategory+startedAt+matchId], [playerKey+playlistId+startedAt+matchId], [playerKey+result+startedAt+matchId]',
+        profileSessions:
+          'id, playerKey, sessionId, [playerKey+startedAt+sessionId]',
+        profileSessionCaches: 'playerKey, stale',
+        players:
+          'primaryId, platformPrimaryId, identityKind, normalizedName, firstSeen, lastSeen, [identityKind+normalizedName], [identityKind+lastSeen]',
+        pairs: 'id, matchId, [playerAKey+playerBKey+startedAt+matchId]',
+        relationships: 'id, [playerAKey+playerBKey]',
+        sessions: 'id, startedAt, [startedAt+id]',
+        settings: 'key',
+        profiles: 'key, primaryId',
+        metadata: 'key',
+      })
+      .upgrade(async (transaction) => {
+        await transaction
+          .table<ProfileMatchRecord>('profileMatches')
+          .toCollection()
+          .modify((record) => {
+            delete record.sessionId;
+          });
+      });
   }
 }
 
@@ -523,6 +636,8 @@ async function normalizeExistingData(): Promise<void> {
       db.rawEvents,
       db.appearances,
       db.profileMatches,
+      db.profileSessions,
+      db.profileSessionCaches,
       db.players,
       db.pairs,
       db.relationships,
@@ -574,7 +689,7 @@ async function normalizeExistingData(): Promise<void> {
         match.participants.map((player) => appearance(match, player)),
       );
       const profileMatches = hydrated.flatMap((match) =>
-        profileMatchRecords(match, grouped.byMatch.get(match.id)!),
+        profileMatchRecords(match),
       );
       const players = new Map<string, StoredPlayerRecord>();
       for (const item of appearances) {
@@ -609,6 +724,8 @@ async function normalizeExistingData(): Promise<void> {
         db.rawEvents.clear(),
         db.appearances.clear(),
         db.profileMatches.clear(),
+        db.profileSessions.clear(),
+        db.profileSessionCaches.clear(),
         db.players.clear(),
         db.pairs.clear(),
         db.relationships.clear(),
@@ -1040,10 +1157,13 @@ async function writeMatch(
       db.rawEvents,
       db.appearances,
       db.profileMatches,
+      db.profileSessions,
+      db.profileSessionCaches,
       db.players,
       db.pairs,
       db.relationships,
       db.sessions,
+      db.profiles,
       db.metadata,
     ],
     async () => {
@@ -1065,8 +1185,54 @@ async function writeMatch(
       if (staleAppearanceIds.length)
         await db.appearances.bulkDelete(staleAppearanceIds);
       if (appearances.length) await db.appearances.bulkPut(appearances);
+      const existingProfileMatches = await db.profileMatches
+        .where('matchId')
+        .equals(match.id)
+        .toArray();
+      const existingByPlayer = new Map(
+        existingProfileMatches.map((item) => [item.playerKey, item]),
+      );
+      const profileMatches = profileMatchRecords(match);
+      const nextByPlayer = new Map(
+        profileMatches.map((item) => [item.playerKey, item]),
+      );
+      const activeProfile = await db.profiles.get('profile');
+      const activePlayerKey = playerKeyForPrimaryId(activeProfile?.primaryId);
+      const affectedPlayerKeys = new Set([
+        ...existingByPlayer.keys(),
+        ...nextByPlayer.keys(),
+      ]);
+      for (const playerKey of affectedPlayerKeys) {
+        const cache = await db.profileSessionCaches.get(playerKey);
+        if (!cache) continue;
+        const existingLink = existingByPlayer.get(playerKey);
+        const nextLink = nextByPlayer.get(playerKey);
+        const canRefreshActiveSession =
+          playerKey === activePlayerKey &&
+          cache.stale === 0 &&
+          cache.idleMinutes === idleMinutes &&
+          !!existingLink?.sessionId &&
+          !!nextLink &&
+          existingLink.startedAt === nextLink.startedAt;
+        if (!canRefreshActiveSession) {
+          await db.profileSessionCaches.put({ ...cache, stale: 1 });
+          continue;
+        }
+        const session = await db.profileSessions.get(
+          `${playerKey}\u0000${existingLink.sessionId}`,
+        );
+        if (session?.matchIds.at(-1) !== match.id) {
+          await db.profileSessionCaches.put({ ...cache, stale: 1 });
+          continue;
+        }
+        nextLink.sessionId = existingLink.sessionId;
+        await db.profileSessions.put({
+          ...session,
+          endedAt: match.endedAt ?? match.lastEventAt,
+          endedManually: profileEndedSession(match, activeProfile?.primaryId),
+        });
+      }
       await db.profileMatches.where('matchId').equals(match.id).delete();
-      const profileMatches = profileMatchRecords(match, sessionId);
       if (profileMatches.length)
         await db.profileMatches.bulkPut(profileMatches);
       for (const item of appearances) {
@@ -1205,6 +1371,79 @@ async function settleMatchWrites(): Promise<void> {
   while (matchDrains.size) await Promise.all([...matchDrains.values()]);
 }
 
+const profileSessionBuilds = new Map<string, Promise<void>>();
+
+async function rebuildProfileSessions(
+  playerKey: string,
+  idleMinutes: number,
+): Promise<void> {
+  await db.transaction(
+    'rw',
+    [
+      db.matches,
+      db.profileMatches,
+      db.profileSessions,
+      db.profileSessionCaches,
+    ],
+    async () => {
+      const links = await db.profileMatches
+        .where('[playerKey+startedAt+matchId]')
+        .between(
+          [playerKey, stringMinKey, stringMinKey],
+          [playerKey, stringMaxKey, stringMaxKey],
+        )
+        .toArray();
+      const matches = (
+        await db.matches.bulkGet(links.map((item) => item.matchId))
+      )
+        .filter((item): item is StoredMatch => !!item)
+        .sort(
+          (left, right) =>
+            left.startedAt.localeCompare(right.startedAt) ||
+            left.id.localeCompare(right.id),
+        );
+      const grouped = groupProfileSessionRecords(
+        playerKey,
+        matches,
+        idleMinutes,
+      );
+      await db.profileSessions.where('playerKey').equals(playerKey).delete();
+      if (grouped.records.length)
+        await db.profileSessions.bulkPut(grouped.records);
+      if (links.length)
+        await db.profileMatches.bulkPut(
+          links.map((item) => ({
+            ...item,
+            sessionId: grouped.byMatch.get(item.matchId),
+          })),
+        );
+      await db.profileSessionCaches.put({
+        playerKey,
+        idleMinutes,
+        stale: 0,
+      });
+    },
+  );
+}
+
+export async function prepareProfileSessions(playerKey: string): Promise<void> {
+  await normalizeExistingData();
+  await settleMatchWrites();
+  const idleMinutes = (await loadSettings()).sessionGapMinutes;
+  const cache = await db.profileSessionCaches.get(playerKey);
+  if (cache?.stale === 0 && cache.idleMinutes === idleMinutes) return;
+  const existing = profileSessionBuilds.get(playerKey);
+  if (existing) {
+    await existing;
+    return prepareProfileSessions(playerKey);
+  }
+  const build = rebuildProfileSessions(playerKey, idleMinutes).finally(() =>
+    profileSessionBuilds.delete(playerKey),
+  );
+  profileSessionBuilds.set(playerKey, build);
+  return build;
+}
+
 export async function deleteMatch(id: string): Promise<boolean> {
   await settleMatchWrites();
   await normalizeExistingData();
@@ -1216,6 +1455,8 @@ export async function deleteMatch(id: string): Promise<boolean> {
       db.rawEvents,
       db.appearances,
       db.profileMatches,
+      db.profileSessions,
+      db.profileSessionCaches,
       db.players,
       db.pairs,
       db.relationships,
@@ -1229,9 +1470,9 @@ export async function deleteMatch(id: string): Promise<boolean> {
       if (match.lifecycle === 'live')
         throw new Error('Live matches cannot be deleted.');
 
-      const [deletedAppearances, deletedPairs, session, settings] =
+      const [deletedProfileMatches, deletedPairs, session, settings] =
         await Promise.all([
-          db.appearances.where('matchId').equals(id).toArray(),
+          db.profileMatches.where('matchId').equals(id).toArray(),
           db.pairs.where('matchId').equals(id).toArray(),
           db.sessions.get(match.sessionId),
           loadSettings(),
@@ -1246,10 +1487,40 @@ export async function deleteMatch(id: string): Promise<boolean> {
       ]);
 
       const affectedPlayerKeys = new Set(
-        deletedAppearances
-          .map((item) => item.playerKey)
-          .filter((playerKey): playerKey is string => !!playerKey),
+        deletedProfileMatches.map((item) => item.playerKey),
       );
+      for (const playerKey of affectedPlayerKeys) {
+        const cache = await db.profileSessionCaches.get(playerKey);
+        if (cache) await db.profileSessionCaches.put({ ...cache, stale: 1 });
+      }
+      for (const primaryId of match.sessionEndedAfterByPrimaryIds ?? []) {
+        const playerKey = playerKeyForPrimaryId(primaryId);
+        const deletedLink = deletedProfileMatches.find(
+          (item) => item.playerKey === playerKey,
+        );
+        if (!playerKey || !deletedLink?.sessionId) continue;
+        const priorLink = await db.profileMatches
+          .where('[playerKey+startedAt+matchId]')
+          .between(
+            [playerKey, stringMinKey, stringMinKey],
+            [playerKey, deletedLink.startedAt, deletedLink.matchId],
+            true,
+            false,
+          )
+          .last();
+        if (!priorLink) continue;
+        const priorMatch = await db.matches.get(priorLink.matchId);
+        if (!priorMatch) continue;
+        await db.matches.put({
+          ...priorMatch,
+          sessionEndedAfterByPrimaryIds: [
+            ...new Set([
+              ...(priorMatch.sessionEndedAfterByPrimaryIds ?? []),
+              primaryId,
+            ]),
+          ],
+        });
+      }
       for (const playerKey of affectedPlayerKeys) {
         const remaining = await db.appearances
           .where('[playerKey+startedAt+matchId]')
@@ -1323,17 +1594,6 @@ export async function deleteMatch(id: string): Promise<boolean> {
               sessionId: grouped.byMatch.get(item.id)!,
             })),
           );
-        const remainingProfileMatches = await db.profileMatches
-          .where('sessionId')
-          .equals(session.id)
-          .toArray();
-        if (remainingProfileMatches.length)
-          await db.profileMatches.bulkPut(
-            remainingProfileMatches.map((item) => ({
-              ...item,
-              sessionId: grouped.byMatch.get(item.matchId)!,
-            })),
-          );
       }
 
       await db.metadata.put({
@@ -1346,83 +1606,52 @@ export async function deleteMatch(id: string): Promise<boolean> {
 }
 
 export async function endCurrentSession(
+  profileKey: string,
   activeMatchId?: string,
 ): Promise<EndSessionResult> {
-  await normalizeExistingData();
-  await settleMatchWrites();
-  return db.transaction(
+  await prepareProfileSessions(profileKey);
+  const primaryId = playerPrimaryId(profileKey);
+  if (!primaryId) return 'unchanged';
+  const result = await db.transaction(
     'rw',
-    [db.matches, db.profileMatches, db.sessions],
+    [
+      db.matches,
+      db.profileMatches,
+      db.profileSessions,
+      db.profileSessionCaches,
+    ],
     async () => {
-      const ordered = await db.matches.orderBy('[startedAt+id]').toArray();
-      if (!ordered.length) return 'unchanged';
-
-      if (!activeMatchId) {
-        const latest = ordered.at(-1)!;
-        if (latest.sessionEndedAfter) return 'unchanged';
-        await db.matches.put({ ...latest, sessionEndedAfter: true });
-        return 'ended';
-      }
-
-      const activeIndex = ordered.findIndex(
-        (match) => match.id === activeMatchId,
-      );
-      if (activeIndex <= 0) return 'unchanged';
-      const active = ordered[activeIndex]!;
-      const prior = ordered[activeIndex - 1]!;
-      if (active.sessionId !== prior.sessionId) return 'unchanged';
-
-      const session = await db.sessions.get(active.sessionId);
-      if (!session) return 'unchanged';
-      const sessionMatches = (await db.matches.bulkGet(session.matchIds))
-        .filter((match): match is StoredMatch => !!match)
-        .sort(
-          (left, right) =>
-            left.startedAt.localeCompare(right.startedAt) ||
-            left.id.localeCompare(right.id),
-        );
-      const splitIndex = sessionMatches.findIndex(
-        (match) => match.id === activeMatchId,
-      );
-      if (splitIndex <= 0) return 'unchanged';
-
-      const before = sessionMatches.slice(0, splitIndex);
-      const after = sessionMatches.slice(splitIndex);
-      const boundary = before.at(-1)!;
-      const firstMoved = after[0]!;
-      const newSessionId = sessionIdFor(firstMoved);
-      await db.matches.bulkPut([
-        { ...boundary, sessionEndedAfter: true },
-        ...after.map((match) => ({ ...match, sessionId: newSessionId })),
-      ]);
-      const movedProfileMatches = await db.profileMatches
-        .where('matchId')
-        .anyOf(after.map((match) => match.id))
-        .toArray();
-      if (movedProfileMatches.length)
-        await db.profileMatches.bulkPut(
-          movedProfileMatches.map((item) => ({
-            ...item,
-            sessionId: newSessionId,
-          })),
-        );
-      await db.sessions.bulkPut([
-        {
-          id: session.id,
-          startedAt: before[0]!.startedAt,
-          endedAt: boundary.endedAt ?? boundary.lastEventAt,
-          matchIds: before.map((match) => match.id),
-        },
-        {
-          id: newSessionId,
-          startedAt: firstMoved.startedAt,
-          endedAt: after.at(-1)!.endedAt ?? after.at(-1)!.lastEventAt,
-          matchIds: after.map((match) => match.id),
-        },
-      ]);
-      return 'split-live';
+      const latestSession = await db.profileSessions
+        .where('[playerKey+startedAt+sessionId]')
+        .between(
+          [profileKey, stringMinKey, stringMinKey],
+          [profileKey, stringMaxKey, stringMaxKey],
+        )
+        .last();
+      if (!latestSession) return 'unchanged';
+      const boundaryId = activeMatchId
+        ? latestSession.matchIds[
+            latestSession.matchIds.indexOf(activeMatchId) - 1
+          ]
+        : latestSession.matchIds.at(-1);
+      if (!boundaryId) return 'unchanged';
+      const boundary = await db.matches.get(boundaryId);
+      if (!boundary || profileEndedSession(boundary, primaryId))
+        return 'unchanged';
+      await db.matches.put({
+        ...boundary,
+        sessionEndedAfterByPrimaryIds: [
+          ...(boundary.sessionEndedAfterByPrimaryIds ?? []),
+          primaryId,
+        ],
+      });
+      const cache = await db.profileSessionCaches.get(profileKey);
+      if (cache) await db.profileSessionCaches.put({ ...cache, stale: 1 });
+      return activeMatchId ? 'split-live' : 'ended';
     },
   );
+  if (result !== 'unchanged') await prepareProfileSessions(profileKey);
+  return result;
 }
 
 export async function loadMatches(profileKey?: string): Promise<MatchState[]> {
@@ -1450,9 +1679,9 @@ async function rebuildSessions(
   await db.transaction(
     'rw',
     db.matches,
-    db.profileMatches,
     db.sessions,
     db.settings,
+    db.profileSessionCaches,
     async () => {
       await db.sessions.clear();
       if (grouped.records.length) await db.sessions.bulkPut(grouped.records);
@@ -1463,14 +1692,7 @@ async function rebuildSessions(
             sessionId: grouped.byMatch.get(match.id)!,
           })),
         );
-      const profileMatches = await db.profileMatches.toArray();
-      if (profileMatches.length)
-        await db.profileMatches.bulkPut(
-          profileMatches.map((item) => ({
-            ...item,
-            sessionId: grouped.byMatch.get(item.matchId)!,
-          })),
-        );
+      await db.profileSessionCaches.toCollection().modify({ stale: 1 });
       await db.settings.put({ key: 'settings', value: settings });
     },
   );
@@ -1478,9 +1700,12 @@ async function rebuildSessions(
 
 export async function saveSettings(value: FennecSettings): Promise<void> {
   const previous = await loadSettings();
-  if (previous.sessionGapMinutes !== value.sessionGapMinutes)
+  if (previous.sessionGapMinutes !== value.sessionGapMinutes) {
     await rebuildSessions(value.sessionGapMinutes, value);
-  else await db.settings.put({ key: 'settings', value });
+    const profile = await loadProfile();
+    const profileKey = playerKeyForPrimaryId(profile?.primaryId);
+    if (profileKey) await prepareProfileSessions(profileKey);
+  } else await db.settings.put({ key: 'settings', value });
 }
 
 export async function loadProfile(): Promise<FennecProfile | undefined> {
@@ -1504,6 +1729,8 @@ export async function clearHistory(): Promise<void> {
       db.rawEvents,
       db.appearances,
       db.profileMatches,
+      db.profileSessions,
+      db.profileSessionCaches,
       db.players,
       db.pairs,
       db.relationships,
@@ -1517,6 +1744,8 @@ export async function clearHistory(): Promise<void> {
         db.rawEvents.clear(),
         db.appearances.clear(),
         db.profileMatches.clear(),
+        db.profileSessions.clear(),
+        db.profileSessionCaches.clear(),
         db.players.clear(),
         db.pairs.clear(),
         db.relationships.clear(),
@@ -1527,6 +1756,7 @@ export async function clearHistory(): Promise<void> {
   );
 }
 
+/** Replaces durable history and leaves only the restored active profile cached. */
 export async function replaceAll(
   matches: MatchState[],
   settings: FennecSettings,
@@ -1543,9 +1773,7 @@ export async function replaceAll(
   const appearances = ordered.flatMap((match) =>
     match.participants.map((player) => appearance(match, player)),
   );
-  const profileMatches = ordered.flatMap((match) =>
-    profileMatchRecords(match, grouped.byMatch.get(match.id)!),
-  );
+  const profileMatches = ordered.flatMap((match) => profileMatchRecords(match));
   const events = ordered.flatMap((match) => match.events);
   const players = new Map<string, StoredPlayerRecord>();
   for (const item of appearances) {
@@ -1577,6 +1805,8 @@ export async function replaceAll(
       db.rawEvents,
       db.appearances,
       db.profileMatches,
+      db.profileSessions,
+      db.profileSessionCaches,
       db.players,
       db.pairs,
       db.relationships,
@@ -1592,6 +1822,8 @@ export async function replaceAll(
         db.rawEvents.clear(),
         db.appearances.clear(),
         db.profileMatches.clear(),
+        db.profileSessions.clear(),
+        db.profileSessionCaches.clear(),
         db.players.clear(),
         db.pairs.clear(),
         db.relationships.clear(),
@@ -1632,6 +1864,8 @@ export async function replaceAll(
       ]);
     },
   );
+  const profileKey = playerKeyForPrimaryId(profile?.primaryId);
+  if (profileKey) await prepareProfileSessions(profileKey);
   await compactRawEvents();
 }
 
@@ -1665,12 +1899,8 @@ export const historyRepository: HistoryRepository = {
       : db.matches.count(),
   async countSessions(profileKey) {
     if (!profileKey) return db.sessions.count();
-    return (
-      await db.profileMatches
-        .where('[playerKey+sessionId]')
-        .between([profileKey, stringMinKey], [profileKey, stringMaxKey])
-        .uniqueKeys()
-    ).length;
+    await prepareProfileSessions(profileKey);
+    return db.profileSessions.where('playerKey').equals(profileKey).count();
   },
   async firstMatchStartedAt(profileKey) {
     if (profileKey)
@@ -1685,85 +1915,99 @@ export const historyRepository: HistoryRepository = {
       )?.startedAt;
     return (await db.matches.orderBy('[startedAt+id]').first())?.startedAt;
   },
-  /** Pages only sessions containing matches linked to the selected profile. */
+  prepareProfileSessions,
+  /** Pages sessions grouped exclusively from the selected profile's matches. */
   async listSessions(profileKey, cursor, limit = 25) {
+    if (!profileKey) {
+      const pageSize = Math.min(Math.max(limit, 1), 50);
+      const parsed = parseCursor(cursor);
+      const records = await (
+        parsed
+          ? db.sessions.where('[startedAt+id]').below(parsed).reverse()
+          : db.sessions.orderBy('[startedAt+id]').reverse()
+      )
+        .limit(pageSize + 1)
+        .toArray();
+      const page = records.slice(0, pageSize);
+      return {
+        items: await Promise.all(
+          page.map(async (record): Promise<SessionGroup> => {
+            const matches = await hydrateSummariesByIds(record.matchIds);
+            return {
+              id: record.id,
+              startedAt: record.startedAt,
+              endedAt: record.endedAt,
+              matches,
+              endedManually: matches.at(-1)?.sessionEndedAfter === true,
+            };
+          }),
+        ),
+        nextCursor:
+          records.length > pageSize && page.length
+            ? cursorFor(page.at(-1)!.startedAt, page.at(-1)!.id)
+            : undefined,
+      };
+    }
+    await prepareProfileSessions(profileKey);
     const pageSize = Math.min(Math.max(limit, 1), 50);
     const parsed = parseCursor(cursor);
-    const collection = parsed
-      ? db.sessions.where('[startedAt+id]').below(parsed).reverse()
-      : db.sessions.orderBy('[startedAt+id]').reverse();
-    const selected: Array<{
-      record: SessionRecord;
-      matchIds: string[];
-    }> = [];
-    let offset = 0;
-    while (selected.length <= pageSize) {
-      const records = await collection.offset(offset).limit(100).toArray();
-      if (!records.length) break;
-      offset += records.length;
-      for (const record of records) {
-        const matchIds = profileKey
-          ? (
-              await db.profileMatches
-                .where('[playerKey+sessionId]')
-                .equals([profileKey, record.id])
-                .toArray()
-            ).map((item) => item.matchId)
-          : record.matchIds;
-        if (matchIds.length) selected.push({ record, matchIds });
-        if (selected.length > pageSize) break;
-      }
-      if (records.length < 100 || selected.length > pageSize) break;
-    }
-    const page = selected.slice(0, pageSize);
+    const lower: [string, string, string] = [
+      profileKey,
+      stringMinKey,
+      stringMinKey,
+    ];
+    const upper: [string, string, string] = parsed
+      ? [profileKey, parsed[0], parsed[1]]
+      : [profileKey, stringMaxKey, stringMaxKey];
+    const records = await db.profileSessions
+      .where('[playerKey+startedAt+sessionId]')
+      .between(lower, upper, true, !parsed)
+      .reverse()
+      .limit(pageSize + 1)
+      .toArray();
+    const page = records.slice(0, pageSize);
     const groups = await Promise.all(
-      page.map(async ({ record, matchIds }): Promise<SessionGroup> => {
-        const matches = await hydrateSummariesByIds(matchIds);
-        const ordered = matches.sort((a, b) =>
-          a.startedAt.localeCompare(b.startedAt),
-        );
+      page.map(async (record): Promise<SessionGroup> => {
+        const matches = await hydrateSummariesByIds(record.matchIds);
         return {
-          id: record.id,
-          startedAt: ordered[0]!.startedAt,
-          endedAt: ordered.at(-1)!.endedAt ?? ordered.at(-1)!.lastEventAt,
-          matches: ordered,
-          endedManually:
-            record.matchIds.at(-1) === ordered.at(-1)?.id &&
-            ordered.at(-1)?.sessionEndedAfter === true,
+          id: record.sessionId,
+          startedAt: record.startedAt,
+          endedAt: record.endedAt,
+          matches,
+          endedManually: record.endedManually,
         };
       }),
     );
     return {
       items: groups,
       nextCursor:
-        selected.length > pageSize && page.length
-          ? cursorFor(page.at(-1)!.record.startedAt, page.at(-1)!.record.id)
+        records.length > pageSize && page.length
+          ? cursorFor(page.at(-1)!.startedAt, page.at(-1)!.sessionId)
           : undefined,
     };
   },
   async getSession(id, profileKey) {
+    if (profileKey) {
+      await prepareProfileSessions(profileKey);
+      const record = await db.profileSessions.get(`${profileKey}\u0000${id}`);
+      if (!record) return undefined;
+      return {
+        id: record.sessionId,
+        startedAt: record.startedAt,
+        endedAt: record.endedAt,
+        matches: await hydrateSummariesByIds(record.matchIds),
+        endedManually: record.endedManually,
+      };
+    }
     const record = await db.sessions.get(id);
     if (!record) return undefined;
-    const matchIds = profileKey
-      ? (
-          await db.profileMatches
-            .where('[playerKey+sessionId]')
-            .equals([profileKey, record.id])
-            .toArray()
-        ).map((item) => item.matchId)
-      : record.matchIds;
-    if (!matchIds.length) return undefined;
-    const matches = (await hydrateSummariesByIds(matchIds)).sort((a, b) =>
-      a.startedAt.localeCompare(b.startedAt),
-    );
+    const matches = await hydrateSummariesByIds(record.matchIds);
     return {
       id: record.id,
-      startedAt: matches[0]!.startedAt,
-      endedAt: matches.at(-1)!.endedAt ?? matches.at(-1)!.lastEventAt,
+      startedAt: record.startedAt,
+      endedAt: record.endedAt,
       matches,
-      endedManually:
-        record.matchIds.at(-1) === matches.at(-1)?.id &&
-        matches.at(-1)?.sessionEndedAfter === true,
+      endedManually: matches.at(-1)?.sessionEndedAfter === true,
     };
   },
   listMatches(query = {}) {

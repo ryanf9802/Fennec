@@ -33,6 +33,7 @@ vi.mock('../src/data/database', () => ({
   historyRepository: {
     initialize: vi.fn(async () => undefined),
     countMatches: vi.fn(async () => 0),
+    prepareProfileSessions: vi.fn(async () => undefined),
     loadLatestMatch: vi.fn(async () => mocks.latestMatch),
     loadLiveMatches: vi.fn(async () => []),
   },
@@ -354,6 +355,7 @@ describe('Fennec live state', () => {
   });
 
   it('splits before the active match when ending a live session', async () => {
+    mocks.profile = { primaryId: 'Steam|you|0', displayName: 'You' };
     render(
       <FennecProvider>
         <EndSessionProbe />
@@ -370,7 +372,10 @@ describe('Fennec live state', () => {
     screen.getByRole('button', { name: 'End session' }).click();
 
     await waitFor(() =>
-      expect(mocks.endCurrentSession).toHaveBeenCalledWith('live-match'),
+      expect(mocks.endCurrentSession).toHaveBeenCalledWith(
+        'id:Steam|you|0',
+        'live-match',
+      ),
     );
   });
 });

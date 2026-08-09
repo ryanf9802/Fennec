@@ -106,6 +106,8 @@ export interface MatchState {
   participants: ParticipantState[];
   events: TimelineEvent[];
   sessionEndedAfter?: true;
+  /** Stable platform identities that manually ended their session here. */
+  sessionEndedAfterByPrimaryIds?: string[];
 }
 
 export interface SessionGroup {

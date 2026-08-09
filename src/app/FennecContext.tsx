@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { recoverActiveMatch, reduceStatsEnvelope } from '../domain/reducer';
+import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 import { isHistoryEligibleMatch } from '../domain/playlists';
 import {
   defaultSettings,
@@ -106,6 +107,9 @@ export function FennecProvider({
         (item) => liveIds.has(item.id) && item.lifecycle === 'incomplete',
       ))
         await saveMatch(match, storedSettings.sessionGapMinutes);
+      const storedProfileKey = playerKeyForPrimaryId(storedProfile?.primaryId);
+      if (storedProfileKey)
+        await historyRepository.prepareProfileSessions(storedProfileKey);
       const reducerMatch =
         recovered ?? (await historyRepository.loadLatestMatch());
       if (cancelled) return;
@@ -283,6 +287,9 @@ export function FennecProvider({
     profileRef.current = next;
     setProfile(next);
     await saveProfile(next);
+    await historyRepository.prepareProfileSessions(
+      playerKeyForPrimaryId(next.primaryId)!,
+    );
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
   const deleteMatch = useCallback(async (id: string) => {
@@ -292,11 +299,13 @@ export function FennecProvider({
     return deleted;
   }, []);
   const endSession = useCallback(async () => {
+    const profileKey = playerKeyForPrimaryId(profileRef.current?.primaryId);
+    if (!profileKey) return 'unchanged';
     const activeMatchId =
       activeRef.current?.lifecycle === 'live'
         ? activeRef.current.id
         : undefined;
-    const result = await endCurrentSession(activeMatchId);
+    const result = await endCurrentSession(profileKey, activeMatchId);
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
     return result;
   }, []);
