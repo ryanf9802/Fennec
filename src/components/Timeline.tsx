@@ -33,10 +33,14 @@ export function Timeline({
                   <PlayerName
                     key={`${part.text}:${index}`}
                     name={part.player.name}
-                    team={resolveTeamPresentation(
-                      match.teams,
-                      part.player.teamNumber,
-                    )}
+                    team={
+                      part.player.teamNumber === undefined
+                        ? undefined
+                        : resolveTeamPresentation(
+                            match.teams,
+                            part.player.teamNumber,
+                          )
+                    }
                   />
                 ) : (
                   <span key={`${part.text}:${index}`}>{part.text}</span>

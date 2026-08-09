@@ -207,19 +207,15 @@ test('3D touch map controls and preference persist across matches', async ({
   await page.mouse.move(box.x + box.width / 2 + 100, box.y + 180);
   await expect
     .poll(async () => {
-      const [targetX, targetZ] = (await viewport.getAttribute(
-        'data-camera-target',
-      ))!
-        .split(',')
-        .map(Number);
+      const [targetX = Number.NaN, targetZ = Number.NaN] =
+        (await viewport.getAttribute('data-camera-target'))!
+          .split(',')
+          .map(Number);
       return targetX < 0 && targetZ < 0;
     })
     .toBe(true);
-  const [pannedTargetX, pannedTargetZ] = (await viewport.getAttribute(
-    'data-camera-target',
-  ))!
-    .split(',')
-    .map(Number);
+  const [pannedTargetX = Number.NaN, pannedTargetZ = Number.NaN] =
+    (await viewport.getAttribute('data-camera-target'))!.split(',').map(Number);
   expect(pannedTargetX).toBeLessThan(0);
   expect(pannedTargetZ).toBeLessThan(0);
   await page.mouse.up();
@@ -234,11 +230,10 @@ test('3D touch map controls and preference persist across matches', async ({
   await page.mouse.move(box.x + box.width / 2 + 100, box.y + 120);
   await expect
     .poll(async () => {
-      const [targetX, targetZ] = (await viewport.getAttribute(
-        'data-camera-target',
-      ))!
-        .split(',')
-        .map(Number);
+      const [targetX = Number.NaN, targetZ = Number.NaN] =
+        (await viewport.getAttribute('data-camera-target'))!
+          .split(',')
+          .map(Number);
       return Math.abs(targetX) <= 1 && targetZ > 0;
     })
     .toBe(true);
