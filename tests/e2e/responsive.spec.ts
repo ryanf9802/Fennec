@@ -646,6 +646,31 @@ test('primary pages use the same full content width', async ({ page }) => {
   }
 });
 
+test('profile save action floats above mobile navigation while dirty', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 760 });
+  await page.goto('/profile?demo=1');
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+
+  const playerSelect = page.getByRole('combobox');
+  await expect
+    .poll(() => playerSelect.locator('option').count())
+    .toBeGreaterThan(1);
+  await playerSelect.selectOption('Epic|demo-luna|0');
+
+  const save = page.getByRole('button', { name: 'Save profile' });
+  await expect(save).toBeVisible();
+  const saveBox = (await save.boundingBox())!;
+  const mobileNavBox = (await page.locator('nav.fixed').boundingBox())!;
+  expect(saveBox.x + saveBox.width).toBeCloseTo(375 - 16, 0);
+  expect(saveBox.y + saveBox.height).toBeLessThan(mobileNavBox.y);
+
+  await save.click();
+  await expect(save).toHaveCount(0);
+  await expect(page.getByText('Profile updated.')).toBeVisible();
+});
+
 test('primary pages reserve a stable root scrollbar gutter', async ({
   page,
 }) => {

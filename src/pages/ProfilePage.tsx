@@ -22,6 +22,8 @@ export function ProfilePage() {
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
   const [selected, setSelected] = useState(profile?.primaryId ?? '');
   const [saved, setSaved] = useState(false);
+  const hasUnsavedChanges =
+    selected.length > 0 && selected !== (profile?.primaryId ?? '');
   const trackingSince = overviewQuery.data?.firstMatchStartedAt
     ? new Date(overviewQuery.data.firstMatchStartedAt).toLocaleDateString(
         undefined,
@@ -72,7 +74,7 @@ export function ProfilePage() {
           Players appear after Fennec receives a match. Changing this selection
           recalculates every existing summary without altering history.
         </p>
-        <div className="mt-5 flex max-w-2xl flex-col gap-3 sm:flex-row">
+        <div className="mt-5 max-w-2xl">
           <select
             className="control flex-1"
             value={selected}
@@ -88,24 +90,28 @@ export function ProfilePage() {
               </option>
             ))}
           </select>
-          <button
-            className="button-primary sm:self-stretch"
-            disabled={!selected}
-            onClick={() => {
-              const next = players.find((item) => item.primaryId === selected);
-              if (next) void selectProfile(next).then(() => setSaved(true));
-            }}
-          >
-            <Check className="size-4" />
-            Use player
-          </button>
         </div>
         {saved && (
-          <p className="mt-3 text-sm font-bold text-fennec-cyan">
+          <p
+            className="mt-3 text-sm font-bold text-fennec-cyan"
+            aria-live="polite"
+          >
             Profile updated.
           </p>
         )}
       </section>
+      {hasUnsavedChanges && (
+        <button
+          className="button-primary fixed right-4 bottom-24 z-40 shadow-2xl shadow-black/40 sm:right-6 md:right-8 md:bottom-8"
+          onClick={() => {
+            const next = players.find((item) => item.primaryId === selected);
+            if (next) void selectProfile(next).then(() => setSaved(true));
+          }}
+        >
+          <Check className="size-4" />
+          Save profile
+        </button>
+      )}
     </div>
   );
 }

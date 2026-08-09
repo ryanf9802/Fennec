@@ -109,6 +109,15 @@ vi.mock('../src/data/historyQueries', () => ({
         lastSeen: botMatch.startedAt,
       },
       {
+        playerKey: 'id:Epic|teammate|0',
+        primaryId: 'Epic|teammate|0',
+        identityKind: 'platform',
+        latestName: 'Teammate',
+        normalizedName: 'teammate',
+        firstSeen: botMatch.startedAt,
+        lastSeen: botMatch.startedAt,
+      },
+      {
         playerKey: 'name:boomer',
         identityKind: 'name',
         latestName: 'Boomer',
@@ -205,5 +214,28 @@ describe('player profile UI', () => {
     expect(
       screen.queryByRole('option', { name: /Boomer/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it('floats the profile save action only when the selection changes', () => {
+    render(
+      <MemoryRouter>
+        <ProfilePage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Save profile' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'Epic|teammate|0' },
+    });
+
+    expect(screen.getByRole('button', { name: 'Save profile' })).toHaveClass(
+      'fixed',
+      'right-4',
+      'bottom-24',
+      'md:bottom-8',
+    );
   });
 });
