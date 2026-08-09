@@ -22,6 +22,7 @@ function expectWebBuildBeforeRustTests(contents: string) {
 
 describe('companion release workflow', () => {
   it('publishes signed updates automatically from main', () => {
+    expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('branches:\n      - main');
     expect(workflow).toContain('group: companion-release');
     expect(workflow).toContain('cargo test --locked');
