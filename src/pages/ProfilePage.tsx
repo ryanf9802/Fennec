@@ -102,7 +102,7 @@ export function ProfilePage() {
       </section>
       {hasUnsavedChanges && (
         <button
-          className="button-primary fixed right-4 bottom-24 z-40 shadow-2xl shadow-black/40 sm:right-6 md:right-8 md:bottom-8"
+          className="profile-save-fab button-primary shadow-2xl shadow-black/40"
           onClick={() => {
             const next = players.find((item) => item.primaryId === selected);
             if (next) void selectProfile(next).then(() => setSaved(true));

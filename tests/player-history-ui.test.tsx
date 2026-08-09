@@ -260,10 +260,7 @@ describe('player profile UI', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Save profile' })).toHaveClass(
-      'fixed',
-      'right-4',
-      'bottom-24',
-      'md:bottom-8',
+      'profile-save-fab',
     );
   });
 });

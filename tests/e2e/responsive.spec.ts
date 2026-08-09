@@ -661,10 +661,22 @@ test('profile save action floats above mobile navigation while dirty', async ({
 
   const save = page.getByRole('button', { name: 'Save profile' });
   await expect(save).toBeVisible();
+  await expect(save).toHaveCSS('position', 'fixed');
   const saveBox = (await save.boundingBox())!;
   const mobileNavBox = (await page.locator('nav.fixed').boundingBox())!;
-  expect(saveBox.x + saveBox.width).toBeCloseTo(375 - 16, 0);
+  const documentWidth = await page.evaluate(
+    () => document.documentElement.clientWidth,
+  );
+  const rightGap = documentWidth - (saveBox.x + saveBox.width);
+  expect(rightGap).toBeGreaterThanOrEqual(16);
+  expect(rightGap).toBeLessThanOrEqual(32);
   expect(saveBox.y + saveBox.height).toBeLessThan(mobileNavBox.y);
+
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(0);
+  expect((await save.boundingBox())!.y).toBeCloseTo(saveBox.y, 0);
 
   await save.click();
   await expect(save).toHaveCount(0);
