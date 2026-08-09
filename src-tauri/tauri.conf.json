@@ -13,8 +13,9 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
-    "icon": ["../public/icons/icon-192.png", "../public/icons/icon-512.png"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
     "windows": {
       "nsis": {
         "installMode": "currentUser"
@@ -25,6 +26,15 @@
     "deep-link": {
       "desktop": {
         "schemes": ["fennec"]
+      }
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/ryanf9802/Fennec/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU2NUQ3NTk4RTY4ODlENjIKUldSaW5Zam1tSFZkNWp5TjR2T0s2dTBJUXBqbndnUENScGZjSFY1RTR0RFhQUWIvbmFVSFFHR0wK",
+      "windows": {
+        "installMode": "quiet"
       }
     }
   }

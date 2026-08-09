@@ -1,5 +1,6 @@
 /// <reference types="node" />
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const workflow = readFileSync(
@@ -20,17 +21,28 @@ function expectWebBuildBeforeRustTests(contents: string) {
 }
 
 describe('companion release workflow', () => {
-  it('publishes the stable installer name used by the browser', () => {
-    expect(workflow).toContain("tags:\n      - 'v*'");
+  it('publishes signed updates automatically from main', () => {
+    expect(workflow).toContain('branches:\n      - main');
+    expect(workflow).toContain('group: companion-release');
     expect(workflow).toContain('cargo test --locked');
+    expect(workflow).toContain('tauri-apps/tauri-action@v1');
     expect(workflow).toContain(
-      'release/Fennec-Companion-Windows-x64-setup.exe',
+      'releaseAssetNamePattern: Fennec-Companion-Windows-x64[setup][ext]',
     );
-    expect(workflow).toContain('gh release create');
+    expect(workflow).toContain('updaterJsonPreferNsis: true');
+    expect(workflow).toContain('/fennec/companion/updater-signing');
   });
 
   it('builds the frontend before compiling Tauri tests', () => {
     expectWebBuildBeforeRustTests(workflow);
     expectWebBuildBeforeRustTests(companionWorkflow);
+  });
+
+  it('derives a monotonic companion patch version without manual tags', () => {
+    expect(
+      execFileSync('node', ['scripts/companion-release-version.mjs', '42'], {
+        encoding: 'utf8',
+      }),
+    ).toBe('0.2.42');
   });
 });

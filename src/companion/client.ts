@@ -9,6 +9,15 @@ export interface CompanionHealth {
   stores?: Array<'steam' | 'epic'>;
   configuredStores: Array<'steam' | 'epic'>;
   launchOnStartup: boolean;
+  updateStatus?:
+    | 'current'
+    | 'checking'
+    | 'downloading'
+    | 'waitingForIdle'
+    | 'installing'
+    | 'retrying';
+  availableUpdateVersion?: string;
+  lastUpdateCheckAt?: string;
 }
 
 export const companionProtocolVersion = 1;

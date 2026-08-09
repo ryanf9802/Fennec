@@ -2,11 +2,25 @@ name: Release Windows companion
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'src-tauri/**'
+      - 'src/companion/**'
+      - 'src/components/CompanionSettings.tsx'
+      - 'src/pages/OnboardingPage.tsx'
+      - 'scripts/companion-release-version.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/release-companion.yml'
+
+concurrency:
+  group: companion-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -26,36 +40,51 @@ jobs:
         with:
           toolchain: stable
       - run: pnpm install --frozen-lockfile
-      - name: Verify release version
+      - name: Derive automatic release version
         shell: pwsh
         run: |
-          $packageVersion = node -p "require('./package.json').version"
-          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
-            throw "Tag $env:GITHUB_REF_NAME must match package version v$packageVersion"
-          }
+          $version = node scripts/companion-release-version.mjs $env:GITHUB_RUN_NUMBER
+          "COMPANION_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          @{ version = $version } | ConvertTo-Json | Set-Content "src-tauri/tauri.release.conf.json"
       - name: Build web application
         run: pnpm build
       - name: Rust tests
         working-directory: src-tauri
         run: cargo test --locked
-      - name: Build companion installer
-        run: pnpm companion:build
-      - name: Prepare stable installer asset
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/FennecGitHubDeployRole
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Load updater signing material
         shell: pwsh
         run: |
-          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
-          if (-not $installer) {
-            throw "Companion installer was not produced"
-          }
-          New-Item -ItemType Directory -Force "release" | Out-Null
-          Copy-Item $installer.FullName "release/Fennec-Companion-Windows-x64-setup.exe"
-      - name: Publish GitHub release
-        shell: pwsh
+          $payload = aws ssm get-parameter `
+            --name "/fennec/companion/updater-signing" `
+            --with-decryption `
+            --query "Parameter.Value" `
+            --output text
+          $signing = $payload | ConvertFrom-Json
+          $keyPath = Join-Path $env:RUNNER_TEMP "fennec-updater.key"
+          [IO.File]::WriteAllBytes(
+            $keyPath,
+            [Convert]::FromBase64String($signing.privateKeyBase64)
+          )
+          Write-Output "::add-mask::$($signing.password)"
+          "TAURI_SIGNING_PRIVATE_KEY_PATH=$keyPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$($signing.password)" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Build and publish signed companion
+        uses: tauri-apps/tauri-action@v1
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create $env:GITHUB_REF_NAME `
-            "release/Fennec-Companion-Windows-x64-setup.exe" `
-            --verify-tag `
-            --generate-notes `
-            --title "Fennec $env:GITHUB_REF_NAME"
+          FENNEC_BUILD_VERSION: ${{ env.COMPANION_VERSION }}
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          tagName: companion-v${{ env.COMPANION_VERSION }}
+          releaseName: Fennec Companion v${{ env.COMPANION_VERSION }}
+          generateReleaseNotes: true
+          updaterJsonPreferNsis: true
+          releaseAssetNamePattern: Fennec-Companion-Windows-x64[setup][ext]
+          args: --config src-tauri/tauri.release.conf.json
+      - name: Remove temporary signing key
+        if: always()
+        shell: pwsh
+        run: Remove-Item "$env:RUNNER_TEMP/fennec-updater.key" -Force -ErrorAction SilentlyContinue

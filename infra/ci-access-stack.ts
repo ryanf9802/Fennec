@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as kms from 'aws-cdk-lib/aws-kms';
 import type { Construct } from 'constructs';
 
 export interface FennecCiAccessStackProps extends cdk.StackProps {
@@ -45,6 +46,23 @@ export class FennecCiAccessStack extends cdk.Stack {
     const account = cdk.Aws.ACCOUNT_ID;
     const region = cdk.Aws.REGION;
     const partition = cdk.Aws.PARTITION;
+    const updaterSigningParameterName = '/fennec/companion/updater-signing';
+    const updaterSigningKey = new kms.Key(this, 'UpdaterSigningKey', {
+      alias: 'alias/fennec-companion-updater',
+      description:
+        'Encrypts the Fennec companion updater signing material in SSM.',
+      enableKeyRotation: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+    updaterSigningKey.grantDecrypt(role);
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:${partition}:ssm:${region}:${account}:parameter${updaterSigningParameterName}`,
+        ],
+      }),
+    );
     const bucketArn = `arn:${partition}:s3:::fennec-site-${account}-${region}`;
     role.addToPolicy(
       new iam.PolicyStatement({
@@ -90,5 +108,11 @@ export class FennecCiAccessStack extends cdk.Stack {
       }),
     );
     new cdk.CfnOutput(this, 'DeploymentRoleArn', { value: role.roleArn });
+    new cdk.CfnOutput(this, 'UpdaterSigningKeyArn', {
+      value: updaterSigningKey.keyArn,
+    });
+    new cdk.CfnOutput(this, 'UpdaterSigningParameterName', {
+      value: updaterSigningParameterName,
+    });
   }
 }

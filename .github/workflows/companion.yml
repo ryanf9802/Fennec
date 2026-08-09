@@ -2,6 +2,8 @@ name: Windows companion
 
 on:
   push:
+    branches-ignore:
+      - main
     paths:
       - 'src-tauri/**'
       - 'package.json'

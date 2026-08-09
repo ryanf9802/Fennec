@@ -55,8 +55,15 @@ updates the effective Stats API file (requesting elevation only when needed),
 captures while the browser is closed, and synchronizes frames, checkpoints, and
 deletions with a paired browser. Its optional per-store desktop shortcuts launch
 Rocket League through Steam or Epic, monitor the exact game executable, and exit
-the companion when that game process ends. Settings can also register or remove
-the tray collector from the current user's Windows sign-in startup.
+the companion when that game process ends unless Windows startup is enabled.
+When startup is enabled, the lightweight collector remains idle in the tray
+after the game closes so it is ready for the next session. Settings can register
+or remove it from the current user's Windows sign-in startup.
+
+The companion checks for signed updates shortly after launch and every hour. It
+downloads updates in the background, waits until Rocket League capture has been
+idle for 15 seconds, and then installs quietly and restarts. Update failures do
+not stop collection and are retried on the next check.
 
 ## Local data
 
@@ -95,6 +102,13 @@ pnpm test:e2e
 Windows companion builds additionally require the stable Rust toolchain and the
 Tauri Windows prerequisites. Run `pnpm companion:dev` for development or
 `pnpm companion:build` for the current-user NSIS installer.
+
+Companion releases are automatic. A companion-related change pushed to `main`
+derives a patch version from the GitHub workflow run number, builds and tests the
+Windows application, and publishes a `companion-v<version>` GitHub release with
+the stable installer, signed NSIS updater archive, and `latest.json`. The
+checked-in package major/minor version defines the release train; its patch
+component is reserved for CI. No manual tag is needed.
 
 Run `pnpm format` to format repository-owned code, configuration, documentation,
 styles, and markup. ESLint also requires explanatory JSDoc on named functions
@@ -171,6 +185,62 @@ To establish or recreate deployment access:
 If the AWS account already has the GitHub Actions OIDC provider, set
 `GITHUB_OIDC_PROVIDER_ARN` while deploying `FennecCiAccess` so CDK imports it
 instead of creating a duplicate.
+
+### Companion updater signing key
+
+`FennecCiAccess` owns a retained, rotation-enabled KMS key with alias
+`alias/fennec-companion-updater`. The main-only GitHub OIDC role can decrypt one
+SSM SecureString parameter: `/fennec/companion/updater-signing`. The release
+workflow reads that parameter directly; the signing key is not duplicated in
+GitHub secrets.
+
+Provision the parameter once after generating the updater key pair. Store JSON
+with this shape as a SecureString encrypted by the updater KMS alias:
+
+```bash
+pnpm tauri signer generate --write-keys updater.key
+```
+
+The command prompts for the private-key password and writes `updater.key` plus
+`updater.key.pub`. Put the public-key contents in `src-tauri/tauri.conf.json`.
+Base64-encode the complete encrypted `updater.key` file without line wrapping,
+then store it and the password using this JSON shape:
+
+```json
+{
+  "privateKeyBase64": "<base64 of the encrypted Tauri private-key file>",
+  "password": "<private-key password>"
+}
+```
+
+```bash
+aws ssm put-parameter \
+  --profile fennec \
+  --region us-east-1 \
+  --name /fennec/companion/updater-signing \
+  --type SecureString \
+  --key-id alias/fennec-companion-updater \
+  --value file://updater-signing.json
+```
+
+For disaster recovery, retrieve it only into a protected local file and never
+print it into CI or shared terminal logs:
+
+```bash
+umask 077
+aws ssm get-parameter \
+  --profile fennec \
+  --region us-east-1 \
+  --name /fennec/companion/updater-signing \
+  --with-decryption \
+  --query Parameter.Value \
+  --output text > updater-signing-recovery.json
+```
+
+Do not replace the Tauri signing key during ordinary maintenance: installed
+companions pin its public key and will reject releases signed by another key.
+AWS KMS automatic rotation is safe because it re-encrypts the SSM value without
+changing the updater signing identity.
 
 ## License
 

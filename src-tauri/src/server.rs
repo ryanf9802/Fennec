@@ -23,6 +23,18 @@ use tower_http::cors::CorsLayer;
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub enum UpdateStatus {
+    #[default]
+    Current,
+    Checking,
+    Downloading,
+    WaitingForIdle,
+    Installing,
+    Retrying,
+}
+
+#[derive(Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RuntimeHealth {
     pub version: String,
     pub protocol_version: u8,
@@ -34,6 +46,9 @@ pub struct RuntimeHealth {
     pub feed_connected: bool,
     pub last_packet_at: Option<String>,
     pub launch_on_startup: bool,
+    pub update_status: UpdateStatus,
+    pub available_update_version: Option<String>,
+    pub last_update_check_at: Option<String>,
 }
 
 pub struct AppState {

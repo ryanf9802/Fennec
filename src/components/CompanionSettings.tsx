@@ -7,6 +7,31 @@ import {
 } from '../companion/client';
 import { useCompanionStatus } from '../companion/useCompanionStatus';
 
+/** Converts optional, backward-compatible updater telemetry into non-interactive status copy. */
+function updateMessage(
+  status: NonNullable<
+    ReturnType<typeof useCompanionStatus>['health']
+  >['updateStatus'],
+  version?: string,
+): string {
+  if (!status)
+    return 'Install the latest companion once to enable automatic updates.';
+  switch (status) {
+    case 'checking':
+      return 'Checking for companion updates…';
+    case 'downloading':
+      return `Downloading companion ${version ?? 'update'}…`;
+    case 'waitingForIdle':
+      return `Companion ${version ?? 'update'} is ready and will install after Rocket League closes.`;
+    case 'installing':
+      return `Installing companion ${version ?? 'update'}…`;
+    case 'retrying':
+      return 'The automatic update check will retry in the background.';
+    case 'current':
+      return 'Companion updates install automatically in the background.';
+  }
+}
+
 /** Shows only the store-specific shortcuts and startup controls proven available by a paired, protocol-compatible companion. */
 export function CompanionSettings() {
   const { health, checking, recheck } = useCompanionStatus();
@@ -53,7 +78,8 @@ export function CompanionSettings() {
             </strong>
             <p className="text-muted mt-2 text-sm">
               Each shortcut starts the companion, launches the selected store,
-              and closes the companion when that exact game process exits.
+              and monitors that exact game process. When Windows startup is off,
+              the companion closes after the game exits.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               {health.stores?.includes('steam') && (
@@ -92,7 +118,11 @@ export function CompanionSettings() {
             </strong>
             <p className="text-muted mt-2 text-sm">
               Start the tray collector when you sign in to Windows so it can
-              capture even when no Fennec window is open.
+              capture even when no Fennec window is open. Safe to leave running:
+              the companion is lightweight and remains idle with minimal
+              resource use until Fennec or Rocket League needs it, aside from
+              brief automatic update checks. When Windows startup is enabled, it
+              remains available after Rocket League closes.
             </p>
             <button
               className="button-secondary mt-3"
@@ -112,6 +142,11 @@ export function CompanionSettings() {
             </button>
           </div>
         </div>
+      )}
+      {ready && (
+        <p className="text-muted mt-4 text-sm">
+          {updateMessage(health.updateStatus, health.availableUpdateVersion)}
+        </p>
       )}
       {message && <p className="text-muted mt-3 text-sm">{message}</p>}
     </section>

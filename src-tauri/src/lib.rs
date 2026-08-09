@@ -2,8 +2,9 @@ mod config;
 mod server;
 mod storage;
 mod store;
+mod updater;
 
-use server::{AppState, RuntimeHealth};
+use server::{AppState, RuntimeHealth, UpdateStatus};
 use std::{
     fs,
     process::Command,
@@ -94,9 +95,15 @@ fn launch_from_url(app: tauri::AppHandle, value: &url::Url) {
                 .is_ok()
         {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-            app.exit(0);
+            if should_exit_after_game(store::launch_on_startup()) {
+                app.exit(0);
+            }
         }
     });
+}
+
+fn should_exit_after_game(launch_on_startup: bool) -> bool {
+    !launch_on_startup
 }
 
 fn handle_urls(
@@ -132,6 +139,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let directory = app.path().app_data_dir()?;
             fs::create_dir_all(&directory)?;
@@ -158,7 +166,9 @@ pub fn run() {
                 token: token.clone(),
                 storage: storage::Storage::open(&directory.join("fennec.sqlite3"))?,
                 health: RwLock::new(RuntimeHealth {
-                    version: env!("CARGO_PKG_VERSION").to_string(),
+                    version: option_env!("FENNEC_BUILD_VERSION")
+                        .unwrap_or(env!("CARGO_PKG_VERSION"))
+                        .to_string(),
                     protocol_version: 1,
                     paired: false,
                     store: selected,
@@ -168,6 +178,9 @@ pub fn run() {
                     feed_connected: false,
                     last_packet_at: None,
                     launch_on_startup: store::launch_on_startup(),
+                    update_status: UpdateStatus::Current,
+                    available_update_version: None,
+                    last_update_check_at: None,
                 }),
                 frames,
                 replicas,
@@ -181,6 +194,10 @@ pub fn run() {
                 }
             });
             tauri::async_runtime::spawn(server::collect_stats(state));
+            updater::spawn(
+                app.handle().clone(),
+                app.state::<Arc<AppState>>().inner().clone(),
+            );
 
             let open = MenuItem::with_id(app, "open", "Open Fennec", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit companion", true, None::<&str>)?;
@@ -218,7 +235,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{pairing_url, PRODUCTION_SETUP_URL};
+    use super::{pairing_url, should_exit_after_game, PRODUCTION_SETUP_URL};
 
     #[test]
     fn pairing_accepts_known_local_development_urls() {
@@ -234,5 +251,11 @@ mod tests {
             pairing_url(Some("https://attacker.example/setup"), "abc123"),
             format!("{PRODUCTION_SETUP_URL}#companion=abc123")
         );
+    }
+
+    #[test]
+    fn shortcut_companion_exits_only_when_windows_startup_is_disabled() {
+        assert!(should_exit_after_game(false));
+        assert!(!should_exit_after_game(true));
     }
 }

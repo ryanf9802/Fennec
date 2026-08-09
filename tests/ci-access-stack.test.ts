@@ -30,6 +30,36 @@ describe('Fennec CI access infrastructure', () => {
         ],
       }),
     });
+    template.hasResourceProperties('AWS::KMS::Key', {
+      Description:
+        'Encrypts the Fennec companion updater signing material in SSM.',
+      EnableKeyRotation: true,
+    });
+    template.hasResource('AWS::KMS::Key', {
+      DeletionPolicy: 'Retain',
+      UpdateReplacePolicy: 'Retain',
+    });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'kms:Decrypt',
+          }),
+          Match.objectLike({
+            Action: 'ssm:GetParameter',
+            Resource: {
+              'Fn::Join': Match.arrayWith([
+                Match.arrayWith([
+                  Match.stringLikeRegexp(
+                    'parameter/fennec/companion/updater-signing',
+                  ),
+                ]),
+              ]),
+            },
+          }),
+        ]),
+      },
+    });
   });
 
   it('rejects wildcard or non-main subjects', () => {
