@@ -189,6 +189,7 @@ describe('ball touch map', () => {
           ],
         }}
         profileId="Steam|1|0"
+        speedUnit="kmh"
       />,
     );
 
@@ -230,6 +231,7 @@ describe('ball touch map', () => {
           ],
         }}
         profileId="Steam|1|0"
+        speedUnit="kmh"
       />,
     );
 
@@ -266,7 +268,9 @@ describe('ball touch map', () => {
   });
 
   it('defaults to the selected player and supports all-touch filtering', () => {
-    render(<BallTouchMap match={match} profileId="Steam|1|0" />);
+    render(
+      <BallTouchMap match={match} profileId="Steam|1|0" speedUnit="kmh" />,
+    );
     const map = screen.getByRole('img', { name: /soccar 3d ball touch map/i });
     expect(map).toBeInTheDocument();
     expect(scene.props?.profile.goal).toEqual({
@@ -310,6 +314,7 @@ describe('ball touch map', () => {
 
     const selectedTouch = screen.getByRole('button', { name: /Me · Save/ });
     expect(selectedTouch).toHaveAccessibleName(/Save, at 1:00/);
+    expect(selectedTouch).toHaveAccessibleName(/32 km\/h/);
     expect(selectedTouch).toBeInTheDocument();
     fireEvent.focus(selectedTouch);
     expect(scene.props?.emphasizedIds).toEqual(['map:1']);
@@ -365,7 +370,7 @@ describe('ball touch map', () => {
           elapsedSeconds: 240,
           payload: {
             Scorer: { Name: 'Them', Shortcut: 2, TeamNum: 1 },
-            GoalSpeed: 1200,
+            GoalSpeed: 120,
             ImpactLocation: { X: 200, Y: 5000, Z: 500 },
           },
         },
@@ -379,13 +384,13 @@ describe('ball touch map', () => {
           elapsedSeconds: 210,
           payload: {
             Scorer: { Name: 'Me', Shortcut: 1, TeamNum: 0 },
-            GoalSpeed: 1100,
+            GoalSpeed: 110,
             ImpactLocation: { X: -200, Y: -5000, Z: 450 },
           },
         },
       ],
     };
-    render(<BallTouchMap match={goalMatch} />);
+    render(<BallTouchMap match={goalMatch} speedUnit="kmh" />);
 
     expect(
       scene.props?.points.filter((point) => point.kind === 'goal'),
@@ -396,12 +401,47 @@ describe('ball touch map', () => {
       ]),
     );
     const secondGoal = screen.getByRole('button', {
-      name: /Them · Goal #2 scored, at 4:00, 1200 uu\/s/,
+      name: /Them · Goal #2 scored, at 4:00, 120 km\/h/,
     });
     fireEvent.focus(secondGoal);
     expect(screen.getByText('Them · Goal #2 scored')).toBeInTheDocument();
     expect(screen.getByText(/4:00 · XYZ 200, 5000, 500/)).toBeInTheDocument();
     expect(scene.props?.emphasizedIds).toEqual(['map:5']);
+  });
+
+  it('converts touch speeds from uu/s but GoalSpeed from its km/h scale', () => {
+    render(
+      <BallTouchMap
+        match={{
+          ...match,
+          events: [
+            match.events[0]!,
+            {
+              id: 'map:5',
+              matchId: 'map',
+              sequence: 5,
+              eventName: 'GoalScored',
+              receivedAt: '2026-08-08T00:04:00Z',
+              matchClockSeconds: 60,
+              elapsedSeconds: 240,
+              payload: {
+                Scorer: { Name: 'Them', Shortcut: 2, TeamNum: 1 },
+                GoalSpeed: 100,
+                ImpactLocation: { X: 200, Y: 5000, Z: 500 },
+              },
+            },
+          ],
+        }}
+        speedUnit="mph"
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Me · touch/ }),
+    ).toHaveAccessibleName(/20 mph/);
+    expect(
+      screen.getByRole('button', { name: /Them · Goal #1 scored/ }),
+    ).toHaveAccessibleName(/62 mph/);
   });
 
   it('orients the selected orange team goal on the left', () => {
@@ -415,6 +455,7 @@ describe('ball touch map', () => {
           })),
         }}
         profileId="Steam|1|0"
+        speedUnit="kmh"
       />,
     );
 
@@ -488,7 +529,9 @@ describe('ball touch map', () => {
         },
       ],
     };
-    render(<BallTouchMap match={fiftyMatch} profileId="Steam|1|0" />);
+    render(
+      <BallTouchMap match={fiftyMatch} profileId="Steam|1|0" speedUnit="kmh" />,
+    );
 
     const fifty = screen.getByRole('button', {
       name: /Me vs Them · 50\/50 · Goal #1 scoring touch/,

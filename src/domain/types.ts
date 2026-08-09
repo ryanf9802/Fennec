@@ -136,11 +136,14 @@ export interface FennecProfile {
   displayName: string;
 }
 
+export type SpeedUnit = 'kmh' | 'mph';
+
 export interface FennecSettings {
   webSocketPort: number;
   sessionGapMinutes: number;
   autoOpenLiveMatch: boolean;
   theme: 'dark' | 'light' | 'system';
+  speedUnit: SpeedUnit;
   timelinePreset: TimelinePreset;
   enabledTimelineEvents: string[];
   timelineAttributes: Record<string, string[]>;
@@ -157,6 +160,7 @@ export const defaultSettings: FennecSettings = {
   sessionGapMinutes: 30,
   autoOpenLiveMatch: false,
   theme: 'dark',
+  speedUnit: 'kmh',
   timelinePreset: 'curated',
   enabledTimelineEvents: [],
   timelineAttributes: {},
@@ -178,6 +182,8 @@ export function normalizeSettings(
     input?.theme && ['dark', 'light', 'system'].includes(input.theme)
       ? input.theme
       : defaultSettings.theme;
+  const speedUnit =
+    input?.speedUnit === 'mph' ? 'mph' : defaultSettings.speedUnit;
   const timelinePreset =
     input?.timelinePreset &&
     ['curated', 'everything', 'custom'].includes(input.timelinePreset)
@@ -201,6 +207,7 @@ export function normalizeSettings(
         ? sessionGapMinutes
         : defaultSettings.sessionGapMinutes,
     theme,
+    speedUnit,
     timelinePreset,
     enabledTimelineEvents: Array.isArray(input?.enabledTimelineEvents)
       ? input.enabledTimelineEvents.filter(

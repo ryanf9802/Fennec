@@ -93,4 +93,22 @@ describe('settings CSV export', () => {
       screen.queryByRole('button', { name: 'Save settings' }),
     ).not.toBeInTheDocument();
   });
+
+  it('defaults speed units to km/h and saves an mph preference', () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const units = screen.getByLabelText('Speed units');
+    expect(units).toHaveValue('kmh');
+    fireEvent.change(units, { target: { value: 'mph' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(mocks.fennec.updateSettings).toHaveBeenCalledWith({
+      ...defaultSettings,
+      speedUnit: 'mph',
+    });
+  });
 });

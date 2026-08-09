@@ -165,6 +165,23 @@ test('dark is the default while system and light remain opt-in', async ({
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
+test('speed units default to km/h and persist as mph', async ({ page }) => {
+  await page.goto('/matches/demo-current-2?demo=1');
+  await expect(page.getByText(/km\/h$/).first()).toBeVisible();
+
+  await page.goto('/settings?demo=1');
+  const speedUnits = page.getByLabel('Speed units');
+  await expect(speedUnits).toHaveValue('kmh');
+  await speedUnits.selectOption('mph');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+
+  await page.reload();
+  await expect(speedUnits).toHaveValue('mph');
+  await page.goto('/matches/demo-current-2?demo=1');
+  await expect(page.getByText(/mph$/).first()).toBeVisible();
+});
+
 test('3D touch map controls and preference persist across matches', async ({
   page,
 }) => {

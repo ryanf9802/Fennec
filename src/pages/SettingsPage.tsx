@@ -200,7 +200,7 @@ export function SettingsPage() {
 
       <section className="surface-flat rounded-3xl p-5 sm:p-7">
         <h2 className="text-xl font-extrabold">Sessions and behavior</h2>
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <div className="mt-5 grid gap-5 lg:grid-cols-3">
           <label>
             <span className="eyebrow">New session after idle minutes</span>
             <input
@@ -228,6 +228,21 @@ export function SettingsPage() {
               <option value="dark">Dark</option>
               <option value="system">System</option>
               <option value="light">Light</option>
+            </select>
+          </label>
+          <label>
+            <span className="eyebrow">Speed units</span>
+            <select
+              className="control mt-2"
+              value={draft.speedUnit}
+              onChange={(event) =>
+                patchDraft({
+                  speedUnit: event.target.value as FennecSettings['speedUnit'],
+                })
+              }
+            >
+              <option value="kmh">Kilometers per hour (km/h)</option>
+              <option value="mph">Miles per hour (mph)</option>
             </select>
           </label>
         </div>

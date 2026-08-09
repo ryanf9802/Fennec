@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { arenaProfile } from '../domain/arenaProfiles';
+import { formatSpeed } from '../domain/speed';
 import { formatClock } from '../domain/timeline';
 import {
   spatialEventPoints,
@@ -20,15 +21,11 @@ import {
   viewRelativePanDelta,
   type TouchMapCameraState,
 } from '../domain/touchMapGeometry';
-import type { MatchState } from '../domain/types';
+import type { MatchState, SpeedUnit } from '../domain/types';
 import { resolveTeamPresentation } from '../domain/teamPresentation';
 import { BallTouchScene } from './BallTouchScene';
 
 type Filter = 'all' | 'self' | 'team' | 'opponents' | `player:${string}`;
-
-function formatSpeed(value?: number): string {
-  return value === undefined ? '—' : `${Math.round(value)} uu/s`;
-}
 
 function goalLabel(point: SpatialEventPoint): string {
   return point.goalNumber ? `Goal #${point.goalNumber} scored` : 'Goal scored';
@@ -66,11 +63,11 @@ function pointTitle(point: SpatialEventPoint): string {
   return `${actors} · ${details.join(' · ') || point.kind}`;
 }
 
-function pointLabel(point: SpatialEventPoint): string {
+function pointLabel(point: SpatialEventPoint, speedUnit: SpeedUnit): string {
   const speed =
     point.kind === 'goal'
-      ? formatSpeed(point.speed)
-      : formatSpeed(point.postHitSpeed);
+      ? formatSpeed(point.speed, speedUnit, { source: 'goal-speed-kmh' })
+      : formatSpeed(point.postHitSpeed, speedUnit);
   return `${pointTitle(point)}, at ${formatClock(point.elapsedSeconds)}, ${speed}`;
 }
 
@@ -133,9 +130,11 @@ class SceneErrorBoundary extends Component<
 export function BallTouchMap({
   match,
   profileId,
+  speedUnit,
 }: {
   match: MatchState;
   profileId?: string;
+  speedUnit: SpeedUnit;
 }) {
   const points = useMemo(
     () =>
@@ -480,8 +479,8 @@ export function BallTouchMap({
               {Math.round(activePoint.x)}, {Math.round(activePoint.y)},{' '}
               {Math.round(activePoint.z)}
               {activePoint.kind !== 'goal'
-                ? ` · ${formatSpeed(activePoint.preHitSpeed)} → ${formatSpeed(activePoint.postHitSpeed)}`
-                : ` · ${formatSpeed(activePoint.speed)}`}
+                ? ` · ${formatSpeed(activePoint.preHitSpeed, speedUnit)} → ${formatSpeed(activePoint.postHitSpeed, speedUnit)}`
+                : ` · ${formatSpeed(activePoint.speed, speedUnit, { source: 'goal-speed-kmh' })}`}
             </div>
           </div>
         )}
@@ -492,7 +491,7 @@ export function BallTouchMap({
           <button
             key={point.id}
             type="button"
-            aria-label={pointLabel(point)}
+            aria-label={pointLabel(point, speedUnit)}
             onFocus={() => setActive(point.id)}
             onBlur={() => setActive(undefined)}
             onClick={() => setActive(point.id)}

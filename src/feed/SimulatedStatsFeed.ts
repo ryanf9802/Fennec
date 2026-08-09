@@ -160,7 +160,7 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
         MatchGuid: guid,
         Scorer: { Name: 'You', Shortcut: 1, TeamNum: 0 },
         Assister: { Name: 'Luna', Shortcut: 2, TeamNum: 0 },
-        GoalSpeed: 1054,
+        GoalSpeed: 105.4,
         ImpactLocation: { X: 320, Y: 5000, Z: 240 },
       },
     });

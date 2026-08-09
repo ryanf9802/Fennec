@@ -391,6 +391,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
             <MatchAnalytics
               match={match}
               profileId={profile?.primaryId}
+              speedUnit={settings.speedUnit}
               view={settings.matchAnalyticsView}
               onViewChange={(matchAnalyticsView) =>
                 updateSettings({ ...settings, matchAnalyticsView })

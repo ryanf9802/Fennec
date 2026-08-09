@@ -1,12 +1,9 @@
 import { lazy, Suspense, useState } from 'react';
 import { observedBallSpeed, playerTouchAnalytics } from '../domain/analytics';
+import { formatSpeed } from '../domain/speed';
 import type { FennecSettings, MatchState } from '../domain/types';
 
 const BallTouchMap = lazy(() => import('./BallTouchMap'));
-
-function speed(value?: number): string {
-  return value === undefined ? '—' : `${Math.round(value)} uu/s`;
-}
 
 /**
  * Presents one persisted match-telemetry view at a time, keeping the WebGL
@@ -15,11 +12,13 @@ function speed(value?: number): string {
 export function MatchAnalytics({
   match,
   profileId,
+  speedUnit,
   view,
   onViewChange,
 }: {
   match: MatchState;
   profileId?: string;
+  speedUnit: FennecSettings['speedUnit'];
   view: FennecSettings['matchAnalyticsView'];
   onViewChange(next: FennecSettings['matchAnalyticsView']): Promise<void>;
 }) {
@@ -46,16 +45,14 @@ export function MatchAnalytics({
         ? '—'
         : `${Math.round(touches.touchShare * 100)}%`,
     ],
-    ['Average hit speed', speed(touches.averagePostHitSpeed)],
-    ['Fastest hit', speed(touches.maximumPostHitSpeed)],
+    ['Average hit speed', formatSpeed(touches.averagePostHitSpeed, speedUnit)],
+    ['Fastest hit', formatSpeed(touches.maximumPostHitSpeed, speedUnit)],
     [
       'Average speed gain',
-      touches.averageSpeedChange === undefined
-        ? '—'
-        : `${touches.averageSpeedChange >= 0 ? '+' : ''}${Math.round(touches.averageSpeedChange)} uu/s`,
+      formatSpeed(touches.averageSpeedChange, speedUnit, { signed: true }),
     ],
-    ['Observed ball speed', speed(ballSpeed.average)],
-    ['Maximum ball speed', speed(ballSpeed.maximum)],
+    ['Observed ball speed', formatSpeed(ballSpeed.average, speedUnit)],
+    ['Maximum ball speed', formatSpeed(ballSpeed.maximum, speedUnit)],
     [
       'Last-touch control',
       !player || !totalControl
@@ -166,7 +163,12 @@ export function MatchAnalytics({
               </div>
             }
           >
-            <BallTouchMap key={match.id} match={match} profileId={profileId} />
+            <BallTouchMap
+              key={match.id}
+              match={match}
+              profileId={profileId}
+              speedUnit={speedUnit}
+            />
           </Suspense>
         </div>
       )}
