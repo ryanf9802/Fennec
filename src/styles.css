@@ -177,6 +177,12 @@ textarea:focus-visible {
 .button-danger:hover {
   filter: brightness(1.07);
 }
+.button-primary:disabled,
+.button-secondary:disabled,
+.button-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 .eyebrow {
   color: var(--muted);
   font-size: 0.72rem;

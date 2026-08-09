@@ -293,19 +293,61 @@ test('settings show installation-relative Stats API instructions', async ({
   ).toBeVisible();
 });
 
-test('setup explains the browser local network prompt and both paths', async ({
+test('setup starts with a centered route choice and expands after selection', async ({
   page,
 }) => {
   await page.goto('/onboarding?demo=1');
+  const companion = page.getByRole('button', { name: /With companion/ });
+  const browser = page.getByRole('button', { name: /Browser only/ });
+  await expect(companion).toBeVisible();
+  await expect(browser).toBeVisible();
+  await expect(companion).toHaveCSS('cursor', 'pointer');
+  await expect(browser).toHaveCSS('cursor', 'pointer');
+  const chooserBox = await page
+    .getByRole('region', { name: 'Choose a setup path' })
+    .boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(
+    Math.abs(chooserBox!.y + chooserBox!.height / 2 - viewport.height / 2),
+  ).toBeLessThan(80);
+  await expect(
+    page.getByRole('heading', { name: 'Connect Fennec' }),
+  ).toHaveCount(0);
+  await expect(page.getByText('Setup status')).toHaveCount(0);
+
+  await companion.click();
+  await expect(
+    page.getByRole('heading', { name: 'Connect Fennec' }),
+  ).toBeVisible();
+  await expect(companion).toHaveAttribute('aria-pressed', 'true');
+  expect(
+    Number(
+      await browser.evaluate((element) => getComputedStyle(element).opacity),
+    ),
+  ).toBeLessThan(1);
+  await expect(page.getByText('Checking the loopback companion…')).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByText('No supported installation has been detected.'),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText('Storefront detection starts after the companion responds.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Open installed companion' }),
+  ).toHaveAttribute(
+    'href',
+    `fennec://open?return_to=${encodeURIComponent(`${new URL(page.url()).origin}/setup`)}`,
+  );
+
+  await page.reload();
   await expect(
     page.getByRole('heading', { name: 'Connect Fennec' }),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: /With companion/ }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: /Browser only/ }),
-  ).toBeVisible();
+  ).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
@@ -356,6 +398,8 @@ test('primary pages use the same full content width', async ({ page }) => {
     ['/setup?demo=1', 'Connect Fennec', undefined],
   ] as const) {
     await page.goto(path);
+    if (path.startsWith('/setup'))
+      await page.getByRole('button', { name: /With companion/ }).click();
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();
     if (removedEyebrow)
       await expect(page.getByText(removedEyebrow, { exact: true })).toHaveCount(

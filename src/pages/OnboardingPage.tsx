@@ -7,26 +7,29 @@ import {
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useFennec } from '../app/FennecContext';
 import { BrowserStatsApiSetup } from '../components/BrowserStatsApiSetup';
 import {
   acceptCompanionPairing,
   companionCommand,
+  companionOpenUrl,
   companionProtocolVersion,
 } from '../companion/client';
 import { useCompanionStatus } from '../companion/useCompanionStatus';
 import { useLocalAccess } from '../platform/LocalAccessContext';
 
 type SetupPath = 'companion' | 'browser';
+const setupPathKey = 'fennec-setup-path-explicit-v2';
 
-function storedSetupPath(): SetupPath {
-  try {
-    return window.localStorage?.getItem('fennec-setup-path') === 'browser'
-      ? 'browser'
-      : 'companion';
-  } catch {
+function storedSetupPath(): SetupPath | undefined {
+  if (new URLSearchParams(location.hash.slice(1)).has('companion'))
     return 'companion';
+  try {
+    const stored = window.localStorage?.getItem(setupPathKey);
+    return stored === 'browser' || stored === 'companion' ? stored : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -64,27 +67,83 @@ function Requirement({
   );
 }
 
+function SetupPathChooser({
+  path,
+  onSelect,
+}: {
+  path?: SetupPath;
+  onSelect(path: SetupPath): void;
+}) {
+  const cardClass = (candidate: SetupPath) =>
+    `surface cursor-pointer rounded-3xl p-6 text-left transition-[opacity,filter,box-shadow] ${
+      path === candidate
+        ? 'opacity-100 ring-2 ring-cyan-400'
+        : path
+          ? 'opacity-65 hover:opacity-90 focus-visible:opacity-100'
+          : 'opacity-100 hover:brightness-110'
+    }`;
+  return (
+    <section
+      aria-label="Choose a setup path"
+      className="grid w-full gap-4 lg:grid-cols-2"
+    >
+      <button
+        aria-pressed={path === 'companion'}
+        className={cardClass('companion')}
+        onClick={() => onSelect('companion')}
+      >
+        <span className="eyebrow">Recommended</span>
+        <h2 className="mt-2 text-xl font-extrabold">With companion</h2>
+        <p className="text-muted mt-2 text-sm">
+          Background capture, guided Steam/Epic setup, tray operation, and
+          synchronized browser history.
+        </p>
+      </button>
+      <button
+        aria-pressed={path === 'browser'}
+        className={cardClass('browser')}
+        onClick={() => onSelect('browser')}
+      >
+        <span className="eyebrow">No installation</span>
+        <h2 className="mt-2 text-xl font-extrabold">Browser only</h2>
+        <p className="text-muted mt-2 text-sm">
+          Works without the companion, but Fennec must remain open and protected
+          configuration may need manual editing.
+        </p>
+      </button>
+    </section>
+  );
+}
+
 /** Presents both setup paths from live browser, companion, storefront, and feed evidence instead of user-checked documentation. */
 export function OnboardingPage() {
   const access = useLocalAccess();
   const { connection } = useFennec();
   const companion = useCompanionStatus();
-  const { health, checking, recheck } = companion;
-  const [path, setPath] = useState<SetupPath>(storedSetupPath);
+  const { health, recheck } = companion;
+  const [path, setPath] = useState<SetupPath | undefined>(storedSetupPath);
   const [browserConfigured, setBrowserConfigured] = useState(
     storedBrowserConfiguration,
   );
   const [configuring, setConfiguring] = useState<'steam' | 'epic'>();
   const [companionMessage, setCompanionMessage] = useState<string>();
-  useEffect(() => {
+  const selectPath = useCallback((nextPath: SetupPath) => {
+    setPath(nextPath);
     try {
-      window.localStorage?.setItem('fennec-setup-path', path);
+      window.localStorage?.setItem(setupPathKey, nextPath);
     } catch {
       // Setup remains usable when browser storage is blocked.
     }
-  }, [path]);
+  }, []);
   useEffect(() => {
-    if (acceptCompanionPairing()) void recheck();
+    if (acceptCompanionPairing()) {
+      try {
+        window.localStorage?.setItem(setupPathKey, 'companion');
+      } catch {
+        // Pairing remains active for this visit when storage is blocked.
+      }
+      void recheck();
+    }
   }, [recheck]);
   const paired = Boolean(health?.paired);
   const compatible =
@@ -112,6 +171,12 @@ export function OnboardingPage() {
     await recheck();
     setConfiguring(undefined);
   };
+  if (!path)
+    return (
+      <div className="flex min-h-[calc(100vh-8rem)] items-center">
+        <SetupPathChooser onSelect={selectPath} />
+      </div>
+    );
   return (
     <div className="space-y-7">
       <header>
@@ -123,30 +188,7 @@ export function OnboardingPage() {
         </p>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <button
-          className={`surface rounded-3xl p-6 text-left ${path === 'companion' ? 'ring-2 ring-cyan-400' : ''}`}
-          onClick={() => setPath('companion')}
-        >
-          <span className="eyebrow">Recommended</span>
-          <h2 className="mt-2 text-xl font-extrabold">With companion</h2>
-          <p className="text-muted mt-2 text-sm">
-            Background capture, guided Steam/Epic setup, tray operation, and
-            synchronized browser history.
-          </p>
-        </button>
-        <button
-          className={`surface rounded-3xl p-6 text-left ${path === 'browser' ? 'ring-2 ring-cyan-400' : ''}`}
-          onClick={() => setPath('browser')}
-        >
-          <span className="eyebrow">No installation</span>
-          <h2 className="mt-2 text-xl font-extrabold">Browser only</h2>
-          <p className="text-muted mt-2 text-sm">
-            Works without the companion, but Fennec must remain open and
-            protected configuration may need manual editing.
-          </p>
-        </button>
-      </section>
+      <SetupPathChooser path={path} onSelect={selectPath} />
 
       <section className="surface rounded-3xl p-5 sm:p-7">
         <div className="flex items-center justify-between gap-3">
@@ -169,7 +211,7 @@ export function OnboardingPage() {
               <>
                 Choose the persistent option when prompted.{' '}
                 <button
-                  className="text-fennec-cyan underline"
+                  className="cursor-pointer text-fennec-cyan underline"
                   onClick={() => void access.request()}
                 >
                   Request access
@@ -183,22 +225,25 @@ export function OnboardingPage() {
                 complete={paired}
                 title="Install and pair the companion"
               >
-                {checking
-                  ? 'Checking the loopback companion…'
-                  : paired
-                    ? `Companion ${health?.version} is paired and responding.`
-                    : health
-                      ? `Companion ${health.version} is responding. Use its tray menu to open Fennec and complete pairing.`
-                      : 'The companion is not responding. Install it, then use its tray menu to open and pair Fennec.'}
-                {!health && (
-                  <a
-                    className="button-secondary mt-3 w-fit"
-                    href="https://github.com/ryanf9802/Fennec/releases/latest"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Download className="size-4" /> Download companion
-                  </a>
+                {paired
+                  ? `Companion ${health?.version} is paired and responding.`
+                  : health
+                    ? `Companion ${health.version} is responding but is not paired with this browser.`
+                    : 'The companion is not running or cannot be reached from this browser.'}
+                {!paired && (
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <a className="button-primary" href={companionOpenUrl()}>
+                      Open installed companion
+                    </a>
+                    <a
+                      className="button-secondary"
+                      href="https://github.com/ryanf9802/Fennec/releases/latest"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Download className="size-4" /> Download latest companion
+                    </a>
+                  </div>
                 )}
               </Requirement>
               <Requirement
@@ -207,7 +252,11 @@ export function OnboardingPage() {
               >
                 {compatible
                   ? 'Browser and companion protocol versions match.'
-                  : 'Update the browser app or companion before synchronization.'}
+                  : !health
+                    ? 'Protocol verification starts after the companion responds.'
+                    : !paired
+                      ? 'Pair this browser to verify protocol compatibility.'
+                      : 'Update the browser app or companion before synchronization.'}
               </Requirement>
               <Requirement
                 complete={Boolean(
@@ -218,9 +267,11 @@ export function OnboardingPage() {
                 )}
                 title="Detect and configure Steam or Epic"
               >
-                {health?.stores?.length
-                  ? `Detected ${health.stores.join(' and ')}. ${health.stores.every((store) => health.configuredStores?.includes(store)) ? 'Stats API configuration is verified.' : 'Configure each installation you use.'}`
-                  : 'No supported installation has been detected.'}
+                {!health
+                  ? 'Storefront detection starts after the companion responds.'
+                  : health.stores?.length
+                    ? `Detected ${health.stores.join(' and ')}. ${health.stores.every((store) => health.configuredStores?.includes(store)) ? 'Stats API configuration is verified.' : 'Configure each installation you use.'}`
+                    : 'The companion did not find a supported Steam or Epic installation.'}
                 {health?.stores?.length ? (
                   <div className="mt-3 flex flex-wrap gap-3">
                     {health.stores?.includes('steam') && (

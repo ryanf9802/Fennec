@@ -1,37 +1,28 @@
 export type LocalAccessState =
-  | 'checking'
-  | 'prompt'
-  | 'denied'
-  | 'granted'
-  | 'not-required'
-  | 'unreportable';
+  'checking' | 'prompt' | 'denied' | 'granted' | 'not-required';
 
-function chromiumMajor(): { edge: boolean; version: number } | undefined {
-  const edge = navigator.userAgent.match(/Edg\/(\d+)/);
-  if (edge) return { edge: true, version: Number(edge[1]) };
-  const chrome = navigator.userAgent.match(/Chrome\/(\d+)/);
-  if (chrome) return { edge: false, version: Number(chrome[1]) };
+function isLoopbackOrigin(): boolean {
+  return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+}
+
+async function loopbackPermission(): Promise<PermissionStatus | undefined> {
+  for (const name of ['loopback-network', 'local-network-access']) {
+    try {
+      return await navigator.permissions.query({
+        name,
+      } as unknown as PermissionDescriptor);
+    } catch {
+      // Try the legacy alias before deciding this browser does not report LNA.
+    }
+  }
   return undefined;
 }
 
-function browserRequiresPermission(): boolean {
-  const browser = chromiumMajor();
-  if (!browser) return false;
-  return browser.edge ? browser.version >= 143 : browser.version >= 142;
-}
-
 export async function queryLocalAccess(): Promise<LocalAccessState> {
-  if (!window.isSecureContext && location.hostname !== 'localhost')
-    return 'denied';
-  if (!browserRequiresPermission()) return 'not-required';
-  try {
-    const permission = await navigator.permissions.query({
-      name: 'local-network-access',
-    } as unknown as PermissionDescriptor);
-    return permission.state;
-  } catch {
-    return 'unreportable';
-  }
+  if (isLoopbackOrigin()) return 'not-required';
+  if (!window.isSecureContext) return 'denied';
+  const permission = await loopbackPermission();
+  return permission?.state ?? 'not-required';
 }
 
 async function probe(url: string): Promise<boolean> {
@@ -40,7 +31,8 @@ async function probe(url: string): Promise<boolean> {
       mode: 'no-cors',
       cache: 'no-store',
       signal: AbortSignal.timeout(2_500),
-    });
+      targetAddressSpace: 'loopback',
+    } as RequestInit);
     return true;
   } catch {
     return false;
@@ -48,27 +40,26 @@ async function probe(url: string): Promise<boolean> {
 }
 
 export async function requestLocalAccess(): Promise<LocalAccessState> {
-  const before = await queryLocalAccess();
+  const beforeRequest = queryLocalAccess();
+  const probes = Promise.all([
+    probe('http://127.0.0.1:49125/permission-probe'),
+    probe('http://127.0.0.1:49124/'),
+  ]);
+  const before = await beforeRequest;
   if (before === 'granted' || before === 'not-required') return before;
-  await probe('http://127.0.0.1:49125/permission-probe');
-  await probe('http://127.0.0.1:49124/');
+  await probes;
   return queryLocalAccess();
 }
 
 export async function observeLocalAccess(
   onChange: (state: LocalAccessState) => void,
 ): Promise<() => void> {
-  if (!browserRequiresPermission()) return () => undefined;
-  try {
-    const permission = await navigator.permissions.query({
-      name: 'local-network-access',
-    } as unknown as PermissionDescriptor);
-    const update = () => onChange(permission.state);
-    permission.addEventListener('change', update);
-    return () => permission.removeEventListener('change', update);
-  } catch {
-    return () => undefined;
-  }
+  if (isLoopbackOrigin()) return () => undefined;
+  const permission = await loopbackPermission();
+  if (!permission) return () => undefined;
+  const update = () => onChange(permission.state);
+  permission.addEventListener('change', update);
+  return () => permission.removeEventListener('change', update);
 }
 
 export function localAccessSatisfied(state: LocalAccessState): boolean {

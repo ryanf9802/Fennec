@@ -8,6 +8,9 @@ describe('browser local network access', () => {
   const permissionQuery = vi.fn();
   beforeEach(() => {
     permissionQuery.mockReset();
+    vi.stubGlobal('location', {
+      hostname: 'app.fennec.gg',
+    });
     Object.defineProperty(window, 'isSecureContext', {
       configurable: true,
       value: true,
@@ -17,32 +20,43 @@ describe('browser local network access', () => {
       value: { query: permissionQuery },
     });
   });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('does not gate loopback development origins', async () => {
+    vi.stubGlobal('location', { hostname: 'localhost' });
+
+    await expect(queryLocalAccess()).resolves.toBe('not-required');
+    expect(permissionQuery).not.toHaveBeenCalled();
+  });
 
   it('reports the Chromium local network permission state when enforcement applies', async () => {
-    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
-      'Mozilla/5.0 Chrome/142.0.0.0 Safari/537.36',
-    );
     permissionQuery.mockResolvedValue({ state: 'prompt' } as PermissionStatus);
 
     await expect(queryLocalAccess()).resolves.toBe('prompt');
-    expect(permissionQuery).toHaveBeenCalledWith({
+    expect(permissionQuery).toHaveBeenCalledWith({ name: 'loopback-network' });
+  });
+
+  it('falls back to the legacy local network permission alias', async () => {
+    permissionQuery
+      .mockRejectedValueOnce(new TypeError('unsupported'))
+      .mockResolvedValueOnce({ state: 'prompt' } as PermissionStatus);
+
+    await expect(queryLocalAccess()).resolves.toBe('prompt');
+    expect(permissionQuery).toHaveBeenNthCalledWith(2, {
       name: 'local-network-access',
     });
   });
 
   it('does not block browsers that do not expose the permission requirement', async () => {
-    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
-      'Mozilla/5.0 Firefox/141.0',
-    );
+    permissionQuery.mockRejectedValue(new TypeError('unsupported'));
     await expect(queryLocalAccess()).resolves.toBe('not-required');
-    expect(permissionQuery).not.toHaveBeenCalled();
+    expect(permissionQuery).toHaveBeenCalledTimes(2);
   });
 
   it('probes loopback apps to trigger the prompt and accepts a persistent grant', async () => {
-    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
-      'Mozilla/5.0 Edg/143.0.0.0 Chrome/143.0.0.0',
-    );
     permissionQuery
       .mockResolvedValueOnce({ state: 'prompt' } as PermissionStatus)
       .mockResolvedValueOnce({ state: 'granted' } as PermissionStatus);
@@ -52,6 +66,10 @@ describe('browser local network access', () => {
 
     await expect(requestLocalAccess()).resolves.toBe('granted');
     expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ targetAddressSpace: 'loopback' }),
+    );
     expect(localAccessSatisfied('granted')).toBe(true);
   });
 });

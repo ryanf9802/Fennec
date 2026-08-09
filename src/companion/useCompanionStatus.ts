@@ -1,13 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { companionHealth, type CompanionHealth } from './client';
 
 export function useCompanionStatus() {
   const [checking, setChecking] = useState(true);
   const [health, setHealth] = useState<CompanionHealth>();
-  const recheck = useCallback(async () => {
-    setChecking(true);
-    setHealth(await companionHealth());
-    setChecking(false);
+  const inFlight = useRef<Promise<void> | undefined>(undefined);
+  const recheck = useCallback(() => {
+    if (inFlight.current) return inFlight.current;
+    const request = companionHealth()
+      .then(setHealth)
+      .finally(() => {
+        setChecking(false);
+        inFlight.current = undefined;
+      });
+    inFlight.current = request;
+    return request;
   }, []);
   useEffect(() => {
     const initial = window.setTimeout(() => void recheck(), 0);

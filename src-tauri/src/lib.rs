@@ -54,8 +54,24 @@ pub(crate) fn configure_with_elevation(path: &std::path::Path) -> std::io::Resul
     }
 }
 
-fn open_fennec(token: &str) {
-    let url = format!("https://app.fennec.gg/setup#companion={token}");
+const PRODUCTION_SETUP_URL: &str = "https://app.fennec.gg/setup";
+const PAIRING_RETURN_URLS: [&str; 5] = [
+    PRODUCTION_SETUP_URL,
+    "http://localhost:5173/setup",
+    "http://localhost:5174/setup",
+    "http://127.0.0.1:5173/setup",
+    "http://127.0.0.1:5174/setup",
+];
+
+fn pairing_url(return_to: Option<&str>, token: &str) -> String {
+    let return_to = return_to
+        .filter(|candidate| PAIRING_RETURN_URLS.contains(candidate))
+        .unwrap_or(PRODUCTION_SETUP_URL);
+    format!("{return_to}#companion={token}")
+}
+
+fn open_fennec(token: &str, return_to: Option<&str>) {
+    let url = pairing_url(return_to, token);
     #[cfg(windows)]
     let _ = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
     #[cfg(not(windows))]
@@ -83,10 +99,21 @@ fn launch_from_url(app: tauri::AppHandle, value: &url::Url) {
     });
 }
 
-fn handle_urls(app: tauri::AppHandle, urls: impl IntoIterator<Item = url::Url>) {
+fn handle_urls(
+    app: tauri::AppHandle,
+    urls: impl IntoIterator<Item = url::Url>,
+    token: Option<&str>,
+) {
     for value in urls {
         if value.scheme() == "fennec" && value.host_str() == Some("launch") {
             launch_from_url(app.clone(), &value);
+        } else if value.scheme() == "fennec" && value.host_str() == Some("open") {
+            let return_to = value
+                .query_pairs()
+                .find_map(|(key, value)| (key == "return_to").then(|| value.into_owned()));
+            if let Some(token) = token {
+                open_fennec(token, return_to.as_deref());
+            }
         }
     }
 }
@@ -98,7 +125,10 @@ pub fn run() {
             let urls = args
                 .into_iter()
                 .filter_map(|arg| url::Url::parse(&arg).ok());
-            handle_urls(app.clone(), urls);
+            let token = app
+                .try_state::<Arc<AppState>>()
+                .map(|state| state.token.clone());
+            handle_urls(app.clone(), urls, token.as_deref());
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
@@ -162,21 +192,47 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
-                    "open" => open_fennec(&menu_token),
+                    "open" => open_fennec(&menu_token, None),
                     "quit" => app.exit(0),
                     _ => {}
                 })
                 .build(app)?;
 
             if let Some(urls) = app.deep_link().get_current()? {
-                handle_urls(app.handle().clone(), urls);
+                handle_urls(app.handle().clone(), urls, Some(&token));
             }
             let deep_link_handle = app.handle().clone();
+            let deep_link_token = token.clone();
             app.deep_link().on_open_url(move |event| {
-                handle_urls(deep_link_handle.clone(), event.urls().to_vec());
+                handle_urls(
+                    deep_link_handle.clone(),
+                    event.urls().to_vec(),
+                    Some(&deep_link_token),
+                );
             });
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running Fennec Companion");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{pairing_url, PRODUCTION_SETUP_URL};
+
+    #[test]
+    fn pairing_accepts_known_local_development_urls() {
+        assert_eq!(
+            pairing_url(Some("http://localhost:5173/setup"), "abc123"),
+            "http://localhost:5173/setup#companion=abc123"
+        );
+    }
+
+    #[test]
+    fn pairing_rejects_untrusted_return_urls() {
+        assert_eq!(
+            pairing_url(Some("https://attacker.example/setup"), "abc123"),
+            format!("{PRODUCTION_SETUP_URL}#companion=abc123")
+        );
+    }
 }

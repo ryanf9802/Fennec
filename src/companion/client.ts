@@ -13,6 +13,23 @@ export interface CompanionHealth {
 
 export const companionProtocolVersion = 1;
 
+const productionSetupUrl = 'https://app.fennec.gg/setup';
+const pairingReturnUrls = new Set([
+  productionSetupUrl,
+  'http://localhost:5173/setup',
+  'http://localhost:5174/setup',
+  'http://127.0.0.1:5173/setup',
+  'http://127.0.0.1:5174/setup',
+]);
+
+export function companionOpenUrl(): string {
+  const candidate = `${location.origin}/setup`;
+  const returnTo = pairingReturnUrls.has(candidate)
+    ? candidate
+    : productionSetupUrl;
+  return `fennec://open?return_to=${encodeURIComponent(returnTo)}`;
+}
+
 function browserStorage(): Storage | undefined {
   try {
     return typeof window.localStorage?.getItem === 'function' &&
