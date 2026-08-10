@@ -13,10 +13,14 @@ turns the games you play into a useful personal history: what happened in each
 match, how a play session went, where you interacted with the ball, and which
 players you keep meeting.
 
-Fennec runs at [app.fennec.gg](https://app.fennec.gg) in Chrome or Edge. There
-is no Fennec account to create, no Fennec software to install, and no match
-history uploaded to a Fennec service. The browser connects directly to Rocket
-League's local Stats API and keeps the resulting history on your device.
+Fennec runs at [app.fennec.gg](https://app.fennec.gg) on the same Windows PC as
+Rocket League. Chromium-based desktop browsers are currently tested and
+supported. Other browser engines are not yet part of Fennec's compatibility
+test matrix.
+
+There is no Fennec account to create, no Fennec software to install, and no
+match history uploaded to a Fennec service. The browser connects directly to
+Rocket League's local Stats API and keeps the resulting history on your device.
 
 ## Why Fennec exists
 
@@ -93,7 +97,8 @@ telemetry, and unavailable data is shown as unavailable rather than estimated.
 
 ## Start without installing anything
 
-1. Open [app.fennec.gg](https://app.fennec.gg) in Chrome or Edge.
+1. Open [app.fennec.gg](https://app.fennec.gg) in a supported desktop browser
+   on the same Windows PC as Rocket League.
 2. Allow local network access if the browser asks. This lets the site connect
    to Rocket League on the same computer; it does not send your local history
    elsewhere.
@@ -104,9 +109,10 @@ telemetry, and unavailable data is shown as unavailable rather than estimated.
 5. Choose your player in **Profile** so Fennec can present teams, scores,
    sessions, and history from your point of view.
 
-Keep the Fennec tab or installed browser app open while you play. Chrome and
-Edge can install the site as a Progressive Web App for a dedicated window and
-offline application shell, but installing it is optional.
+Keep the Fennec tab or installed browser app open while you play. A compatible
+Chromium-based browser can install Fennec as a Progressive Web App for a
+dedicated window and offline application shell. Installation is optional; the
+complete Fennec experience is available in a normal browser tab.
 
 The in-app Setup center remains the source of truth for configuration and can
 be revisited at any time. The official protocol and manual configuration are
