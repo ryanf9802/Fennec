@@ -1,5 +1,4 @@
 import { Gamepad2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 export function EmptyState() {
   return (
@@ -9,12 +8,9 @@ export function EmptyState() {
       </div>
       <h2 className="mt-5 text-xl font-extrabold">Ready for kickoff</h2>
       <p className="text-muted mx-auto mt-2 max-w-md">
-        Start Rocket League after enabling its Stats API. Fennec will
-        automatically build your game timeline and sessions.
+        Start Rocket League and play a match. Fennec will automatically build
+        your game timeline and sessions.
       </p>
-      <Link className="button-primary mt-6" to="/setup">
-        Open setup guide
-      </Link>
     </div>
   );
 }

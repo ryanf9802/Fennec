@@ -95,7 +95,7 @@ function session(endedManually = false): SessionGroup {
 }
 
 function renderPage(
-  value = session(),
+  value: SessionGroup | null = session(),
   withProfile = true,
   activeMatch?: MatchState,
 ) {
@@ -109,7 +109,7 @@ function renderPage(
     settings: defaultSettings,
   };
   mocks.sessions = {
-    data: { pages: [{ items: [value] }] },
+    data: { pages: [{ items: value ? [value] : [] }] },
     isLoading: false,
     isError: false,
     hasNextPage: false,
@@ -179,6 +179,23 @@ describe('closed session presentation', () => {
     ).toHaveAttribute('href', '/profile#player-selection');
     expect(
       screen.queryByRole('heading', { name: 'Current session' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('treats an empty timeline as ready to capture the first match', () => {
+    renderPage(null);
+
+    expect(
+      screen.getByRole('heading', { name: 'Ready for kickoff' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Start Rocket League and play a match. Fennec will automatically build your game timeline and sessions.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Stats API/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Open setup guide' }),
     ).not.toBeInTheDocument();
   });
 

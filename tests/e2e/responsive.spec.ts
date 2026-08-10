@@ -837,6 +837,38 @@ test('incomplete first launch opens Setup and completed setup links to Game time
   ).toBeVisible();
 });
 
+test('empty game timeline focuses on playing the first match', async ({
+  page,
+}) => {
+  await page.route('**/__fennec/dev-telemetry', (route) =>
+    route.fulfill({ status: 204 }),
+  );
+  await page.goto('/setup?demo=0');
+  await page.evaluate(async () => {
+    localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
+    localStorage.setItem('fennec-stats-api-verified-v1', 'true');
+    const { saveProfile } = await import('/src/data/database.ts');
+    await saveProfile({
+      primaryId: 'Steam|first-match|0',
+      displayName: 'First Match',
+    });
+  });
+  await page.goto('/?demo=0');
+
+  await expect(
+    page.getByRole('heading', { name: 'Ready for kickoff' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Start Rocket League and play a match. Fennec will automatically build your game timeline and sessions.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/Stats API/i)).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: 'Open setup guide' }),
+  ).toHaveCount(0);
+});
+
 test('selected setup path reactively controls desktop and mobile navigation', async ({
   page,
 }) => {
