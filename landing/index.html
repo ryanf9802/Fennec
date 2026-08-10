@@ -89,39 +89,56 @@
         aria-labelledby="features-title"
       >
         <div class="section-heading">
-          <p class="eyebrow">More than a scoreboard</p>
-          <h2 id="features-title">The story of how you actually played.</h2>
+          <p class="eyebrow">Analytics Rocket League leaves out</p>
+          <h2 id="features-title">See the plays behind the scoreboard.</h2>
           <p>
-            Rank tells you where you landed. Fennec keeps the useful context
-            from the games that got you there.
+            Fennec turns observed ball events into consistent, inspectable
+            stats—so passes, challenges, and field position become part of your
+            match history instead of disappearing at the final whistle.
           </p>
         </div>
         <div class="feature-grid">
           <article class="feature-card">
             <span class="feature-number">01</span>
-            <h3>Every game, live and saved</h3>
+            <h3>Passes</h3>
             <p>
-              Follow the score, teams, events, touches, demolitions, passes, and
-              50s during a match. Revisit the same detail afterward.
+              Fennec credits a pass when the next identifiable single-player
+              touch comes from a different teammate during the same active play.
+            </p>
+            <p class="feature-rule">
+              An opponent touch, ambiguous multi-player hit, or dead-ball
+              transition breaks the sequence.
             </p>
           </article>
           <article class="feature-card">
             <span class="feature-number">02</span>
-            <h3>Sessions with context</h3>
+            <h3>50s</h3>
             <p>
-              See records, streaks, trends, recurring teammates, and player
-              encounters across a stretch of play—not just isolated results.
+              Fennec credits each identified player when opponents contact the
+              ball on the same hit or within 250 milliseconds of one another.
+            </p>
+            <p class="feature-rule">
+              Rapid follow-up contacts within half a second remain one challenge
+              instead of inflating the count.
             </p>
           </article>
           <article class="feature-card">
             <span class="feature-number">03</span>
-            <h3>Explainable ball analytics</h3>
+            <h3>3D touch map</h3>
             <p>
-              Explore touch maps, hit speed, possession context, scoring
-              touches, saves, and challenges derived from observed events.
+              Explore the observed locations of touches, 50s, saves, and scoring
+              touches in an interactive arena view, filtered by player or team.
+            </p>
+            <p class="feature-rule">
+              The map uses normal-play ball-event coordinates—not estimated
+              heatmap data—and adapts to different arena shapes.
             </p>
           </article>
         </div>
+        <p class="feature-summary">
+          Also included: team touch share, post-hit speed, speed gained or lost,
+          last-touch control, session trends, and recurring teammates.
+        </p>
       </section>
 
       <section

@@ -319,7 +319,9 @@ h2 {
 }
 
 .feature-card {
-  min-height: 20rem;
+  display: flex;
+  min-height: 19rem;
+  flex-direction: column;
   padding: 1.6rem;
   border: 1px solid var(--border);
   border-radius: 1rem;
@@ -352,8 +354,9 @@ h2 {
 }
 
 .feature-card h3 {
-  margin: 5.5rem 0 0.7rem;
-  font-size: 1.3rem;
+  margin: 1.75rem 0 0.7rem;
+  font-size: 1.65rem;
+  letter-spacing: -0.025em;
   line-height: 1.2;
 }
 
@@ -361,6 +364,25 @@ h2 {
   margin: 0;
   color: var(--muted);
   font-size: 0.94rem;
+}
+
+.feature-card .feature-rule {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: #b8c7d9;
+  font-size: 0.84rem;
+}
+
+.feature-summary {
+  max-width: 920px;
+  margin: 1.25rem 0 0;
+  padding: 0.9rem 1rem;
+  border-left: 2px solid var(--cyan);
+  border-radius: 0 0.6rem 0.6rem 0;
+  background: rgba(54, 215, 255, 0.05);
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .ownership {
@@ -545,11 +567,7 @@ footer {
   }
 
   .feature-card {
-    min-height: 15rem;
-  }
-
-  .feature-card h3 {
-    margin-top: 3.5rem;
+    min-height: 17rem;
   }
 
   .terminal {

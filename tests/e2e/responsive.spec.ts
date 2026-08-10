@@ -23,6 +23,11 @@ test('landing page stays concise and usable across viewport sizes', async ({
     ).toBeVisible();
     await expect(page.getByRole('link', { name: /demo/i })).toHaveCount(0);
     await expect(page.getByText('MIT License').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Passes' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '50s' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: '3D touch map' }),
+    ).toBeVisible();
     const dimensions = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
       client: document.documentElement.clientWidth,

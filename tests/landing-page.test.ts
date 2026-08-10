@@ -35,4 +35,19 @@ describe('Fennec landing page', () => {
       page.querySelector('a[href$="/blob/main/TRADEMARKS.md"]'),
     ).not.toBeNull();
   });
+
+  it('prioritizes explainable analytics beyond the standard scoreboard', () => {
+    const page = landingDocument();
+    const cards = Array.from(page.querySelectorAll('.feature-card'));
+    const text = cards.map((card) => card.textContent?.replace(/\s+/g, ' '));
+
+    expect(cards.map((card) => card.querySelector('h3')?.textContent)).toEqual([
+      'Passes',
+      '50s',
+      '3D touch map',
+    ]);
+    expect(text[0]).toContain('next identifiable single-player touch');
+    expect(text[1]).toContain('within 250 milliseconds');
+    expect(text[2]).toContain('not estimated heatmap data');
+  });
 });
