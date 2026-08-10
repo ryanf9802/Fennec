@@ -50,4 +50,24 @@ describe('Fennec landing page', () => {
     expect(text[1]).toContain('within 250 milliseconds');
     expect(text[2]).toContain('not estimated heatmap data');
   });
+
+  it('pairs every featured analytic with a decorative schematic', () => {
+    const page = landingDocument();
+    const diagrams = Array.from(
+      page.querySelectorAll<SVGElement>('.feature-card .feature-visual'),
+    );
+
+    expect(diagrams.map((diagram) => diagram.dataset.featureVisual)).toEqual([
+      'pass',
+      'fifty',
+      'touch-map',
+    ]);
+    for (const diagram of diagrams) {
+      expect(diagram.getAttribute('aria-hidden')).toBe('true');
+      expect(diagram.getAttribute('focusable')).toBe('false');
+      expect(
+        diagram.querySelectorAll('path, circle, rect').length,
+      ).toBeGreaterThan(3);
+    }
+  });
 });

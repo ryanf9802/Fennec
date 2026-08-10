@@ -333,6 +333,14 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.feature-card-top {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .feature-number {
   display: inline-flex;
   width: 2.4rem;
@@ -345,6 +353,7 @@ h2 {
   color: var(--cyan);
   font-size: 0.75rem;
   font-weight: 850;
+  flex: 0 0 auto;
 }
 
 .feature-card:nth-child(2) .feature-number {
@@ -353,8 +362,117 @@ h2 {
   color: var(--orange);
 }
 
+.feature-visual {
+  width: min(10rem, calc(100% - 3.4rem));
+  height: 4rem;
+  overflow: visible;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.16));
+  transform-origin: center;
+  transition:
+    filter 180ms ease,
+    transform 180ms ease;
+}
+
+.feature-visual path,
+.feature-visual circle,
+.feature-visual rect {
+  vector-effect: non-scaling-stroke;
+}
+
+.visual-guide,
+.visual-field,
+.visual-field-line {
+  fill: none;
+  stroke: rgba(145, 177, 215, 0.2);
+  stroke-width: 1;
+}
+
+.visual-field {
+  fill: rgba(54, 215, 255, 0.025);
+}
+
+.visual-cyan-stroke {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 1.5;
+}
+
+.visual-orange-stroke {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 1.5;
+}
+
+.visual-cyan-fill {
+  fill: var(--cyan);
+}
+
+.visual-orange-fill {
+  fill: var(--orange);
+}
+
+.visual-node {
+  fill: rgba(7, 17, 31, 0.74);
+}
+
+.visual-ball {
+  fill: var(--text);
+  stroke: rgba(7, 17, 31, 0.8);
+  stroke-width: 2;
+}
+
+.visual-route {
+  stroke-dasharray: 4 4;
+  transition: stroke-dashoffset 240ms ease;
+}
+
+.visual-impact {
+  opacity: 0.48;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.visual-impact-line {
+  fill: none;
+  stroke: var(--text);
+  stroke-linecap: round;
+  stroke-width: 1.2;
+  opacity: 0.55;
+}
+
+.visual-touch {
+  stroke: rgba(7, 17, 31, 0.86);
+  stroke-width: 1.5;
+}
+
+.visual-fifty {
+  fill: rgba(255, 138, 61, 0.18);
+}
+
+.visual-scoring {
+  fill: rgba(54, 215, 255, 0.12);
+  stroke-width: 2;
+}
+
+.feature-card:hover .feature-visual {
+  filter: drop-shadow(0 12px 22px rgba(54, 215, 255, 0.12)) brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.feature-card:hover .visual-route {
+  stroke-dashoffset: -4;
+}
+
+.feature-card:hover .visual-impact {
+  opacity: 0.7;
+  transform: scale(1.06);
+}
+
 .feature-card h3 {
-  margin: 1.75rem 0 0.7rem;
+  margin: 1.25rem 0 0.7rem;
   font-size: 1.65rem;
   letter-spacing: -0.025em;
   line-height: 1.2;
@@ -640,5 +758,15 @@ footer {
 
   .button {
     transition: none;
+  }
+
+  .feature-visual,
+  .visual-route,
+  .visual-impact {
+    transition: none;
+  }
+
+  .feature-card:hover .feature-visual {
+    transform: none;
   }
 }

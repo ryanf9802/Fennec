@@ -28,6 +28,16 @@ test('landing page stays concise and usable across viewport sizes', async ({
     await expect(
       page.getByRole('heading', { name: '3D touch map' }),
     ).toBeVisible();
+    const diagrams = page.locator('.feature-visual');
+    await expect(diagrams).toHaveCount(3);
+    for (let index = 0; index < 3; index += 1) {
+      const card = page.locator('.feature-card').nth(index);
+      const number = await card.locator('.feature-number').boundingBox();
+      const diagram = await card.locator('.feature-visual').boundingBox();
+      const heading = await card.getByRole('heading').boundingBox();
+      expect(diagram!.x).toBeGreaterThan(number!.x + number!.width);
+      expect(heading!.y).toBeGreaterThanOrEqual(diagram!.y + diagram!.height);
+    }
     const dimensions = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
       client: document.documentElement.clientWidth,
