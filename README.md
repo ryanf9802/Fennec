@@ -6,6 +6,7 @@
 </picture>
 
 [![Web build and deploy](https://github.com/ryanf9802/Fennec/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanf9802/Fennec/actions/workflows/ci.yml)
+[![Companion build and release](https://github.com/ryanf9802/Fennec/actions/workflows/release-companion.yml/badge.svg)](https://github.com/ryanf9802/Fennec/actions/workflows/release-companion.yml)
 
 Fennec is a local-first Rocket League match journal and live dashboard. It
 turns the games you play into a useful personal history: what happened in each
