@@ -52,43 +52,33 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link
             to="/"
             aria-label="Fennec home"
-            className="flex min-w-0 flex-1 items-center overflow-hidden"
+            className={`flex min-w-0 flex-1 items-center overflow-hidden ${collapsed ? 'justify-center' : 'justify-center lg:justify-start lg:gap-3'}`}
           >
-            {collapsed ? (
-              <img
-                src="/assets/brand/fennec-a-mark-primary.svg"
-                alt="Fennec"
-                className="mx-auto size-11 shrink-0"
-              />
-            ) : (
-              <>
-                <img
-                  src="/assets/brand/fennec-a-mark-primary.svg"
-                  alt="Fennec"
-                  className="mx-auto size-11 shrink-0 lg:hidden"
-                />
-                <img
-                  src="/assets/brand/fennec-a-lockup-primary.svg"
-                  alt="Fennec"
-                  className="hidden h-9 min-w-0 max-w-[8.5rem] lg:block"
-                />
-              </>
+            <img
+              src="/assets/brand/fennec-a-mark-primary.svg"
+              alt="Fennec"
+              className="size-11 shrink-0"
+            />
+            {!collapsed && (
+              <span className="text-main hidden truncate text-xl font-black tracking-tight lg:inline">
+                Fennec
+              </span>
             )}
           </Link>
-          <button
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="hover-surface hidden size-9 shrink-0 items-center justify-center rounded-lg lg:flex"
-            onClick={() =>
-              void updateSettings({ ...settings, sidebarCollapsed: !collapsed })
-            }
-          >
-            {collapsed ? (
-              <ChevronRight className="size-4" />
-            ) : (
-              <ChevronLeft className="size-4" />
-            )}
-          </button>
         </div>
+        <button
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="surface-flat hover-surface absolute top-[5.25rem] -right-4 z-10 hidden size-8 items-center justify-center rounded-full lg:flex"
+          onClick={() =>
+            void updateSettings({ ...settings, sidebarCollapsed: !collapsed })
+          }
+        >
+          {collapsed ? (
+            <ChevronRight className="size-4" />
+          ) : (
+            <ChevronLeft className="size-4" />
+          )}
+        </button>
         <nav className="flex flex-1 flex-col gap-2 p-3">
           {navigation.map(({ to, label, icon: Icon }) => (
             <NavLink

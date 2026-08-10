@@ -1041,8 +1041,35 @@ test('desktop sidebar connection status fits and stays meaningful when collapsed
 }) => {
   await page.setViewportSize({ width: 1440, height: 620 });
   await page.goto('/?demo=1');
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
   const sidebar = page.locator('aside');
+  const home = sidebar.getByRole('link', { name: 'Fennec home' });
+  const brandRow = home.locator('..');
+  const mark = home.locator('img');
+  const brandName = home.getByText('Fennec', { exact: true });
+  const collapseButton = sidebar.getByRole('button', {
+    name: 'Collapse sidebar',
+  });
   const status = sidebar.getByRole('status');
+  await expect(mark).toBeVisible();
+  await expect(brandName).toBeVisible();
+  await expect(brandRow.getByRole('button')).toHaveCount(0);
+  const [expandedMarkBox, expandedSidebarBox, collapseButtonBox] =
+    await Promise.all([
+      mark.boundingBox(),
+      sidebar.boundingBox(),
+      collapseButton.boundingBox(),
+    ]);
+  expect(expandedMarkBox).toMatchObject({ width: 44, height: 44 });
+  expect(collapseButtonBox!.x).toBeLessThan(
+    expandedSidebarBox!.x + expandedSidebarBox!.width,
+  );
+  expect(collapseButtonBox!.x + collapseButtonBox!.width).toBeGreaterThan(
+    expandedSidebarBox!.x + expandedSidebarBox!.width,
+  );
   await expect(status).toBeVisible();
   await expect(status).toHaveAttribute(
     'aria-label',
@@ -1071,8 +1098,14 @@ test('desktop sidebar connection status fits and stays meaningful when collapsed
     .locator('[aria-hidden="true"]')
     .getAttribute('class');
   const expandedHeight = (await status.boundingBox())!.height;
-  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await collapseButton.click();
 
+  await expect(brandName).toBeHidden();
+  const collapsedMarkBox = await mark.boundingBox();
+  expect(collapsedMarkBox).toMatchObject({
+    width: expandedMarkBox!.width,
+    height: expandedMarkBox!.height,
+  });
   await expect(status).toBeVisible();
   await expect(status).toHaveAttribute(
     'aria-label',
