@@ -316,6 +316,47 @@ textarea:focus-visible {
 .scoreboard-table {
   table-layout: fixed;
 }
+.scoreboard-team-panel {
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in srgb, var(--scoreboard-team-secondary) 32%, var(--border));
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      105deg,
+      color-mix(in srgb, var(--scoreboard-team-primary) 7%, transparent),
+      transparent 45%
+    ),
+    var(--background-elevated);
+  box-shadow:
+    inset 4px 0 0 var(--scoreboard-team-primary),
+    0 10px 28px rgba(0, 0, 0, 0.14);
+}
+.scoreboard-team-header {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: min(100cqi, 100%);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--scoreboard-team-primary) 24%, var(--border));
+  background: color-mix(
+    in srgb,
+    var(--scoreboard-team-primary) 10%,
+    transparent
+  );
+}
+.scoreboard-team-score {
+  color: color-mix(in srgb, var(--scoreboard-team-primary) 76%, var(--text));
+  text-shadow: 0 0 20px
+    color-mix(in srgb, var(--scoreboard-team-primary) 30%, transparent);
+}
+.scoreboard-stat-header {
+  background: color-mix(
+    in srgb,
+    var(--scoreboard-team-primary) 4%,
+    transparent
+  );
+}
 .stat-label-full {
   display: none;
 }
@@ -341,7 +382,11 @@ textarea:focus-visible {
     position: sticky;
     left: 0;
     z-index: 1;
-    background: var(--background-elevated);
+    background: color-mix(
+      in srgb,
+      var(--scoreboard-team-primary) 4%,
+      var(--background-elevated)
+    );
   }
   thead .scoreboard-player-cell {
     z-index: 2;

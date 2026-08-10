@@ -1,5 +1,5 @@
 import { ArrowLeft, History, Trophy } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { PlayerName } from '../components/PlayerName';
@@ -109,6 +109,102 @@ function PlayerRow({
         </td>
       ))}
     </tr>
+  );
+}
+
+function TeamScoreboard({
+  team,
+  score,
+  winner,
+  players,
+  profileId,
+  playersWithHistory,
+  onInspect,
+}: {
+  team: TeamPresentation;
+  score: number;
+  winner: boolean;
+  players: ParticipantState[];
+  profileId?: string;
+  playersWithHistory: Set<string>;
+  onInspect(playerKey: string, playerName: string): void;
+}) {
+  const titleId = `scoreboard-team-${team.teamNumber}`;
+  return (
+    <section
+      aria-labelledby={titleId}
+      data-scoreboard-team={team.teamNumber}
+      className="scoreboard-team-panel"
+      style={
+        {
+          '--scoreboard-team-primary': team.primaryColor,
+          '--scoreboard-team-secondary': team.secondaryColor,
+        } as CSSProperties
+      }
+    >
+      <div className="scoreboard-team-header flex items-center justify-between gap-4 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <TeamSwatch team={team} />
+          <h3
+            id={titleId}
+            className="truncate text-sm font-black uppercase tracking-[0.14em]"
+          >
+            {team.name}
+          </h3>
+          {winner && (
+            <Trophy
+              aria-label="Winner"
+              className="size-4 shrink-0 text-amber-400"
+            />
+          )}
+        </div>
+        <div
+          aria-label={`${team.name} score ${score}`}
+          className="scoreboard-team-score text-2xl font-black tabular-nums"
+        >
+          {score}
+        </div>
+      </div>
+      <table className="scoreboard-table w-full">
+        <caption className="sr-only">{team.name} scoreboard</caption>
+        <colgroup>
+          <col className="w-56" />
+          {stats.map(({ key }) => (
+            <col key={key} />
+          ))}
+        </colgroup>
+        <thead className="scoreboard-stat-header eyebrow">
+          <tr>
+            <th
+              scope="col"
+              className="scoreboard-player-cell w-56 min-w-56 px-3 py-2.5 text-left"
+            >
+              Player
+            </th>
+            {stats.map(({ key, full, short }) => (
+              <th key={key} scope="col" className="px-2 py-2.5 text-center">
+                <span className="stat-label-full">{full}</span>
+                <abbr title={full} className="stat-label-short no-underline">
+                  {short}
+                </abbr>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {players.map((player, index) => (
+            <PlayerRow
+              key={`${player.shortcut ?? playerKeyFor(player) ?? player.name}:${index}`}
+              player={player}
+              team={team}
+              profileId={profileId}
+              hasHistory={playersWithHistory.has(playerKeyFor(player) ?? '')}
+              onInspect={onInspect}
+            />
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 
@@ -313,81 +409,29 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
               </Link>
             )}
           </div>
-          <div className="overflow-x-auto rounded-2xl">
-            <table className="scoreboard-table surface-flat w-full min-w-[47.25rem] overflow-hidden rounded-2xl">
-              <colgroup>
-                <col className="w-56" />
-                {stats.map(({ key }) => (
-                  <col key={key} />
-                ))}
-              </colgroup>
-              <thead className="eyebrow">
-                <tr>
-                  <th
-                    scope="col"
-                    className="scoreboard-player-cell w-56 min-w-56 px-3 py-3 text-left"
-                  >
-                    Player
-                  </th>
-                  {stats.map(({ key, full, short }) => (
-                    <th key={key} scope="col" className="px-2 py-3 text-center">
-                      <span className="stat-label-full">{full}</span>
-                      <abbr
-                        title={full}
-                        className="stat-label-short no-underline"
-                      >
-                        {short}
-                      </abbr>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              {teams.map((team) => (
-                <tbody key={team.teamNumber}>
-                  <tr className="border-t border-ui">
-                    <th
-                      colSpan={stats.length + 1}
-                      className="px-3 py-2 text-left text-sm font-black uppercase tracking-wider"
-                    >
-                      <TeamSwatch
-                        team={resolveTeamPresentation(
-                          match.teams,
-                          team.teamNumber,
-                        )}
-                        className="mr-2"
-                      />
-                      {
-                        resolveTeamPresentation(match.teams, team.teamNumber)
-                          .name
-                      }
-                      {match.winnerTeamNumber === team.teamNumber && (
-                        <Trophy className="ml-2 inline size-4 text-amber-400" />
-                      )}
-                    </th>
-                  </tr>
-                  {match.participants
-                    .filter((player) => player.teamNumber === team.teamNumber)
-                    .sort((a, b) => b.score - a.score)
-                    .map((player, index) => (
-                      <PlayerRow
-                        key={`${player.shortcut ?? playerKeyFor(player) ?? player.name}:${index}`}
-                        player={player}
-                        team={resolveTeamPresentation(
-                          match.teams,
-                          player.teamNumber,
-                        )}
-                        profileId={profile?.primaryId}
-                        hasHistory={playersWithHistory.has(
-                          playerKeyFor(player) ?? '',
-                        )}
-                        onInspect={(key, name) =>
-                          setProfilePlayer({ key, name })
-                        }
-                      />
-                    ))}
-                </tbody>
-              ))}
-            </table>
+          <div className="scoreboard-scroller overflow-x-auto pb-1">
+            <div className="scoreboard-stack min-w-[47.25rem] space-y-3">
+              {teams.map((team) => {
+                const presentation = resolveTeamPresentation(
+                  match.teams,
+                  team.teamNumber,
+                );
+                return (
+                  <TeamScoreboard
+                    key={team.teamNumber}
+                    team={presentation}
+                    score={team.score}
+                    winner={match.winnerTeamNumber === team.teamNumber}
+                    players={match.participants
+                      .filter((player) => player.teamNumber === team.teamNumber)
+                      .sort((a, b) => b.score - a.score)}
+                    profileId={profile?.primaryId}
+                    playersWithHistory={playersWithHistory}
+                    onInspect={(key, name) => setProfilePlayer({ key, name })}
+                  />
+                );
+              })}
+            </div>
           </div>
           {!match.participants.length && (
             <div className="surface-flat text-muted mt-3 rounded-2xl p-8 text-center">

@@ -56,7 +56,7 @@ test('demo feed opens a live match and settings remain usable', async ({
     page.getByRole('button', { name: 'View profile for Luna' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('columnheader', { name: '50', exact: true }),
+    page.getByRole('columnheader', { name: '50', exact: true }).first(),
   ).toBeVisible();
   const lunaRow = page.getByRole('row').filter({
     has: page.getByRole('button', { name: 'View profile for Luna' }),
@@ -72,11 +72,9 @@ test('demo feed opens a live match and settings remain usable', async ({
   );
   const teamNameWeight = Number(
     await page
-      .locator('.scoreboard-table tbody')
+      .locator('.scoreboard-team-header')
       .first()
-      .locator('tr')
-      .first()
-      .locator('th')
+      .locator('h3')
       .evaluate((element) => getComputedStyle(element).fontWeight),
   );
   expect(playerNameWeight).toBeLessThan(teamNameWeight);
@@ -356,16 +354,16 @@ test('custom team identity uses exact accents and theme-colored text', async ({
 }) => {
   await page.goto('/matches/demo-history-1?demo=1');
   const neonHeader = page
-    .locator('.scoreboard-table th')
+    .locator('.scoreboard-team-header')
     .filter({ hasText: 'Neon Foxes' });
   const solarHeader = page
-    .locator('.scoreboard-table th')
+    .locator('.scoreboard-team-header')
     .filter({ hasText: 'Solar Flare' });
   await expect(neonHeader).toBeVisible();
   await expect(solarHeader).toBeVisible();
 
   const teamStyles = await page
-    .locator('.scoreboard-table tbody > tr:first-child [data-team-number]')
+    .locator('.scoreboard-team-header [data-team-number]')
     .evaluateAll((swatches) =>
       swatches.slice(0, 2).map((swatch) => {
         const style = getComputedStyle(swatch);
@@ -379,6 +377,9 @@ test('custom team identity uses exact accents and theme-colored text', async ({
     { background: 'rgb(101, 217, 238)', border: 'rgb(37, 99, 235)' },
     { background: 'rgb(250, 204, 21)', border: 'rgb(239, 68, 68)' },
   ]);
+  await expect(page.locator('[data-scoreboard-team]')).toHaveCount(2);
+  await expect(page.getByLabel('Neon Foxes score 3')).toBeVisible();
+  await expect(page.getByLabel('Solar Flare score 1')).toBeVisible();
   await expect(neonHeader).toHaveCSS('color', 'rgb(244, 248, 255)');
   await page.getByRole('tab', { name: 'Touch map' }).click();
   const touchMap = page.getByTestId('ball-touch-map-viewport');
@@ -394,9 +395,7 @@ test('custom team identity uses exact accents and theme-colored text', async ({
   });
   await expect(neonHeader).toHaveCSS('color', 'rgb(16, 35, 61)');
   await expect(
-    page.locator(
-      '.scoreboard-table tbody > tr:first-child [data-team-number="0"]',
-    ),
+    page.locator('.scoreboard-team-header [data-team-number="0"]'),
   ).toHaveCSS('background-color', 'rgb(101, 217, 238)');
 });
 
@@ -1021,10 +1020,12 @@ test('scoreboard columns align and the desktop timeline scrolls independently', 
   await page.goto('/?demo=1');
   await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
   await page.getByText('Live now').click();
-  const scoreHeader = page.getByRole('columnheader', {
-    name: 'Score',
-    exact: true,
-  });
+  const scoreHeader = page
+    .getByRole('columnheader', {
+      name: 'Score',
+      exact: true,
+    })
+    .first();
   await expect(scoreHeader).toBeVisible();
   const headerBox = await scoreHeader.boundingBox();
   const scoreBox = await page
@@ -1037,13 +1038,13 @@ test('scoreboard columns align and the desktop timeline scrolls independently', 
     ),
   ).toBeLessThan(1);
   await expect(
-    page.getByRole('columnheader', { name: 'Goals', exact: true }),
+    page.getByRole('columnheader', { name: 'Goals', exact: true }).first(),
   ).toBeVisible();
   await expect(
-    page.getByRole('columnheader', { name: 'Passes', exact: true }),
+    page.getByRole('columnheader', { name: 'Passes', exact: true }).first(),
   ).toBeVisible();
   await expect(
-    page.getByRole('columnheader', { name: '50s', exact: true }),
+    page.getByRole('columnheader', { name: '50s', exact: true }).first(),
   ).toBeVisible();
   const timelineScroller = page.locator('.timeline-scroller');
   expect(
@@ -1060,7 +1061,7 @@ test('wide split-layout scoreboards preserve readable player names', async ({
   await page.goto('/?demo=1');
   await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
   await page.getByText('Live now').click();
-  const scoreboardScroller = page.locator('.scoreboard-table').locator('..');
+  const scoreboardScroller = page.locator('.scoreboard-scroller');
   const dimensions = () =>
     scoreboardScroller.evaluate((element) => ({
       scroll: element.scrollWidth,
@@ -1074,7 +1075,7 @@ test('wide split-layout scoreboards preserve readable player names', async ({
   for (const label of ['S', 'G', 'A', 'P', '50', 'SV', 'SH', 'T', 'D'])
     await expect(
       page.getByRole('columnheader', { name: label, exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(2);
   await expect(
     page.getByRole('columnheader', { name: 'CT', exact: true }),
   ).toHaveCount(0);
@@ -1152,7 +1153,7 @@ test('mobile scoreboard scroll stays inside the page', async ({ page }) => {
   await page.goto('/?demo=1');
   await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
   await page.getByText('Live now').click();
-  const scoreboardScroller = page.locator('.scoreboard-table').locator('..');
+  const scoreboardScroller = page.locator('.scoreboard-scroller');
   const dimensions = await scoreboardScroller.evaluate((element) => ({
     scroll: element.scrollWidth,
     client: element.clientWidth,
@@ -1165,6 +1166,21 @@ test('mobile scoreboard scroll stays inside the page', async ({ page }) => {
   expect(documentDimensions.scroll).toBeLessThanOrEqual(
     documentDimensions.client,
   );
+  const [scrollerBox, scoreBoxes] = await Promise.all([
+    scoreboardScroller.boundingBox(),
+    page
+      .locator('.scoreboard-team-score')
+      .evaluateAll((elements) =>
+        elements.map((element) => element.getBoundingClientRect().toJSON()),
+      ),
+  ]);
+  expect(scoreBoxes).toHaveLength(2);
+  for (const scoreBox of scoreBoxes) {
+    expect(scoreBox.x).toBeGreaterThanOrEqual(scrollerBox!.x);
+    expect(scoreBox.right).toBeLessThanOrEqual(
+      scrollerBox!.x + scrollerBox!.width,
+    );
+  }
 });
 
 test('auto-open remains opt-in and navigates when enabled', async ({

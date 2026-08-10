@@ -129,19 +129,21 @@ describe('user-first team presentation', () => {
 
     expect(screen.getByText('2 – 0')).toBeInTheDocument();
     expect(
-      screen.getByRole('columnheader', { name: /^Passes/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('columnheader', { name: /^50s/ }),
-    ).toBeInTheDocument();
+      screen.getAllByRole('columnheader', { name: /^Passes/ }),
+    ).toHaveLength(2);
+    expect(screen.getAllByRole('columnheader', { name: /^50s/ })).toHaveLength(
+      2,
+    );
     expect(
       screen.queryByRole('columnheader', { name: /Car touches/ }),
     ).not.toBeInTheDocument();
-    const teamSections = screen.getByRole('table').querySelectorAll('tbody');
-    expect([...teamSections].map((section) => section.textContent)).toEqual([
-      expect.stringMatching(/^Orange.*You/),
-      expect.stringMatching(/^Blue.*Opponent/),
+    const teamPanels = screen.getAllByRole('region');
+    expect(teamPanels.map((panel) => panel.textContent)).toEqual([
+      expect.stringMatching(/^Orange2.*You/),
+      expect.stringMatching(/^Blue0.*Opponent/),
     ]);
+    expect(screen.getByLabelText('Orange score 2')).toBeInTheDocument();
+    expect(screen.getByLabelText('Blue score 0')).toBeInTheDocument();
   });
 
   it('renders custom team names and colors as accents instead of text colors', () => {
