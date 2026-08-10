@@ -185,7 +185,10 @@ export function CompanionSettings() {
       ) : !ready ? (
         <p className="surface-strong mt-4 rounded-2xl p-4 text-sm">
           No compatible paired companion is available. Complete pairing in the{' '}
-          <Link className="text-fennec-cyan underline" to="/setup">
+          <Link
+            className="text-fennec-cyan underline"
+            to="/setup?path=companion"
+          >
             Setup center
           </Link>
           .

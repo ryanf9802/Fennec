@@ -727,6 +727,28 @@ test('setup starts with a centered route choice and expands after selection', as
   ).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('settings companion pairing link selects the companion setup guide', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
+  });
+  await page.goto('/settings?demo=1');
+
+  const setupLink = page.getByRole('link', { name: 'Setup center' });
+  await expect(setupLink).toHaveAttribute('href', '/setup?path=companion');
+  await setupLink.click();
+
+  await expect(page).toHaveURL(/\/setup\?path=companion$/);
+  await expect(
+    page.getByRole('button', { name: /With companion/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('heading', { name: 'Setup instructions' }),
+  ).toBeVisible();
+  await expect(page.getByText('Install and pair the companion')).toBeVisible();
+});
+
 test('paired setup exposes companion launch preferences', async ({ page }) => {
   let dashboardCommandSeen = false;
   await page.addInitScript(() => {

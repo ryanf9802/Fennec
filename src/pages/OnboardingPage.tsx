@@ -27,6 +27,8 @@ const setupPathKey = 'fennec-setup-path-explicit-v2';
 function storedSetupPath(): SetupPath | undefined {
   if (new URLSearchParams(location.hash.slice(1)).has('companion'))
     return 'companion';
+  const requested = new URLSearchParams(location.search).get('path');
+  if (requested === 'browser' || requested === 'companion') return requested;
   try {
     const stored = window.localStorage?.getItem(setupPathKey);
     return stored === 'browser' || stored === 'companion' ? stored : undefined;
