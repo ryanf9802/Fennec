@@ -77,10 +77,9 @@ describe('settings CSV export', () => {
     const sections = screen.getAllByRole('heading', { level: 2 });
     expect(sections[0]).toHaveTextContent('Setup center');
     expect(sections[1]).toHaveTextContent('Sessions and behavior');
-    expect(screen.getByRole('link', { name: 'Open setup' })).toHaveAttribute(
-      'href',
-      '/setup',
-    );
+    const setupLink = screen.getByRole('link', { name: 'Open setup' });
+    expect(setupLink).toHaveAttribute('href', '/setup');
+    expect(setupLink.querySelector('svg')).toHaveClass('lucide-list-checks');
   });
 
   it('floats the save action only after a setting changes', () => {

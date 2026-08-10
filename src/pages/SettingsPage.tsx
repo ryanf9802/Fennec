@@ -1,4 +1,12 @@
-import { Check, Download, FileJson, Save, Trash2, Upload } from 'lucide-react';
+import {
+  Check,
+  Download,
+  FileJson,
+  ListChecks,
+  Save,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
@@ -152,6 +160,7 @@ export function SettingsPage() {
             optional recommended companion, and live capture.
           </p>
           <Link className="button-primary" to="/setup">
+            <ListChecks className="size-4" />
             Open setup
           </Link>
         </div>

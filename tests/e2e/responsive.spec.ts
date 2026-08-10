@@ -533,7 +533,9 @@ test('settings show installation-relative Stats API instructions', async ({
   await expect(steps.getByRole('listitem')).toHaveCount(4);
   await expect(page.getByRole('button', { name: /copy/i })).toHaveCount(0);
   await expect(page.getByText(/Program Files/)).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Open setup' })).toBeVisible();
+  const openSetup = page.getByRole('link', { name: 'Open setup' });
+  await expect(openSetup).toBeVisible();
+  await expect(openSetup.locator('svg.lucide-list-checks')).toBeVisible();
   await expect(
     page.getByText(/set Local network access to Allow, then reload Fennec/),
   ).toBeVisible();
