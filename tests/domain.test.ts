@@ -1652,7 +1652,7 @@ describe('Stats API domain', () => {
       items.map((item) => item.parts.map((part) => part.text).join('')),
     ).toEqual([
       'Saltie left',
-      'Samara scored — assisted by Caveman',
+      'Samara scored, assisted by Caveman',
       'Saltie shot on goal',
       'Saltie joined',
     ]);

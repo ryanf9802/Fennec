@@ -48,7 +48,9 @@ describe('Fennec landing page', () => {
     ]);
     expect(text[0]).toContain('next identifiable single-player touch');
     expect(text[1]).toContain('within 250 milliseconds');
-    expect(text[2]).toContain('not estimated heatmap data');
+    expect(text[2]).toContain(
+      'Map every touch, 50, save, and goal in a rotatable 3D arena',
+    );
   });
 
   it('pairs every featured analytic with a decorative schematic', () => {

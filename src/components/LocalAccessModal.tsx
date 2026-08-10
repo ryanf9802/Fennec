@@ -31,8 +31,8 @@ export function LocalAccessModal() {
         <p className="text-muted mt-3">
           Fennec cannot connect to Rocket League or the companion until this
           browser permission is enabled. When your browser asks, choose the
-          persistent option—usually <strong>Always allow</strong> or{' '}
-          <strong>Allow on every visit</strong>—so capture keeps working.
+          persistent option, usually <strong>Always allow</strong> or{' '}
+          <strong>Allow on every visit</strong>, so capture keeps working.
         </p>
         {denied && (
           <div className="surface-strong mt-4 rounded-xl p-4 text-sm">

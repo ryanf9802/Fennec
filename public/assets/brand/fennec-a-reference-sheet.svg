@@ -5,7 +5,7 @@
   .s{font:500 17px Inter, sans-serif;fill:#65D9EE}
   .b{font:400 15px Inter, sans-serif;fill:#B9C5D4}
 </style>
-<text x="60" y="70" class="h">Fennec — Concept A vector set</text>
+<text x="60" y="70" class="h">Fennec: Concept A vector set</text>
 <text x="60" y="105" class="b">F-first monogram · abstract fennec ears · 5–10° forward character · integrated orange activity accent</text>
 
 <g transform="translate(70 150) scale(1.6)"><path fill="#65D9EE" d="M45 28 L105 74 L93 85 L210 28 L190 92 L109 121 L107 141 L184 116 L172 151 L100 175 L91 226 L53 249 L65 158 L63 126 L49 91 Z"/><path fill="#FF8A3D" d="M164 145 L190 136 L180 170 L155 179 Z"/></g>

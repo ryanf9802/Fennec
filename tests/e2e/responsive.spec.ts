@@ -36,7 +36,7 @@ test('landing page stays concise and usable across viewport sizes', async ({
       const diagram = await card.locator('.feature-visual').boundingBox();
       const heading = await card.getByRole('heading').boundingBox();
       expect(diagram!.x).toBeGreaterThan(number!.x + number!.width);
-      expect(heading!.y).toBeGreaterThanOrEqual(diagram!.y + diagram!.height);
+      expect(heading!.y - (number!.y + number!.height)).toBeLessThanOrEqual(32);
     }
     const dimensions = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,

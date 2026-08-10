@@ -215,7 +215,7 @@ function semanticParts(
     return [
       playerPart(scorer),
       { text: ' scored' },
-      ...(assister ? [{ text: ' — assisted by ' }, playerPart(assister)] : []),
+      ...(assister ? [{ text: ', assisted by ' }, playerPart(assister)] : []),
     ];
   }
   if (event.eventName === 'StatfeedEvent') {
@@ -244,7 +244,7 @@ function semanticParts(
         { text: ' demolished ' },
         playerPart(secondary),
       ];
-    return main ? [playerPart(main), { text: ` — ${type}` }] : [{ text: type }];
+    return main ? [playerPart(main), { text: `: ${type}` }] : [{ text: type }];
   }
   if (event.eventName === 'CrossbarHit') {
     const lastTouch = record(event.payload.BallLastTouch);
