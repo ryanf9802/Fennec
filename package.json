@@ -27,7 +27,7 @@
     "cdk": "cdk",
     "cdk:synth": "cdk synth --quiet",
     "companion:dev": "tauri dev",
-    "companion:build": "tauri build"
+    "companion:build": "tauri build --no-sign"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",

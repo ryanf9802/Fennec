@@ -57,6 +57,15 @@ describe('companion release workflow', () => {
     expectWebBuildBeforeRustTests(companionWorkflow);
   });
 
+  it('builds unsigned local and pull request installers', () => {
+    expect(packageJson.scripts['companion:build']).toBe(
+      'tauri build --no-sign',
+    );
+    expect(companionWorkflow).toContain('run: pnpm companion:build');
+    expect(workflow).toContain('TAURI_SIGNING_PRIVATE_KEY=$keyPath');
+    expect(workflow).toContain('tauri-apps/tauri-action@v1');
+  });
+
   it('uses the local validation gate in web CI', () => {
     expect(packageJson.scripts.prepare).toBe('husky');
     expect(packageJson.scripts.check).toBe(

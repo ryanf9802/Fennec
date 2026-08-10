@@ -115,9 +115,11 @@ pnpm companion:dev
 pnpm companion:build
 ```
 
-`pnpm companion:build` produces the current-user NSIS installer. Build the web
-application before running Rust tests because Tauri's `frontendDist` points to
-the generated `dist` directory:
+`pnpm companion:build` produces an unsigned current-user NSIS installer for
+local and pull request validation. Signed updater artifacts are produced only
+by the main-branch release workflow, which retrieves the private updater key.
+Build the web application before running Rust tests because Tauri's
+`frontendDist` points to the generated `dist` directory:
 
 ```bash
 pnpm build
