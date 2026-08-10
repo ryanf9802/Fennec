@@ -6,22 +6,66 @@ on:
       - main
     paths:
       - 'src-tauri/**'
+      - 'src/companion/**'
+      - 'src/components/CompanionSettings.tsx'
+      - 'src/pages/OnboardingPage.tsx'
+      - 'scripts/companion-release-version.mjs'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/companion.yml'
+      - '.github/workflows/release-companion.yml'
   pull_request:
-    paths:
-      - 'src-tauri/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/companion.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  detect:
+    name: Detect companion changes
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.changes.outputs.relevant }}
+    steps:
+      - id: changes
+        name: Detect companion-relevant paths
+        uses: actions/github-script@v9
+        with:
+          script: |
+            if (context.eventName !== 'pull_request') {
+              core.setOutput('relevant', 'true');
+              return;
+            }
+
+            const relevantPaths = [
+              'src-tauri/',
+              'src/companion/',
+              'src/components/CompanionSettings.tsx',
+              'src/pages/OnboardingPage.tsx',
+              'scripts/companion-release-version.mjs',
+              'package.json',
+              'pnpm-lock.yaml',
+              '.github/workflows/companion.yml',
+              '.github/workflows/release-companion.yml',
+            ];
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100,
+            });
+            const relevant = files.some(({ filename }) =>
+              relevantPaths.some((path) =>
+                path.endsWith('/') ? filename.startsWith(path) : filename === path,
+              ),
+            );
+            core.setOutput('relevant', relevant ? 'true' : 'false');
+
   validate:
+    name: Windows companion validation
+    needs: detect
+    if: needs.detect.outputs.relevant == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -51,3 +95,27 @@ jobs:
           path: src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
           retention-days: 14
+
+  gate:
+    name: Windows companion gate
+    needs:
+      - detect
+      - validate
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require relevant Windows validation
+        shell: bash
+        env:
+          DETECT_RESULT: ${{ needs.detect.result }}
+          RELEVANT: ${{ needs.detect.outputs.relevant }}
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+        run: |
+          if [[ "$DETECT_RESULT" != "success" ]]; then
+            echo "::error::Companion change detection did not succeed."
+            exit 1
+          fi
+          if [[ "$RELEVANT" == "true" && "$VALIDATE_RESULT" != "success" ]]; then
+            echo "::error::Companion changes require successful Windows validation."
+            exit 1
+          fi

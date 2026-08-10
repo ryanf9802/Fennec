@@ -8,9 +8,12 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "prepare": "husky",
     "dev": "vite",
     "dev:demo": "vite --mode demo",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b --pretty false && vite build",
+    "build:web": "vite build",
+    "check": "prettier --check . --ignore-unknown && eslint . && tsc -b --pretty false && vitest run && vite build",
     "preview": "vite preview",
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
@@ -58,6 +61,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "fake-indexeddb": "^6.2.5",
     "globals": "^16.5.0",
+    "husky": "^9.1.7",
     "jsdom": "^27.2.0",
     "prettier": "3.9.6",
     "tsx": "^4.21.0",

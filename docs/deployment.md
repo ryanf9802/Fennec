@@ -61,6 +61,13 @@ instead of creating a duplicate.
 lint, typechecking, unit tests, a web build, CDK synthesis, and responsive
 Playwright tests. It retains the web build as a workflow artifact.
 
+The `main` branch accepts changes only through pull requests. Every pull request
+must have current successful `Web validation` and `Windows companion gate`
+checks. Contributor pull requests also require approval from the repository
+code owner; authors cannot approve their own changes. Repository administrators
+may bypass only the review requirement from within a pull request, so solo
+maintainer changes still use a green PR and direct pushes remain blocked.
+
 On a push or manual dispatch from `main`, the deployment job assumes the OIDC
 role, deploys the CDK site stack, synchronizes immutable assets and non-cached
 application entry files separately, invalidates CloudFront, and smoke-tests the
@@ -69,9 +76,10 @@ deployed site URL.
 ## Companion validation and releases
 
 `.github/workflows/companion.yml` builds and tests companion changes on Windows
-outside `main`. It builds the web application, runs `cargo test --locked`,
-builds the current-user NSIS installer, and retains the installer as an
-artifact.
+outside `main`. On pull requests it always reports `Windows companion gate`,
+but runs the Windows build only when companion or release inputs changed. The
+Windows job builds the web application, runs `cargo test --locked`, builds the
+current-user NSIS installer, and retains the installer as an artifact.
 
 `.github/workflows/release-companion.yml` releases companion-related changes
 from `main`. It derives a patch version from the GitHub workflow run number,

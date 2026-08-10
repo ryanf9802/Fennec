@@ -63,14 +63,25 @@ not take effect until Rocket League is restarted.
 
 ## Validation
 
-The repository provides these checks:
+Run the fast local gate before pushing:
 
 ```bash
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test:run
-pnpm build
+pnpm check
+```
+
+It checks formatting, lint, TypeScript, unit tests, and the production web
+bundle. A Husky pre-push hook installs with dependencies and runs the same
+command automatically. This keeps commits fast while preventing locally
+reproducible failures from reaching GitHub.
+
+Behavior changes should add or update focused automated tests. Bug fixes should
+include a regression test that demonstrates the failure when practical. Run
+the affected test while iterating, then run the complete fast gate before
+publishing.
+
+CI additionally provides these slower or environment-specific checks:
+
+```bash
 pnpm cdk:synth
 pnpm test:e2e
 ```
