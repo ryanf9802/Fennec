@@ -490,10 +490,17 @@ test('settings show installation-relative Stats API instructions', async ({
     ),
   ).toBeVisible();
   await expect(
+    page.getByText('Change PacketSendRate to 2 and save the file.'),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Launch or restart Rocket League.'),
+  ).toBeVisible();
+  await expect(
     page.getByText(
-      'Change PacketSendRate to 2, save the file, and restart Rocket League.',
+      'Fennec will verify the Stats API connection once the game is running.',
     ),
   ).toBeVisible();
+  await expect(steps.getByRole('listitem')).toHaveCount(4);
   await expect(page.getByRole('button', { name: /copy/i })).toHaveCount(0);
   await expect(page.getByText(/Program Files/)).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Open setup' })).toBeVisible();

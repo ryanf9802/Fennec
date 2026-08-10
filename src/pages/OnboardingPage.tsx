@@ -355,7 +355,7 @@ export function OnboardingPage() {
                     ? "Fennec is connected to Rocket League's Stats API."
                     : statsApiVerified
                       ? 'Fennec previously connected successfully. Start Rocket League to reconnect.'
-                      : 'Follow these steps, restart Rocket League, and keep Fennec open. This step will complete automatically when the connection is ready.'}
+                      : 'Follow these steps and keep Fennec open. This step will complete automatically when the connection is ready.'}
                 </p>
                 <StatsApiSetup />
               </CollapsibleRequirement>

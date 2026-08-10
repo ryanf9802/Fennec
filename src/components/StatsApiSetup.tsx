@@ -42,9 +42,21 @@ export function StatsApiSetup() {
           3
         </span>
         <strong className="min-w-0">
-          Change <code>PacketSendRate</code> to <code>2</code>, save the file,
-          and restart Rocket League.
+          Change <code>PacketSendRate</code> to <code>2</code> and save the
+          file.
         </strong>
+      </li>
+      <li className="border-ui flex gap-3 rounded-lg border px-3 py-2.5">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-cyan-400/15 text-xs font-extrabold text-cyan-300">
+          4
+        </span>
+        <div className="min-w-0">
+          <strong className="block">Launch or restart Rocket League.</strong>
+          <p className="mt-1">
+            Fennec will verify the Stats API connection once the game is
+            running.
+          </p>
+        </div>
       </li>
     </ol>
   );
