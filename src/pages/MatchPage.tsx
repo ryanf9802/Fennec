@@ -138,7 +138,6 @@ function TeamScoreboard({
       style={
         {
           '--scoreboard-team-primary': team.primaryColor,
-          '--scoreboard-team-secondary': team.secondaryColor,
         } as CSSProperties
       }
     >
