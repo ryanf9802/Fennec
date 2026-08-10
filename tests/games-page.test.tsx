@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GamesPage } from '../src/pages/GamesPage';
 import {
@@ -200,17 +200,40 @@ describe('closed session presentation', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses the full-width current session panel as its detail link', () => {
+  it('contains the current session identity, action, and feedback in its detail card', async () => {
     renderPage();
 
+    const sessionLink = screen.getByRole('link', {
+      name: 'View current session details',
+    });
+    const sessionCard = sessionLink.parentElement!;
+    expect(sessionLink).toHaveAttribute('href', '/sessions/latest-session');
     expect(
-      screen.getByRole('link', { name: 'View current session details' }),
-    ).toHaveAttribute('href', '/sessions/latest-session');
+      within(sessionCard).getByRole('heading', { name: 'Current session' }),
+    ).toBeInTheDocument();
+    expect(
+      within(sessionCard).getByRole('button', { name: 'End session' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Past sessions' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: /Full session/ }),
     ).not.toBeInTheDocument();
+
+    const endSession = mocks.fennec.endSession as ReturnType<typeof vi.fn>;
+    endSession.mockResolvedValue('ended');
+    await act(async () => {
+      fireEvent.click(
+        within(sessionCard).getByRole('button', { name: 'End session' }),
+      );
+      await Promise.resolve();
+    });
+    expect(endSession).toHaveBeenCalledOnce();
     expect(
-      screen.getByRole('button', { name: 'End session' }),
+      within(sessionCard).getByText(
+        'Session ended. The next game will start a new session.',
+      ),
     ).toBeInTheDocument();
   });
 

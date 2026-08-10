@@ -206,55 +206,64 @@ export function GamesPage() {
       ) : (
         profile &&
         focusedSession && (
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="eyebrow text-fennec-cyan">In focus</div>
-                <h2 className="mt-1 text-2xl font-extrabold">
-                  Current session
-                </h2>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                <button
-                  className="button-secondary"
-                  disabled={endingSession}
-                  onClick={() => void handleEndSession()}
-                >
-                  <Square className="size-3.5 fill-current" />
-                  {endingSession ? 'Ending…' : 'End session'}
-                </button>
-              </div>
-            </div>
-            {sessionMessage && (
-              <p
-                className="text-muted text-sm"
-                role="status"
-                aria-live="polite"
-              >
-                {sessionMessage}
-              </p>
-            )}
-            <Link
-              to={`/sessions/${focusedSession.id}`}
-              aria-label="View current session details"
-              className="surface hover-surface group relative block rounded-3xl p-5 transition sm:p-6"
-            >
-              <ArrowUpRight className="text-muted absolute top-5 right-5 size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              <div className="pr-8">
-                <SessionSummaryStats
-                  metrics={sessionMetrics(
-                    focusedSession.matches,
-                    profile?.primaryId,
-                  )}
+          <section
+            aria-labelledby="current-session-heading"
+            className="space-y-4"
+          >
+            <div className="surface hover-surface group relative rounded-3xl p-5 transition sm:p-6">
+              <Link
+                to={`/sessions/${focusedSession.id}`}
+                aria-label="View current session details"
+                className="absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70"
+              />
+              <div className="pointer-events-none relative">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <div className="eyebrow text-fennec-cyan">In focus</div>
+                    <h2
+                      id="current-session-heading"
+                      className="mt-1 text-2xl font-extrabold"
+                    >
+                      Current session
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      className="button-secondary pointer-events-auto relative z-10"
+                      disabled={endingSession}
+                      onClick={() => void handleEndSession()}
+                    >
+                      <Square className="size-3.5 fill-current" />
+                      {endingSession ? 'Ending…' : 'End session'}
+                    </button>
+                    <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </div>
+                </div>
+                {sessionMessage && (
+                  <p
+                    className="text-muted mt-4 text-sm"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {sessionMessage}
+                  </p>
+                )}
+                <div className="mt-5">
+                  <SessionSummaryStats
+                    metrics={sessionMetrics(
+                      focusedSession.matches,
+                      profile?.primaryId,
+                    )}
+                  />
+                </div>
+                <RecurringTeammates
+                  className="mt-5 border-t border-ui pt-5"
+                  matches={focusedSession.matches}
+                  profileId={profile?.primaryId}
+                  limit={2}
                 />
               </div>
-              <RecurringTeammates
-                className="mt-5 border-t border-ui pt-5"
-                matches={focusedSession.matches}
-                profileId={profile?.primaryId}
-                limit={2}
-              />
-            </Link>
+            </div>
             <div className="space-y-2">
               {[...focusedSession.matches].reverse().map((match) => (
                 <MatchRow

@@ -682,9 +682,16 @@ test('session summaries expose recurring teammates and full history in place', a
     name: 'View current session details',
   });
   await expect(sessionPanel).toBeVisible();
+  const sessionCard = sessionPanel.locator('..');
+  await expect(
+    sessionCard.getByRole('heading', { name: 'Current session' }),
+  ).toBeVisible();
+  await expect(
+    sessionCard.getByRole('button', { name: 'End session' }),
+  ).toBeVisible();
   const sectionWidth = (await currentSession.boundingBox())!.width;
-  const panelWidth = (await sessionPanel.boundingBox())!.width;
-  expect(Math.abs(sectionWidth - panelWidth)).toBeLessThan(2);
+  const cardWidth = (await sessionCard.boundingBox())!.width;
+  expect(Math.abs(sectionWidth - cardWidth)).toBeLessThan(2);
   await expect(
     currentSession.getByRole('link', { name: /Full session/ }),
   ).toHaveCount(0);
@@ -715,6 +722,16 @@ test('session summaries expose recurring teammates and full history in place', a
   await page.getByRole('button', { name: 'Close player profile' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(sessionUrl);
+
+  await page.goBack();
+  await expect(
+    currentSession.getByRole('button', { name: 'End session' }),
+  ).toBeVisible();
+  await currentSession.getByRole('button', { name: 'End session' }).click();
+  await expect(page).toHaveURL(/\/?(?:\?demo=1)?$/);
+  await expect(currentSession.getByRole('status')).toContainText(
+    /New session started|Session ended/,
+  );
 });
 
 test('profile player selection is searchable and explicit', async ({
