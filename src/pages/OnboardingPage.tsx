@@ -4,7 +4,6 @@ import {
   Download,
   ExternalLink,
   Monitor,
-  RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -239,17 +238,9 @@ export function OnboardingPage() {
         aria-labelledby="setup-instructions-title"
         className="surface rounded-3xl p-5 sm:p-7"
       >
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="setup-instructions-title" className="text-xl font-extrabold">
-            Setup instructions
-          </h2>
-          <button
-            className="button-secondary"
-            onClick={() => void Promise.all([recheck(), access.recheck()])}
-          >
-            <RefreshCw className="size-4" /> Recheck
-          </button>
-        </div>
+        <h2 id="setup-instructions-title" className="text-xl font-extrabold">
+          Setup instructions
+        </h2>
         <ol className="mt-5 grid gap-3">
           <Requirement
             complete={access.satisfied}

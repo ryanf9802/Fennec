@@ -548,6 +548,9 @@ test('browser-only setup uses instructions and follows the Stats API connection'
     name: 'Setup instructions',
   });
   await expect(
+    instructions.getByRole('button', { name: 'Recheck' }),
+  ).toHaveCount(0);
+  await expect(
     instructions.getByRole('link', { name: 'Official Stats API guide' }),
   ).toBeVisible();
   await expect(
