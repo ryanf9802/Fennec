@@ -16,9 +16,10 @@
 
 - Run the validation skill's `full` command from the final tree before
   publishing a branch or declaring repository changes complete. It invokes the
-  same `check` package script as the `pnpm check` pre-push hook, using npm so the
+  fast `check` package script used for ordinary branch pushes, using npm so the
   command also works in managed linked worktrees where pnpm cannot open its
-  database.
+  database. Pushes targeting `main` additionally run `check:web`, which adds
+  account-neutral CDK synthesis and the complete Playwright suite.
 - Treat a nonzero exit, failed or skipped required stage, React `act(...)`
   message, unhandled error, or other unexpected stderr as unfinished work.
   Diagnose and remove the cause; do not dismiss output because tests passed.

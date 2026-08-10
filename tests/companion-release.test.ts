@@ -66,15 +66,21 @@ describe('companion release workflow', () => {
     expect(workflow).toContain('tauri-apps/tauri-action@v1');
   });
 
-  it('uses the local validation gate in web CI', () => {
+  it('shares the full web gate between main pushes and web CI', () => {
     expect(packageJson.scripts.prepare).toBe('husky');
     expect(packageJson.scripts.check).toBe(
       'prettier --check . --ignore-unknown && eslint . && tsc -b --pretty false && vitest run && vite build',
     );
-    expect(prePushHook.trim()).toBe('pnpm check');
+    expect(packageJson.scripts['check:web']).toBe(
+      'npm run check && npm run cdk:synth && npm run test:e2e',
+    );
+    expect(prePushHook.trim()).toBe('node scripts/pre-push.mjs');
     expect(webWorkflow).toContain('name: Web validation');
     expect(webWorkflow).toContain('push:\n    branches:\n      - main');
-    expect(webWorkflow).toContain('run: pnpm check');
+    expect(webWorkflow).toContain('run: pnpm check:web');
+    expect(webWorkflow.indexOf('Install Chromium')).toBeLessThan(
+      webWorkflow.indexOf('run: pnpm check:web'),
+    );
   });
 
   it('gates every pull request and validates all release-triggering paths', () => {

@@ -29,14 +29,10 @@ jobs:
           corepack enable
           corepack install
       - run: pnpm install --frozen-lockfile
-      - name: Run the local validation gate
-        run: pnpm check
-      - name: Synthesize account-neutral CDK
-        run: pnpm cdk:synth
       - name: Install Chromium
         run: node scripts/playwright.mjs install --with-deps chromium
-      - name: Responsive browser tests
-        run: pnpm test:e2e
+      - name: Run the full web validation gate
+        run: pnpm check:web
       - uses: actions/upload-artifact@v7
         with:
           name: fennec-web-${{ github.sha }}

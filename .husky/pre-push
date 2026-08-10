@@ -1,1 +1,1 @@
-pnpm check
+node scripts/pre-push.mjs
