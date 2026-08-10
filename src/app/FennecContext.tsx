@@ -13,6 +13,7 @@ import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 import { isHistoryEligibleMatch } from '../domain/playlists';
 import {
   defaultSettings,
+  normalizeSettings,
   type FeedConnectionState,
   type FennecProfile,
   type FennecSettings,
@@ -307,9 +308,10 @@ export function FennecProvider({
   ]);
 
   const updateSettings = useCallback(async (next: FennecSettings) => {
-    await saveSettings(next);
-    setSettings(next);
-    applyTheme(next.theme);
+    const normalized = normalizeSettings(next);
+    await saveSettings(normalized);
+    setSettings(normalized);
+    applyTheme(normalized.theme);
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
   const selectProfile = useCallback(async (next: FennecProfile) => {
@@ -354,14 +356,15 @@ export function FennecProvider({
   const restoreBackup = useCallback(async (backup: FennecBackup) => {
     historyGenerationRef.current++;
     try {
-      await replaceAll(backup.matches, backup.settings, backup.profile);
+      const normalizedSettings = normalizeSettings(backup.settings);
+      await replaceAll(backup.matches, normalizedSettings, backup.profile);
       const active = recoverActiveMatch(backup.matches);
       activeRef.current = active;
       profileRef.current = backup.profile;
       setActiveMatch(active);
-      setSettings(backup.settings);
+      setSettings(normalizedSettings);
       setProfile(backup.profile);
-      applyTheme(backup.settings.theme);
+      applyTheme(normalizedSettings.theme);
     } finally {
       setHistoryGeneration(historyGenerationRef.current);
     }

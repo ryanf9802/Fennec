@@ -509,14 +509,26 @@ test('settings show installation-relative Stats API instructions', async ({
   ).toBeVisible();
 });
 
-test('settings place Monitoring below Local data', async ({ page }) => {
+test('settings keep companion after Sessions and omit timeline controls', async ({
+  page,
+}) => {
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   const headings = await page
     .getByRole('heading', { level: 2 })
     .allTextContents();
 
-  expect(headings.indexOf('Local data')).toBeGreaterThanOrEqual(0);
+  expect(headings.indexOf('Sessions and behavior')).toBeGreaterThanOrEqual(0);
+  expect(headings.indexOf('Companion service')).toBeGreaterThan(
+    headings.indexOf('Sessions and behavior'),
+  );
+  expect(headings).not.toContain('Event timeline');
+  await expect(page.getByText('Everything exposes')).toHaveCount(0);
+  await expect(page.getByText('Default preset')).toHaveCount(0);
+
+  expect(headings.indexOf('Local data')).toBeGreaterThan(
+    headings.indexOf('Companion service'),
+  );
   expect(headings.indexOf('Monitoring')).toBeGreaterThan(
     headings.indexOf('Local data'),
   );

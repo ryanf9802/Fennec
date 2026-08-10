@@ -1699,13 +1699,14 @@ async function rebuildSessions(
 }
 
 export async function saveSettings(value: FennecSettings): Promise<void> {
+  const normalized = normalizeSettings(value);
   const previous = await loadSettings();
-  if (previous.sessionGapMinutes !== value.sessionGapMinutes) {
-    await rebuildSessions(value.sessionGapMinutes, value);
+  if (previous.sessionGapMinutes !== normalized.sessionGapMinutes) {
+    await rebuildSessions(normalized.sessionGapMinutes, normalized);
     const profile = await loadProfile();
     const profileKey = playerKeyForPrimaryId(profile?.primaryId);
     if (profileKey) await prepareProfileSessions(profileKey);
-  } else await db.settings.put({ key: 'settings', value });
+  } else await db.settings.put({ key: 'settings', value: normalized });
 }
 
 export async function loadProfile(): Promise<FennecProfile | undefined> {
@@ -1763,13 +1764,17 @@ export async function replaceAll(
   profile?: FennecProfile,
 ): Promise<void> {
   await settleMatchWrites();
+  const normalizedSettings = normalizeSettings(settings);
   const ordered = matches
     .filter(isHistoryEligibleMatch)
     .sort(
       (a, b) =>
         a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id),
     );
-  const grouped = groupSessionRecords(ordered, settings.sessionGapMinutes);
+  const grouped = groupSessionRecords(
+    ordered,
+    normalizedSettings.sessionGapMinutes,
+  );
   const appearances = ordered.flatMap((match) =>
     match.participants.map((player) => appearance(match, player)),
   );
@@ -1830,7 +1835,7 @@ export async function replaceAll(
         db.sessions.clear(),
         db.profiles.clear(),
       ]);
-      await db.settings.put({ key: 'settings', value: settings });
+      await db.settings.put({ key: 'settings', value: normalizedSettings });
       if (profile) await db.profiles.put({ key: 'profile', ...profile });
       if (ordered.length)
         await db.matches.bulkPut(

@@ -156,11 +156,17 @@ describe('IndexedDB storage', () => {
       ...defaultSettings,
       sessionGapMinutes: 45,
       matchAnalyticsView: 'touch-map',
+      timelinePreset: 'custom',
+      enabledTimelineEvents: ['GoalReplayStart'],
+      timelineAttributes: { GoalReplayStart: ['Time'] },
     });
     await saveProfile({ primaryId: 'Steam|1|0', displayName: 'Me' });
     expect(await loadSettings()).toMatchObject({
       sessionGapMinutes: 45,
       matchAnalyticsView: 'touch-map',
+      timelinePreset: 'curated',
+      enabledTimelineEvents: [],
+      timelineAttributes: {},
     });
     expect((await loadProfile())?.displayName).toBe('Me');
   });

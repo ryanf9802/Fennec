@@ -172,8 +172,8 @@ export const defaultSettings: FennecSettings = {
 };
 
 /**
- * Merges persisted settings with defaults while constraining numeric ranges and
- * preserving only valid timeline selections and appearance values.
+ * Merges persisted settings with defaults while constraining numeric ranges,
+ * appearance values, and the currently fixed curated timeline presentation.
  */
 export function normalizeSettings(
   input?: Partial<FennecSettings>,
@@ -186,11 +186,6 @@ export function normalizeSettings(
       : defaultSettings.theme;
   const speedUnit =
     input?.speedUnit === 'mph' ? 'mph' : defaultSettings.speedUnit;
-  const timelinePreset =
-    input?.timelinePreset &&
-    ['curated', 'everything', 'custom'].includes(input.timelinePreset)
-      ? input.timelinePreset
-      : defaultSettings.timelinePreset;
   const matchAnalyticsView =
     input?.matchAnalyticsView === 'touch-map' ? 'touch-map' : 'analytics';
   return {
@@ -210,16 +205,9 @@ export function normalizeSettings(
         : defaultSettings.sessionGapMinutes,
     theme,
     speedUnit,
-    timelinePreset,
-    enabledTimelineEvents: Array.isArray(input?.enabledTimelineEvents)
-      ? input.enabledTimelineEvents.filter(
-          (item): item is string => typeof item === 'string',
-        )
-      : [],
-    timelineAttributes:
-      input?.timelineAttributes && typeof input.timelineAttributes === 'object'
-        ? input.timelineAttributes
-        : {},
+    timelinePreset: defaultSettings.timelinePreset,
+    enabledTimelineEvents: [],
+    timelineAttributes: {},
     sidebarCollapsed: input?.sidebarCollapsed === true,
     matchAnalyticsView,
     autoOpenLiveMatch: input?.autoOpenLiveMatch === true,

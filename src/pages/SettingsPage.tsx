@@ -14,16 +14,13 @@ import {
   streamBackup,
 } from '../data/backup';
 import { historyRepository, loadMatches } from '../data/database';
-import {
-  useStorageStatistics,
-  useTimelineCatalog,
-} from '../data/historyQueries';
+import { useStorageStatistics } from '../data/historyQueries';
 import type { FennecSettings } from '../domain/types';
 import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 
 /**
- * Manages validated settings drafts, timeline preferences, backup transfer,
- * destructive history actions, and browser-storage diagnostics.
+ * Manages validated settings drafts, backup transfer, destructive history
+ * actions, and browser-storage diagnostics.
  */
 export function SettingsPage() {
   const context = useFennec();
@@ -40,7 +37,6 @@ export function SettingsPage() {
   const [message, setMessage] = useState<string>();
   const hasUnsavedChanges = JSON.stringify(draft) !== JSON.stringify(settings);
   const fileInput = useRef<HTMLInputElement>(null);
-  const catalog = useTimelineCatalog().data ?? {};
   const storageQuery = useStorageStatistics();
   const storage = storageQuery.data;
   const patchDraft = (patch: Partial<FennecSettings>) =>
@@ -144,11 +140,9 @@ export function SettingsPage() {
       <header>
         <h1 className="text-3xl font-black sm:text-4xl">Settings</h1>
         <p className="text-muted mt-2">
-          Monitoring, automatic sessions, event detail, and browser-local data.
+          Sessions, appearance, companion behavior, and browser-local data.
         </p>
       </header>
-
-      <CompanionSettings />
 
       <section className="surface-flat rounded-3xl p-5 sm:p-7">
         <h2 className="text-xl font-extrabold">Sessions and behavior</h2>
@@ -217,103 +211,7 @@ export function SettingsPage() {
         </label>
       </section>
 
-      <section className="surface-flat rounded-3xl p-5 sm:p-7">
-        <h2 className="text-xl font-extrabold">Event timeline</h2>
-        <p className="text-muted mt-2">
-          Curated is calm, Everything exposes every stored value, and Custom
-          lets you choose each event and attribute.
-        </p>
-        <label className="mt-5 block">
-          <span className="eyebrow">Default preset</span>
-          <select
-            className="control mt-2"
-            value={draft.timelinePreset}
-            onChange={(event) =>
-              patchDraft({
-                timelinePreset: event.target
-                  .value as FennecSettings['timelinePreset'],
-              })
-            }
-          >
-            <option value="curated">Curated</option>
-            <option value="everything">Everything</option>
-            <option value="custom">Custom</option>
-          </select>
-        </label>
-        {draft.timelinePreset === 'custom' && (
-          <div className="mt-5 space-y-3">
-            {!Object.keys(catalog).length && (
-              <p className="text-muted text-sm">
-                Captured event types will appear here.
-              </p>
-            )}
-            {Object.entries(catalog).map(([eventName, attributes]) => {
-              const enabled = draft.enabledTimelineEvents.includes(eventName);
-              return (
-                <details
-                  key={eventName}
-                  className="surface-strong rounded-xl"
-                  open={enabled}
-                >
-                  <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 font-bold">
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-cyan-400"
-                      checked={enabled}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={(change) =>
-                        patchDraft({
-                          enabledTimelineEvents: change.target.checked
-                            ? [...draft.enabledTimelineEvents, eventName]
-                            : draft.enabledTimelineEvents.filter(
-                                (item) => item !== eventName,
-                              ),
-                        })
-                      }
-                    />
-                    {eventName}
-                  </summary>
-                  {enabled && (
-                    <div className="grid gap-2 border-t border-ui px-4 py-4 sm:grid-cols-2">
-                      {attributes.map((attribute) => (
-                        <label
-                          key={attribute}
-                          className="text-muted flex items-start gap-2 text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 size-4 accent-cyan-400"
-                            checked={(
-                              draft.timelineAttributes[eventName] ?? []
-                            ).includes(attribute)}
-                            onChange={(change) => {
-                              const existing =
-                                draft.timelineAttributes[eventName] ?? [];
-                              patchDraft({
-                                timelineAttributes: {
-                                  ...draft.timelineAttributes,
-                                  [eventName]: change.target.checked
-                                    ? [...existing, attribute]
-                                    : existing.filter(
-                                        (item) => item !== attribute,
-                                      ),
-                                },
-                              });
-                            }}
-                          />
-                          <span className="break-all font-mono">
-                            {attribute}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </details>
-              );
-            })}
-          </div>
-        )}
-      </section>
+      <CompanionSettings />
 
       <section className="surface-flat rounded-3xl p-5 sm:p-7">
         <h2 className="text-xl font-extrabold">Local data</h2>
