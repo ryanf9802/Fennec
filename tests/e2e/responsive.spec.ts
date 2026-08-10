@@ -705,6 +705,22 @@ test('session summaries expose recurring teammates and full history in place', a
   await expect(
     page.getByRole('heading', { name: 'Involvement' }),
   ).toBeVisible();
+  await page.setViewportSize({ width: 900, height: 900 });
+  const detailRegion = page.getByRole('region', {
+    name: 'Session performance details',
+  });
+  for (const heading of ['Outcome', 'Offense', 'Involvement']) {
+    const statLabels = detailRegion
+      .getByRole('heading', { name: heading })
+      .locator('..')
+      .locator('.eyebrow');
+    const labelOffsets = await statLabels.evaluateAll((labels) =>
+      labels.map((label) => label.getBoundingClientRect().top),
+    );
+    expect(Math.max(...labelOffsets) - Math.min(...labelOffsets)).toBeLessThan(
+      2,
+    );
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>

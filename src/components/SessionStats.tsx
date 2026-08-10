@@ -65,9 +65,14 @@ export function SessionSummaryStats({ metrics }: { metrics: SessionMetrics }) {
 
 /** Groups the secondary session metrics so the detail page stays scannable. */
 export function SessionDetailStats({ metrics }: { metrics: SessionMetrics }) {
-  const groups: Array<{ title: string; items: StatItem[] }> = [
+  const groups: Array<{
+    title: string;
+    columnsClass: string;
+    items: StatItem[];
+  }> = [
     {
       title: 'Outcome',
+      columnsClass: 'sm:grid-cols-3',
       items: [
         { label: 'Win rate', value: metrics.winRate },
         { label: 'Streak', value: metrics.streak },
@@ -79,6 +84,7 @@ export function SessionDetailStats({ metrics }: { metrics: SessionMetrics }) {
     },
     {
       title: 'Offense',
+      columnsClass: 'sm:grid-cols-4',
       items: [
         { label: 'Goals', value: metrics.goals },
         { label: 'Assists', value: metrics.assists },
@@ -94,6 +100,7 @@ export function SessionDetailStats({ metrics }: { metrics: SessionMetrics }) {
     },
     {
       title: 'Involvement',
+      columnsClass: 'sm:grid-cols-5',
       items: [
         { label: 'Passes', value: metrics.passes },
         { label: 'Saves', value: metrics.saves },
@@ -105,14 +112,16 @@ export function SessionDetailStats({ metrics }: { metrics: SessionMetrics }) {
   ];
 
   return (
-    <section
-      aria-label="Session performance details"
-      className="grid gap-4 lg:grid-cols-3"
-    >
+    <section aria-label="Session performance details" className="space-y-3">
       {groups.map((group) => (
-        <article key={group.title} className="surface-flat rounded-2xl p-5">
+        <article
+          key={group.title}
+          className="surface-flat rounded-2xl p-5 lg:grid lg:grid-cols-[9rem_minmax(0,1fr)] lg:items-center lg:gap-6"
+        >
           <h2 className="text-lg font-extrabold">{group.title}</h2>
-          <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-5">
+          <div
+            className={`mt-5 grid grid-cols-2 gap-x-5 gap-y-5 lg:mt-0 ${group.columnsClass}`}
+          >
             {group.items.map((item) => (
               <StatValue key={item.label} item={item} />
             ))}
