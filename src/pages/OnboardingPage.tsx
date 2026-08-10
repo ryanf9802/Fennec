@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useFennec } from '../app/FennecContext';
-import { BrowserStatsApiSetup } from '../components/BrowserStatsApiSetup';
 import { CompanionLaunchControls } from '../components/CompanionSettings';
+import { StatsApiSetup } from '../components/StatsApiSetup';
 import {
   acceptCompanionPairing,
   companionCommand,
@@ -19,6 +19,7 @@ import {
   companionProtocolVersion,
 } from '../companion/client';
 import { useCompanionStatus } from '../companion/useCompanionStatus';
+import { isStatsApiConnected } from '../domain/connectionPresentation';
 import { useLocalAccess } from '../platform/LocalAccessContext';
 
 type SetupPath = 'companion' | 'browser';
@@ -32,14 +33,6 @@ function storedSetupPath(): SetupPath | undefined {
     return stored === 'browser' || stored === 'companion' ? stored : undefined;
   } catch {
     return undefined;
-  }
-}
-
-function storedBrowserConfiguration(): boolean {
-  try {
-    return window.localStorage?.getItem('fennec-browser-configured') === 'true';
-  } catch {
-    return false;
   }
 }
 
@@ -124,9 +117,6 @@ export function OnboardingPage() {
   const companion = useCompanionStatus();
   const { health, recheck } = companion;
   const [path, setPath] = useState<SetupPath | undefined>(storedSetupPath);
-  const [browserConfigured, setBrowserConfigured] = useState(
-    storedBrowserConfiguration,
-  );
   const [configuring, setConfiguring] = useState<'steam' | 'epic'>();
   const [companionMessage, setCompanionMessage] = useState<string>();
   const selectPath = useCallback((nextPath: SetupPath) => {
@@ -150,18 +140,7 @@ export function OnboardingPage() {
   const paired = Boolean(health?.paired);
   const compatible =
     paired && health?.protocolVersion === companionProtocolVersion;
-  const feedReady = connection === 'live';
-  const setBrowserConfiguration = (configured: boolean) => {
-    setBrowserConfigured(configured);
-    try {
-      window.localStorage?.setItem(
-        'fennec-browser-configured',
-        String(configured),
-      );
-    } catch {
-      // The verified state remains reactive for this visit without storage.
-    }
-  };
+  const statsApiConnected = isStatsApiConnected(connection);
   const configureStore = async (store: 'steam' | 'epic') => {
     setConfiguring(store);
     const configured = await companionCommand(`configure-${store}`);
@@ -322,21 +301,15 @@ export function OnboardingPage() {
           ) : (
             <>
               <Requirement
-                complete={browserConfigured}
-                title="Configure the selected game installation"
+                complete={statsApiConnected}
+                title="Enable the Rocket League Stats API"
               >
-                {browserConfigured
-                  ? 'The selected Stats API file was successfully verified in this browser.'
-                  : 'Choose the effective Stats API file. Browser writing may fail for installations protected by Windows.'}
-                <BrowserStatsApiSetup onConfigured={setBrowserConfiguration} />
-              </Requirement>
-              <Requirement
-                complete={feedReady}
-                title="Keep Fennec open and verify the feed"
-              >
-                {feedReady
-                  ? 'A valid Rocket League Stats API packet has been processed.'
-                  : 'Restart Rocket League, keep this window open, and wait for the connection to turn green.'}
+                <p>
+                  {statsApiConnected
+                    ? "Fennec is connected to Rocket League's Stats API."
+                    : 'Follow these steps, restart Rocket League, and keep Fennec open. This step will complete automatically when the connection is ready.'}
+                </p>
+                <StatsApiSetup />
               </Requirement>
               <li className="rounded-2xl border border-orange-400/30 bg-orange-400/8 p-4">
                 <div className="flex gap-3">

@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { connectionPresentation } from '../src/domain/connectionPresentation';
+import {
+  connectionPresentation,
+  isStatsApiConnected,
+} from '../src/domain/connectionPresentation';
 
 describe('connection presentation', () => {
+  it('treats idle and active Stats API sockets as connected', () => {
+    expect(isStatsApiConnected('waiting')).toBe(true);
+    expect(isStatsApiConnected('live')).toBe(true);
+    expect(isStatsApiConnected('connecting')).toBe(false);
+    expect(isStatsApiConnected('unavailable')).toBe(false);
+    expect(isStatsApiConnected('stopped')).toBe(false);
+  });
+
   it('presents an idle Stats API socket as a successful connection', () => {
     expect(connectionPresentation('waiting')).toEqual({
       label: 'Connected',

@@ -6,6 +6,10 @@ interface ConnectionPresentation {
   pulse: boolean;
 }
 
+export function isStatsApiConnected(connection: FeedConnectionState): boolean {
+  return connection === 'waiting' || connection === 'live';
+}
+
 export function connectionPresentation(
   connection: FeedConnectionState,
 ): ConnectionPresentation {

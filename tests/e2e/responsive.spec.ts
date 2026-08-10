@@ -464,6 +464,11 @@ test('settings show installation-relative Stats API instructions', async ({
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(
+    page.getByText(
+      '1. In Steam or Epic, use Rocket League’s Manage or Browse option to open its installation folder.',
+    ),
+  ).toBeVisible();
+  await expect(
     page.getByText(String.raw`2. Open TAGame\Config\TAStatsAPI.ini.`),
   ).toBeVisible();
   await expect(
@@ -482,6 +487,30 @@ test('settings show installation-relative Stats API instructions', async ({
   await expect(
     page.getByText(/set Local network access to Allow, then reload Fennec/),
   ).toBeVisible();
+});
+
+test('browser-only setup uses instructions and follows the Stats API connection', async ({
+  page,
+}) => {
+  await page.goto('/onboarding?demo=1');
+  await page.getByRole('button', { name: /Browser only/ }).click();
+
+  const requirement = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Enable the Rocket League Stats API' });
+  await expect(requirement).toContainText(
+    "Fennec is connected to Rocket League's Stats API.",
+  );
+  await expect(requirement.locator('svg.text-emerald-400')).toBeVisible();
+  await expect(
+    requirement.getByText(String.raw`2. Open TAGame\Config\TAStatsAPI.ini.`),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Choose Stats API file' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText('Keep Fennec open and verify the feed'),
+  ).toHaveCount(0);
 });
 
 test('PWA identity uses only the Fennec name', async ({ page }) => {

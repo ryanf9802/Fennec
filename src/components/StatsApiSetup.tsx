@@ -2,7 +2,10 @@ export function StatsApiSetup() {
   return (
     <ol className="mt-5 grid gap-3 text-sm">
       <li className="surface-strong rounded-xl p-4">
-        <strong>1. Open your Rocket League installation directory.</strong>
+        <strong>
+          1. In Steam or Epic, use Rocket League&rsquo;s Manage or Browse option
+          to open its installation folder.
+        </strong>
       </li>
       <li className="surface-strong rounded-xl p-4">
         <strong>
