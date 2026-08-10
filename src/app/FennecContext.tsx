@@ -38,6 +38,7 @@ import { SimulatedStatsFeed } from '../feed/SimulatedStatsFeed';
 import { HybridStatsFeed } from '../feed/HybridStatsFeed';
 import type { StatsFeedAdapter } from '../feed/StatsFeedAdapter';
 import { createDemoHistory } from '../feed/demoHistory';
+import { demoModeEnabled } from '../platform/demoMode';
 
 interface FennecContextValue {
   ready: boolean;
@@ -107,9 +108,10 @@ export function FennecProvider({
   const historyGenerationRef = useRef(0);
   const feedRef = useRef<StatsFeedAdapter | undefined>(undefined);
   const [historyGeneration, setHistoryGeneration] = useState(0);
-  const demoMode =
-    import.meta.env.VITE_DEMO_FEED === 'true' ||
-    new URLSearchParams(location.search).get('demo') === '1';
+  const demoMode = demoModeEnabled(
+    location.search,
+    import.meta.env.VITE_DEMO_FEED === 'true',
+  );
 
   useEffect(() => {
     let cancelled = false;

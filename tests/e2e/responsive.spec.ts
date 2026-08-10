@@ -604,7 +604,7 @@ test('previously verified browser setup stays complete while Rocket League is cl
     localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
     localStorage.setItem('fennec-stats-api-verified-v1', 'true');
   });
-  await page.goto('/onboarding');
+  await page.goto('/setup?demo=0');
 
   const requirement = page
     .getByRole('listitem')
@@ -1091,14 +1091,16 @@ test('profile player selection is searchable and explicit', async ({
     .toEqual(['id:Epic|demo-luna|0:0', 'id:Steam|demo-you|0:1']);
 });
 
-test('dashboard abbreviates GFA while session detail uses the full label', async ({
+test('session summaries show goal difference while detail adds the score totals', async ({
   page,
 }) => {
   await page.goto('/?demo=1');
   const history = page.locator('section').filter({
     has: page.getByRole('heading', { name: 'Past sessions' }),
   });
-  await expect(history.getByText('GFA', { exact: true }).first()).toBeVisible();
+  await expect(
+    history.getByText('Goal diff', { exact: true }).first(),
+  ).toBeVisible();
   await expect(
     page.getByText('Goals for / against', { exact: true }),
   ).toHaveCount(0);
@@ -1108,7 +1110,7 @@ test('dashboard abbreviates GFA while session detail uses the full label', async
   await expect(
     page.getByText('Goals for / against', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('GFA', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Goal diff', { exact: true })).toBeVisible();
 });
 
 test('primary pages use the same full content width', async ({ page }) => {

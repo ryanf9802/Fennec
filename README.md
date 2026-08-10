@@ -196,6 +196,11 @@ Fennec is available under the [MIT License](LICENSE). Third-party components
 remain subject to their own licenses; see
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
+The MIT License covers the source code and brand asset files, but it does not
+grant permission to use Fennec's visual identity as a trademark or imply that a
+fork is an official Fennec offering. See the
+[trademark and brand policy](TRADEMARKS.md) for permitted uses.
+
 Rocket League and related names are trademarks of their respective owners.
 Fennec is an independent community project and is not endorsed by Psyonix or
 Epic Games.

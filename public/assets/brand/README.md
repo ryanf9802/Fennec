@@ -1,8 +1,8 @@
 # Fennec brand assets
 
 This public directory is the source of truth for Fennec's visual identity. The
-SVGs are resolution-independent and can be referenced directly by the web app,
-documentation, community pages, and future product surfaces.
+SVGs are resolution-independent and can be referenced directly by Fennec's web
+app, documentation, and future official product surfaces.
 
 ## Choosing an asset
 
@@ -18,6 +18,14 @@ lower stem. Do not recolor individual paths outside the supplied treatments.
 
 The application favicon uses the primary mark and navigation uses the primary
 lockup. Prefer the supplied micro marks for future small-icon surfaces.
+
+## Using these assets
+
+These files remain available under the repository's MIT License for copyright
+purposes. Use of the designs as source-identifying marks is governed separately
+by Fennec's [trademark and brand policy](../../../TRADEMARKS.md). In particular,
+publicly distributed modified builds and third-party hosted forks must use an
+independent visual identity.
 
 ## Palette
 

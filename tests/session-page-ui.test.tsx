@@ -173,7 +173,11 @@ describe('session detail recurring teammates', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getAllByRole('link', { name: /Ranked Doubles/ })[0]);
+    const [matchLink] = screen.getAllByRole('link', {
+      name: /Ranked Doubles/,
+    });
+    if (!matchLink) throw new Error('Expected the session to contain a match');
+    fireEvent.click(matchLink);
 
     expect(screen.getByTestId('location-state')).toHaveTextContent(
       '/matches/match-2|/sessions/session-one',

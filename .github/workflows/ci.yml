@@ -2,6 +2,8 @@ name: Web build and deploy
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -14,6 +16,7 @@ concurrency:
 
 jobs:
   validate:
+    name: Web validation
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -26,16 +29,8 @@ jobs:
           corepack enable
           corepack install
       - run: pnpm install --frozen-lockfile
-      - name: Check formatting
-        run: pnpm format:check
-      - name: Lint and typecheck
-        run: |
-          pnpm lint
-          pnpm typecheck
-      - name: Unit tests
-        run: pnpm test:run
-      - name: Build web application
-        run: pnpm build
+      - name: Run the local validation gate
+        run: pnpm check
       - name: Synthesize account-neutral CDK
         run: pnpm cdk:synth
       - name: Install Chromium
