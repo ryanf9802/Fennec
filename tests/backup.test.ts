@@ -72,7 +72,7 @@ const value: MatchState = {
       payload: {
         Players: [{ Name: 'Me', TeamNum: 0, PrimaryId: 'Steam|1|0' }],
         Ball: {
-          Location: { X: 1, Y: 2, Z: 3 },
+          Location: { X: 1, Y: 4000, Z: 3 },
           PreHitSpeed: 100,
           PostHitSpeed: 160,
         },
@@ -87,7 +87,7 @@ const value: MatchState = {
       payload: {
         Players: [{ Name: 'Mate', TeamNum: 0, PrimaryId: 'Epic|2|0' }],
         Ball: {
-          Location: { X: 4, Y: 5, Z: 6 },
+          Location: { X: 4, Y: 4500, Z: 6 },
           PreHitSpeed: 150,
           PostHitSpeed: 200,
         },
@@ -268,7 +268,10 @@ describe('portable data', () => {
       'team_touch_share_pct',
       'average_speed_gain',
       'shooting_pct',
-      'team_last_touch_control_pct',
+      'player_attacking_third_touches',
+      'team_field_pressure_pct',
+      'player_pressure_contribution_pct',
+      'average_net_territory_pct',
       'match_average_ball_speed',
       'match_maximum_ball_speed',
     ]);
@@ -298,7 +301,10 @@ describe('portable data', () => {
       team_touch_share_pct: '50.0',
       average_speed_gain: '60.0',
       shooting_pct: '66.7',
-      team_last_touch_control_pct: '75.0',
+      player_attacking_third_touches: '1',
+      team_field_pressure_pct: '100.0',
+      player_pressure_contribution_pct: '50.0',
+      average_net_territory_pct: '4.9',
       match_average_ball_speed: '300.0',
       match_maximum_ball_speed: '400.0',
     });
@@ -369,9 +375,30 @@ describe('portable data', () => {
       team_touch_share_pct: '',
       average_speed_gain: '',
       shooting_pct: '',
-      team_last_touch_control_pct: '',
+      player_attacking_third_touches: '',
+      team_field_pressure_pct: '',
+      player_pressure_contribution_pct: '',
+      average_net_territory_pct: '',
       match_average_ball_speed: '',
       match_maximum_ball_speed: '',
+    });
+  });
+  it('excludes unsupported playlists from territorial CSV metrics', () => {
+    const dropshot = structuredClone(value);
+    dropshot.playlistId = 29;
+    dropshot.playlistName = 'Dropshot';
+
+    const [header, row] = matchesCsv([dropshot], 'Steam|1|0')
+      .split('\r\n')
+      .map((line) => line.slice(1, -1).split('","'));
+    const result = Object.fromEntries(
+      header!.map((key, index) => [key, row![index]]),
+    );
+    expect(result).toMatchObject({
+      player_attacking_third_touches: '',
+      team_field_pressure_pct: '',
+      player_pressure_contribution_pct: '',
+      average_net_territory_pct: '',
     });
   });
 });

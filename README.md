@@ -10,8 +10,9 @@
 
 Fennec is a local-first Rocket League match journal and live dashboard. It
 turns the games you play into a useful personal history: what happened in each
-match, how a play session went, where you interacted with the ball, and which
-players you keep meeting.
+match, how a play session went, how players created pressure and gained
+territory, where you interacted with the ball, and which players you keep
+meeting.
 
 Fennec runs at [app.fennec.gg](https://app.fennec.gg) on the same Windows PC as
 Rocket League. Chromium-based desktop browsers are currently tested and
@@ -30,8 +31,8 @@ the story of the games that got you there.
 Fennec is for remembering and understanding your own play. It combines the
 scoreboard and event data exposed by Rocket League with context derived across
 matches: passes, 50s, automatic sessions, recurring teammates, opponent
-history, ball interaction analytics, and a three-dimensional touch map. The
-result is a record of actual games rather than another public rank lookup.
+history, pressure and territory analytics, and a three-dimensional touch map.
+The result is a record of actual games rather than another public rank lookup.
 
 ## Your data stays local
 
@@ -93,6 +94,14 @@ definition instead of pretending the game reports values that it does not.
 - A **50** is credited to each identified player involved when opponents touch
   the ball on the same hit or within 250 milliseconds of one another. Rapid
   follow-up contacts within half a second count as the same challenge.
+- A **pressure touch** is an unambiguous player touch made in the opponent's
+  defensive third. Fennec compares those touches between teams to show field
+  pressure and each player's contribution to their team's pressure. Contested
+  50s are excluded instead of being credited to either side.
+- **Net territory** measures how far the ball progresses toward or away from
+  the opponent's end between eligible touches, normalized to the arena length.
+  This keeps the impact of clears visible without mislabeling untouched ball
+  travel as pressure.
 
 ### Play sessions instead of isolated results
 
@@ -100,18 +109,28 @@ Nearby games are automatically grouped into sessions. By default, a new session
 starts after a 30-minute gap between games; you can change that gap in Settings
 or end a session manually when one stretch of play is finished. A session shows
 your record, win rate, current streak, goal difference, scoring totals, average
-score, touches, demos, passes, 50s, and recurring teammates.
+score, touches, demos, passes, 50s, pressure, territory, and recurring
+teammates.
 
-### Ball analytics and touch maps
+### Pressure, territory, and touch maps
 
 Fennec records normal-play ball telemetry and turns it into player-relative
 analytics such as:
 
 - ball hits and team touch share;
+- attacking-third pressure touches and team field-pressure share;
+- each player's contribution to their team's pressure;
+- average signed territory gained after a player's or team's touches;
 - average and fastest post-hit speed;
 - speed gained or lost on a hit;
-- observed ball speed and last-touch control; and
+- observed ball speed; and
 - the locations of touches, 50s, saves, and scoring touches.
+
+Pressure and territory are first-class match and session metrics for Soccar and
+Hoops. Pressure describes attacking-third involvement, while territory
+describes subsequent ball advancement. They do not claim to measure
+possession, off-ball influence, boost control, or whether a player was close
+enough to challenge.
 
 The interactive 3D touch map adapts to Soccar, Hoops, Dropshot, and unknown
 arena shapes. It can be explored by player, team, opponent, or all players.

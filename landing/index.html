@@ -6,14 +6,14 @@
     <meta name="theme-color" content="#07111f" />
     <meta
       name="description"
-      content="Fennec is a free, local-first Rocket League match journal and live dashboard. No account and no cloud match history."
+      content="Fennec is a free, local-first Rocket League match journal with pressure and territory analytics. No account and no cloud match history."
     />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Fennec" />
     <meta property="og:title" content="Fennec: Your games, remembered" />
     <meta
       property="og:description"
-      content="A free, open-source Rocket League match journal and live dashboard that keeps your history on your device."
+      content="A free, open-source Rocket League match journal with explainable pressure, territory, and match analytics that stay on your device."
     />
     <meta property="og:url" content="https://fennec.gg/" />
     <meta name="twitter:card" content="summary" />
@@ -61,8 +61,9 @@
         <h1 id="hero-title">Your Rocket League games, remembered.</h1>
         <p class="hero-copy">
           Fennec is a local-first match journal and live dashboard. Understand
-          your games, sessions, and ball interactions without making an account
-          or uploading your history to someone else's service.
+          your games, sessions, pressure, territory, and ball interactions
+          without making an account or uploading your history to someone else's
+          service.
         </p>
         <div class="hero-actions">
           <a class="button" href="https://app.fennec.gg/">Open Fennec</a>
@@ -276,10 +277,99 @@
               filter the action by player or team.
             </p>
           </article>
+          <article class="feature-card">
+            <div class="feature-card-top">
+              <span class="feature-number">04</span>
+              <svg
+                class="feature-visual"
+                data-feature-visual="pressure"
+                viewBox="0 0 160 64"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path class="visual-field" d="M15 14h130l8 36H7Z" />
+                <path class="visual-field-line" d="M80 14v36" />
+                <rect
+                  class="visual-pressure-zone"
+                  x="108"
+                  y="15"
+                  width="38"
+                  height="34"
+                />
+                <circle class="visual-cyan-fill" cx="112" cy="38" r="3" />
+                <circle class="visual-cyan-fill" cx="125" cy="25" r="3" />
+                <circle class="visual-cyan-fill" cx="136" cy="41" r="3" />
+                <circle
+                  class="visual-node visual-orange-stroke"
+                  cx="144"
+                  cy="29"
+                  r="7"
+                />
+                <path
+                  class="visual-route visual-cyan-stroke"
+                  d="M72 44C94 44 102 31 125 25"
+                />
+              </svg>
+            </div>
+            <h3>Pressure</h3>
+            <p>
+              Compare team field pressure from unambiguous touches in the
+              opponent's defensive third and see every player's share of it.
+            </p>
+            <p class="feature-rule">
+              50s and other multi-player contacts never count as unilateral
+              pressure for either side.
+            </p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-card-top">
+              <span class="feature-number">05</span>
+              <svg
+                class="feature-visual"
+                data-feature-visual="territory"
+                viewBox="0 0 160 64"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path class="visual-guide" d="M10 52H150" />
+                <path
+                  class="visual-field-line"
+                  d="M35 48V56M80 45V58M125 48V56"
+                />
+                <path
+                  class="visual-route visual-cyan-stroke"
+                  d="M24 42C57 39 82 24 132 18"
+                />
+                <path class="visual-cyan-fill" d="m137 17-11-5 3 11Z" />
+                <circle
+                  class="visual-node visual-orange-stroke"
+                  cx="24"
+                  cy="42"
+                  r="8"
+                />
+                <circle class="visual-ball" cx="79" cy="28" r="5" />
+                <circle
+                  class="visual-node visual-cyan-stroke"
+                  cx="136"
+                  cy="17"
+                  r="8"
+                />
+              </svg>
+            </div>
+            <h3>Territory gained</h3>
+            <p>
+              Measure signed ball progress toward or away from the opponent's
+              end between eligible touches, normalized to the arena length.
+            </p>
+            <p class="feature-rule">
+              A defensive clear can gain territory without being mislabeled as
+              pressure while the untouched ball travels.
+            </p>
+          </article>
         </div>
         <p class="feature-summary">
           Also included: team touch share, post-hit speed, speed gained or lost,
-          last-touch control, session trends, and recurring teammates.
+          session trends, and recurring teammates.
         </p>
       </section>
 

@@ -60,7 +60,6 @@ function createMatch(guid: string | undefined, now: string): MatchState {
       updateStatePackets: 0,
       activePlayPackets: 0,
       ballSpeed: { samples: 0, sum: 0 },
-      lastTouchSamplesByTeam: {},
     },
     teams: [],
     participants: [],
@@ -165,7 +164,6 @@ function accumulateSnapshot(match: MatchState): void {
     updateStatePackets: 0,
     activePlayPackets: 0,
     ballSpeed: { samples: 0, sum: 0 },
-    lastTouchSamplesByTeam: {},
   });
   capture.updateStatePackets += 1;
   if (!match.roundActive || match.isPaused || match.isReplay || !match.ball)
@@ -182,10 +180,6 @@ function accumulateSnapshot(match: MatchState): void {
     capture.ballSpeed.max === undefined
       ? speed
       : Math.max(capture.ballSpeed.max, speed);
-  const team = match.ball.lastTouchTeamNumber;
-  if (team !== undefined && team !== 255)
-    capture.lastTouchSamplesByTeam[String(team)] =
-      (capture.lastTouchSamplesByTeam[String(team)] ?? 0) + 1;
 }
 
 function recordArray(value: unknown): Record<string, unknown>[] {
@@ -312,7 +306,6 @@ export function reduceStatsEnvelope(
         const ballRecord = ball as Record<string, unknown>;
         match.ball = {
           speed: optionalNumber(ballRecord.Speed) ?? 0,
-          lastTouchTeamNumber: optionalNumber(ballRecord.TeamNum),
         };
       }
       match.viewTarget =

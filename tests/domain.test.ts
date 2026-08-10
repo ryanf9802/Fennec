@@ -18,6 +18,7 @@ import {
   observedBallSpeed,
   playerTouchAnalytics,
   spatialEventPoints,
+  territorialImpactAnalytics,
 } from '../src/domain/analytics';
 import { arenaProfile } from '../src/domain/arenaProfiles';
 import {
@@ -39,6 +40,7 @@ import {
 } from '../src/domain/playlists';
 import {
   defaultSettings,
+  normalizeSettings,
   type MatchState,
   type ParticipantState,
   type TimelineEvent,
@@ -78,6 +80,16 @@ const match = (id: string, start: string, end: string): MatchState => ({
   teams: [],
   participants: [],
   events: [],
+});
+
+describe('settings', () => {
+  it('preserves the pressure analytics preference', () => {
+    expect(normalizeSettings({ matchAnalyticsView: 'pressure' })).toMatchObject(
+      {
+        matchAnalyticsView: 'pressure',
+      },
+    );
+  });
 });
 const event = (
   matchId: string,
@@ -558,7 +570,7 @@ describe('Stats API domain', () => {
       }),
     );
     expect(value.teams[0]?.colorSecondary).toBe('001122');
-    expect(value.ball).toEqual({ speed: 900.5, lastTouchTeamNumber: 0 });
+    expect(value.ball).toEqual({ speed: 900.5 });
     expect(value.capture).toEqual(
       expect.objectContaining({
         updateStatePackets: 1,
@@ -737,6 +749,190 @@ describe('Stats API domain', () => {
         touchShare: 0.5,
         averagePostHitSpeed: 1000,
         averageSpeedChange: 600,
+      }),
+    );
+  });
+
+  it('derives pressure and territory from unambiguous directional touches', () => {
+    const value = match(
+      'territory',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.participants = [
+      { ...player('Blue', 'Steam|1|0', 0), shortcut: 1 },
+      { ...player('Orange', 'Epic|2|0', 1), shortcut: 2 },
+    ];
+    const hit = (
+      sequence: number,
+      y: number,
+      players: Array<{ Name: string; Shortcut: number; TeamNum: number }>,
+    ): TimelineEvent => ({
+      id: `territory:${sequence}`,
+      matchId: value.id,
+      sequence,
+      eventName: 'BallHit',
+      receivedAt: new Date(
+        Date.parse(value.startedAt) + sequence * 100,
+      ).toISOString(),
+      payload: {
+        Players: players,
+        Ball: { Location: { X: 0, Y: y, Z: 100 } },
+      },
+    });
+    value.events = [
+      hit(1, -3000, [{ Name: 'Blue', Shortcut: 1, TeamNum: 0 }]),
+      hit(2, 4000, [
+        { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+        { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+      ]),
+      hit(3, 4000, [{ Name: 'Blue', Shortcut: 1, TeamNum: 0 }]),
+      hit(4, 3000, [{ Name: 'Orange', Shortcut: 2, TeamNum: 1 }]),
+      hit(5, -4000, [{ Name: 'Orange', Shortcut: 2, TeamNum: 1 }]),
+    ];
+
+    const analytics = territorialImpactAnalytics(value)!;
+    expect(analytics.teams).toEqual([
+      expect.objectContaining({
+        teamNumber: 0,
+        pressureTouches: 1,
+        fieldPressureShare: 0.5,
+        territorySamples: 1,
+        averageNetTerritoryPercent: expect.closeTo(-9.765625),
+      }),
+      expect.objectContaining({
+        teamNumber: 1,
+        pressureTouches: 1,
+        fieldPressureShare: 0.5,
+        territorySamples: 1,
+        averageNetTerritoryPercent: expect.closeTo(68.359375),
+      }),
+    ]);
+    expect(
+      analytics.players.find((item) => item.actor.primaryId === 'Steam|1|0'),
+    ).toEqual(
+      expect.objectContaining({
+        pressureTouches: 1,
+        pressureContribution: 1,
+        territorySamples: 1,
+      }),
+    );
+    expect(
+      spatialEventPoints(value).filter((point) => point.kind === 'fifty'),
+    ).toHaveLength(1);
+    expect(sessionMetrics([value], 'Steam|1|0').territorialImpact).toEqual({
+      eligibleMatches: 1,
+      teamFieldPressure: 0.5,
+      playerPressureContribution: 1,
+      averageNetTerritoryPercent: expect.closeTo(-9.765625),
+    });
+
+    value.playlistId = 27;
+    expect(territorialImpactAnalytics(value)).toBeDefined();
+    value.playlistId = 29;
+    expect(territorialImpactAnalytics(value)).toBeUndefined();
+    expect(
+      sessionMetrics([value], 'Steam|1|0').territorialImpact,
+    ).toBeUndefined();
+  });
+
+  it('does not expose pressure when a match contains only a 50', () => {
+    const value = match(
+      'fifty-only',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.participants = [
+      { ...player('Blue', 'Steam|1|0', 0), shortcut: 1 },
+      { ...player('Orange', 'Epic|2|0', 1), shortcut: 2 },
+    ];
+    value.events = [
+      {
+        id: 'fifty-only:1',
+        matchId: value.id,
+        sequence: 1,
+        eventName: 'BallHit',
+        receivedAt: value.startedAt,
+        payload: {
+          Players: [
+            { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+            { Name: 'Orange', Shortcut: 2, TeamNum: 1 },
+          ],
+          Ball: { Location: { X: 0, Y: 4000, Z: 100 } },
+        },
+      },
+    ];
+
+    expect(territorialImpactAnalytics(value)).toBeUndefined();
+  });
+
+  it('uses scoring locations and never carries territory across dead ball', () => {
+    const value = match(
+      'territory-boundaries',
+      '2026-08-08T00:00:00Z',
+      '2026-08-08T00:05:00Z',
+    );
+    value.participants = [{ ...player('Blue', 'Steam|1|0', 0), shortcut: 1 }];
+    value.events = [
+      {
+        id: 'territory-boundaries:1',
+        matchId: value.id,
+        sequence: 1,
+        eventName: 'BallHit',
+        receivedAt: value.startedAt,
+        payload: {
+          Players: [{ Name: 'Blue', Shortcut: 1, TeamNum: 0 }],
+          Ball: { Location: { X: 0, Y: 0, Z: 100 } },
+        },
+      },
+      {
+        id: 'territory-boundaries:2',
+        matchId: value.id,
+        sequence: 2,
+        eventName: 'GoalScored',
+        receivedAt: value.startedAt,
+        payload: {
+          Scorer: { Name: 'Blue', Shortcut: 1, TeamNum: 0 },
+          GoalSpeed: 100,
+          ImpactLocation: { X: 0, Y: 5000, Z: 100 },
+        },
+      },
+      event(value.id, 3, 'RoundStarted', {}),
+      {
+        id: 'territory-boundaries:4',
+        matchId: value.id,
+        sequence: 4,
+        eventName: 'BallHit',
+        receivedAt: value.startedAt,
+        payload: {
+          Players: [{ Name: 'Blue', Shortcut: 1, TeamNum: 0 }],
+          Ball: { Location: { X: 0, Y: -3000, Z: 100 } },
+        },
+      },
+      event(value.id, 5, 'MatchPaused', {}),
+      event(value.id, 6, 'RoundStarted', {}),
+      {
+        id: 'territory-boundaries:7',
+        matchId: value.id,
+        sequence: 7,
+        eventName: 'BallHit',
+        receivedAt: value.startedAt,
+        payload: {
+          Players: [{ Name: 'Blue', Shortcut: 1, TeamNum: 0 }],
+          Ball: { Location: { X: 0, Y: 4000, Z: 100 } },
+        },
+      },
+    ];
+
+    expect(
+      territorialImpactAnalytics(value)?.players.find(
+        (item) => item.actor.primaryId === 'Steam|1|0',
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        pressureTouches: 1,
+        territorySamples: 1,
+        averageNetTerritoryPercent: expect.closeTo(48.828125),
       }),
     );
   });

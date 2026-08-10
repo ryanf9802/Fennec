@@ -28,9 +28,13 @@ test('landing page stays concise and usable across viewport sizes', async ({
     await expect(
       page.getByRole('heading', { name: '3D touch map' }),
     ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Territory gained' }),
+    ).toBeVisible();
     const diagrams = page.locator('.feature-visual');
-    await expect(diagrams).toHaveCount(3);
-    for (let index = 0; index < 3; index += 1) {
+    await expect(diagrams).toHaveCount(5);
+    for (let index = 0; index < 5; index += 1) {
       const card = page.locator('.feature-card').nth(index);
       const number = await card.locator('.feature-number').boundingBox();
       const diagram = await card.locator('.feature-visual').boundingBox();
@@ -38,6 +42,7 @@ test('landing page stays concise and usable across viewport sizes', async ({
       expect(diagram!.x).toBeGreaterThan(number!.x + number!.width);
       expect(heading!.y - (number!.y + number!.height)).toBeLessThanOrEqual(32);
     }
+    await expect(page.getByText(/team field pressure/)).toBeVisible();
     const dimensions = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
       client: document.documentElement.clientWidth,
@@ -228,6 +233,34 @@ test('speed units default to km/h and persist as mph', async ({ page }) => {
   await page.goto('/matches/demo-current-2?demo=1');
   await expect(fastestHit).toContainText('78 mph');
   await expect(maximumBallSpeed).toContainText('38 mph');
+});
+
+test('pressure is an explainable responsive telemetry view', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/matches/demo-current-2?demo=1');
+  await page.getByRole('tab', { name: 'Pressure' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
+  await expect(
+    page.getByText(/Pressure counts unambiguous touches/),
+  ).toBeVisible();
+  const table = page.getByRole('table', {
+    name: 'Pressure and territory contribution by player',
+  });
+  await expect(table).toBeVisible();
+  await expect(
+    table.getByRole('columnheader', { name: 'Team contribution' }),
+  ).toBeVisible();
+  await expect(
+    table.getByRole('columnheader', { name: 'Avg territory' }),
+  ).toBeVisible();
+  expect(
+    await table
+      .locator('..')
+      .evaluate((element) => element.scrollWidth > element.clientWidth),
+  ).toBe(true);
 });
 
 test('3D touch map controls and preference persist across matches', async ({

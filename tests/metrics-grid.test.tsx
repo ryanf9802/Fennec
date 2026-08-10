@@ -24,6 +24,12 @@ const metrics: SessionMetrics = {
   averageScore: 500,
   demos: 0,
   touches: 20,
+  territorialImpact: {
+    eligibleMatches: 1,
+    teamFieldPressure: 0.6,
+    playerPressureContribution: 0.5,
+    averageNetTerritoryPercent: 12.34,
+  },
 };
 
 describe('session stats', () => {
@@ -67,7 +73,7 @@ describe('session stats', () => {
     expect(
       screen.getByRole('region', { name: 'Session performance details' }),
     ).toBeInTheDocument();
-    for (const heading of ['Outcome', 'Offense', 'Involvement'])
+    for (const heading of ['Outcome', 'Offense', 'Involvement', 'Pressure'])
       expect(
         screen.getByRole('heading', { name: heading }),
       ).toBeInTheDocument();
@@ -84,6 +90,10 @@ describe('session stats', () => {
       '50s',
       'Touches',
       'Demos',
+      'Team field pressure',
+      'Your contribution',
+      'Avg territory',
+      'Eligible games',
     ])
       expect(screen.getByText(label)).toBeInTheDocument();
     for (const summaryLabel of [
@@ -94,5 +104,17 @@ describe('session stats', () => {
       'Avg score',
     ])
       expect(screen.queryByText(summaryLabel)).not.toBeInTheDocument();
+  });
+
+  it('omits pressure when a session has no eligible matches', () => {
+    render(
+      <SessionDetailStats
+        metrics={{ ...metrics, territorialImpact: undefined }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('heading', { name: 'Pressure' }),
+    ).not.toBeInTheDocument();
   });
 });

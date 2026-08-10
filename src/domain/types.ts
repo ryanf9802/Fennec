@@ -45,7 +45,6 @@ export interface PlayerReference {
 
 export interface BallState {
   speed: number;
-  lastTouchTeamNumber?: number;
 }
 
 export interface NumericAggregate {
@@ -60,7 +59,8 @@ export interface MatchCapture {
   updateStatePackets: number;
   activePlayPackets: number;
   ballSpeed: NumericAggregate;
-  lastTouchSamplesByTeam: Record<string, number>;
+  /** Retained only for compatibility with older backups. */
+  lastTouchSamplesByTeam?: Record<string, number>;
 }
 
 export interface TimelineEvent {
@@ -150,7 +150,7 @@ export interface FennecSettings {
   enabledTimelineEvents: string[];
   timelineAttributes: Record<string, string[]>;
   sidebarCollapsed: boolean;
-  matchAnalyticsView: 'analytics' | 'touch-map';
+  matchAnalyticsView: 'analytics' | 'pressure' | 'touch-map';
   analytics: {
     playlistMode: 'ranked';
     groupByPlaylist: true;
@@ -187,7 +187,10 @@ export function normalizeSettings(
   const speedUnit =
     input?.speedUnit === 'mph' ? 'mph' : defaultSettings.speedUnit;
   const matchAnalyticsView =
-    input?.matchAnalyticsView === 'touch-map' ? 'touch-map' : 'analytics';
+    input?.matchAnalyticsView === 'touch-map' ||
+    input?.matchAnalyticsView === 'pressure'
+      ? input.matchAnalyticsView
+      : 'analytics';
   return {
     ...defaultSettings,
     ...input,
@@ -234,4 +237,10 @@ export interface SessionMetrics {
   averageScore: number;
   demos: number;
   touches: number;
+  territorialImpact?: {
+    eligibleMatches: number;
+    teamFieldPressure?: number;
+    playerPressureContribution?: number;
+    averageNetTerritoryPercent?: number;
+  };
 }

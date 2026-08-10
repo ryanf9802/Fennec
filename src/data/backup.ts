@@ -4,7 +4,11 @@ import {
   type FennecSettings,
   type MatchState,
 } from '../domain/types';
-import { observedBallSpeed, playerTouchAnalytics } from '../domain/analytics';
+import {
+  observedBallSpeed,
+  playerTouchAnalytics,
+  territorialImpactAnalytics,
+} from '../domain/analytics';
 import { recalculateDerivedTouchStats } from '../domain/passes';
 import { isHistoryEligibleMatch } from '../domain/playlists';
 
@@ -227,7 +231,10 @@ export function matchesCsv(matches: MatchState[], profileId: string): string {
       'team_touch_share_pct',
       'average_speed_gain',
       'shooting_pct',
-      'team_last_touch_control_pct',
+      'player_attacking_third_touches',
+      'team_field_pressure_pct',
+      'player_pressure_contribution_pct',
+      'average_net_territory_pct',
       'match_average_ball_speed',
       'match_maximum_ball_speed',
     ],
@@ -256,12 +263,13 @@ export function matchesCsv(matches: MatchState[], profileId: string): string {
       match.capture !== undefined ||
       match.events.some((event) => event.eventName === 'BallHit');
     const ballSpeed = observedBallSpeed(match);
-    const lastTouchSamples = match.capture?.lastTouchSamplesByTeam ?? {};
-    const totalControlSamples = Object.values(lastTouchSamples).reduce(
-      (sum, value) => sum + value,
-      0,
+    const territorial = territorialImpactAnalytics(match);
+    const territorialTeam = territorial?.teams.find(
+      (value) => value.teamNumber === player.teamNumber,
     );
-    const ownControlSamples = lastTouchSamples[String(player.teamNumber)] ?? 0;
+    const territorialPlayer = territorial?.players.find(
+      (value) => value.actor.primaryId === profileId,
+    );
     rows.push(
       [
         match.id,
@@ -302,9 +310,10 @@ export function matchesCsv(matches: MatchState[], profileId: string): string {
           ? decimal(touchAnalytics.averageSpeedChange)
           : '',
         player.shots ? percentage(player.goals / player.shots) : '',
-        totalControlSamples
-          ? percentage(ownControlSamples / totalControlSamples)
-          : '',
+        territorialPlayer?.pressureTouches ?? '',
+        percentage(territorialTeam?.fieldPressureShare),
+        percentage(territorialPlayer?.pressureContribution),
+        decimal(territorialPlayer?.averageNetTerritoryPercent),
         decimal(ballSpeed.average),
         decimal(ballSpeed.maximum),
       ].map(String),

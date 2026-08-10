@@ -1,4 +1,5 @@
 import type { MatchState, ParticipantState, TimelineEvent } from './types';
+import { arenaProfile } from './arenaProfiles';
 import { derivedFiftyFacts } from './passes';
 
 export type SpatialEventKind = 'touch' | 'goal' | 'fifty' | 'crossbar';
@@ -40,6 +41,27 @@ export interface PlayerTouchAnalytics {
   averagePostHitSpeed?: number;
   maximumPostHitSpeed?: number;
   averageSpeedChange?: number;
+}
+
+export interface TerritorialTeamAnalytics {
+  teamNumber: number;
+  pressureTouches: number;
+  fieldPressureShare?: number;
+  territorySamples: number;
+  averageNetTerritoryPercent?: number;
+}
+
+export interface TerritorialPlayerAnalytics {
+  actor: SpatialActor;
+  pressureTouches: number;
+  pressureContribution?: number;
+  territorySamples: number;
+  averageNetTerritoryPercent?: number;
+}
+
+export interface TerritorialImpactAnalytics {
+  teams: TerritorialTeamAnalytics[];
+  players: TerritorialPlayerAnalytics[];
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -651,6 +673,188 @@ export function spatialEventPoints(match: MatchState): SpatialEventPoint[] {
       : point;
   });
   return points.sort((first, second) => first.sequence - second.sequence);
+}
+
+function participantKey(player: ParticipantState): string {
+  return player.primaryId
+    ? `id:${player.primaryId}`
+    : player.shortcut !== undefined
+      ? `shortcut:${player.shortcut}`
+      : `name:${player.teamNumber}:${player.name}`;
+}
+
+function attackingProgress(
+  y: number,
+  teamNumber: number,
+  yMin: number,
+  yMax: number,
+): number | undefined {
+  if (teamNumber !== 0 && teamNumber !== 1) return undefined;
+  const length = yMax - yMin;
+  if (length <= 0) return undefined;
+  const bounded = Math.max(yMin, Math.min(yMax, y));
+  return teamNumber === 0
+    ? (bounded - yMin) / length
+    : (yMax - bounded) / length;
+}
+
+/**
+ * Derives conservative attacking-third pressure and signed territorial
+ * progress from unambiguous spatial touches in Soccar and Hoops.
+ */
+export function territorialImpactAnalytics(
+  match: MatchState,
+): TerritorialImpactAnalytics | undefined {
+  const arena = arenaProfile(match);
+  if (arena.kind !== 'soccar' && arena.kind !== 'hoops') return undefined;
+
+  const points = spatialEventPoints(match);
+  const contacts = points.filter(
+    (point) => point.kind === 'touch' || point.kind === 'fifty',
+  );
+  if (
+    !contacts.some(
+      (point) =>
+        point.kind === 'touch' &&
+        point.actors.length === 1 &&
+        (point.actors[0]?.teamNumber === 0 ||
+          point.actors[0]?.teamNumber === 1),
+    )
+  )
+    return undefined;
+
+  const segmentByEventId = playSegments(match.events);
+  const segmentFor = (point: SpatialEventPoint) =>
+    point.sourceEventIds
+      .map((id) => segmentByEventId.get(id))
+      .find((value) => value !== undefined);
+  const goalsById = new Map(
+    points
+      .filter((point) => point.kind === 'goal')
+      .map((point) => [point.id, point]),
+  );
+  const teamValues = new Map<
+    number,
+    { pressureTouches: number; territorySum: number; territorySamples: number }
+  >();
+  const playerValues = new Map<
+    string,
+    {
+      actor: SpatialActor;
+      pressureTouches: number;
+      territorySum: number;
+      territorySamples: number;
+    }
+  >();
+
+  for (const teamNumber of [0, 1])
+    teamValues.set(teamNumber, {
+      pressureTouches: 0,
+      territorySum: 0,
+      territorySamples: 0,
+    });
+  for (const player of match.participants) {
+    if (player.teamNumber !== 0 && player.teamNumber !== 1) continue;
+    const key = participantKey(player);
+    playerValues.set(key, {
+      actor: {
+        key,
+        name: player.name,
+        teamNumber: player.teamNumber,
+        shortcut: player.shortcut,
+        primaryId: player.primaryId,
+      },
+      pressureTouches: 0,
+      territorySum: 0,
+      territorySamples: 0,
+    });
+  }
+
+  for (const [index, point] of contacts.entries()) {
+    if (point.kind !== 'touch' || point.actors.length !== 1) continue;
+    const touchActor = point.actors[0]!;
+    const teamValue = teamValues.get(touchActor.teamNumber);
+    if (!teamValue) continue;
+    const playerValue = playerValues.get(touchActor.key) ?? {
+      actor: touchActor,
+      pressureTouches: 0,
+      territorySum: 0,
+      territorySamples: 0,
+    };
+    playerValues.set(touchActor.key, playerValue);
+
+    const origin = attackingProgress(
+      point.y,
+      touchActor.teamNumber,
+      arena.yMin,
+      arena.yMax,
+    );
+    if (origin === undefined) continue;
+    if (origin >= 2 / 3) {
+      teamValue.pressureTouches += 1;
+      playerValue.pressureTouches += 1;
+    }
+
+    let destination = point.associatedPointId
+      ? goalsById.get(point.associatedPointId)
+      : undefined;
+    if (!destination) {
+      const segment = segmentFor(point);
+      const candidate = contacts[index + 1];
+      if (candidate && segmentFor(candidate) === segment)
+        destination = candidate;
+    }
+    if (
+      !destination ||
+      destination.kind === 'fifty' ||
+      (destination.kind === 'touch' && destination.actors.length !== 1)
+    )
+      continue;
+    const destinationProgress = attackingProgress(
+      destination.y,
+      touchActor.teamNumber,
+      arena.yMin,
+      arena.yMax,
+    );
+    if (destinationProgress === undefined) continue;
+    const territory = (destinationProgress - origin) * 100;
+    teamValue.territorySum += territory;
+    teamValue.territorySamples += 1;
+    playerValue.territorySum += territory;
+    playerValue.territorySamples += 1;
+  }
+
+  const totalPressureTouches = [...teamValues.values()].reduce(
+    (sum, value) => sum + value.pressureTouches,
+    0,
+  );
+  const teams = [...teamValues.entries()].map(([teamNumber, value]) => ({
+    teamNumber,
+    pressureTouches: value.pressureTouches,
+    fieldPressureShare: totalPressureTouches
+      ? value.pressureTouches / totalPressureTouches
+      : undefined,
+    territorySamples: value.territorySamples,
+    averageNetTerritoryPercent: value.territorySamples
+      ? value.territorySum / value.territorySamples
+      : undefined,
+  }));
+  const players = [...playerValues.values()].map((value) => {
+    const teamPressureTouches =
+      teamValues.get(value.actor.teamNumber)?.pressureTouches ?? 0;
+    return {
+      actor: value.actor,
+      pressureTouches: value.pressureTouches,
+      pressureContribution: teamPressureTouches
+        ? value.pressureTouches / teamPressureTouches
+        : undefined,
+      territorySamples: value.territorySamples,
+      averageNetTerritoryPercent: value.territorySamples
+        ? value.territorySum / value.territorySamples
+        : undefined,
+    };
+  });
+  return { teams, players };
 }
 
 export function playerTouchAnalytics(

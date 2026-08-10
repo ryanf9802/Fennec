@@ -29,13 +29,15 @@ function Harness({
   save = async () => undefined,
   speedUnit = 'kmh',
   value = match,
+  initialView = 'analytics',
 }: {
   save?(next: FennecSettings['matchAnalyticsView']): Promise<void>;
   speedUnit?: FennecSettings['speedUnit'];
   value?: MatchState;
+  initialView?: FennecSettings['matchAnalyticsView'];
 }) {
   const [view, setView] =
-    useState<FennecSettings['matchAnalyticsView']>('analytics');
+    useState<FennecSettings['matchAnalyticsView']>(initialView);
   return (
     <MatchAnalytics
       match={value}
@@ -67,7 +69,6 @@ describe('match analytics view switch', () => {
               updateStatePackets: 1,
               activePlayPackets: 1,
               ballSpeed: { samples: 1, sum: 10, max: 10 },
-              lastTouchSamplesByTeam: {},
             },
             participants: [
               {
@@ -137,6 +138,62 @@ describe('match analytics view switch', () => {
     ).toBeInTheDocument();
   });
 
+  it('offers pressure as a separate view when spatial telemetry is eligible', async () => {
+    render(
+      <Harness
+        value={{
+          ...match,
+          teams: [
+            { teamNumber: 0, name: 'Blue', score: 0, colorPrimary: '' },
+            { teamNumber: 1, name: 'Orange', score: 0, colorPrimary: '' },
+          ],
+          participants: [
+            {
+              name: 'You',
+              primaryId: 'Steam|1|0',
+              teamNumber: 0,
+              score: 0,
+              goals: 0,
+              assists: 0,
+              passes: 0,
+              fifties: 0,
+              saves: 0,
+              shots: 0,
+              touches: 1,
+              demos: 0,
+            },
+          ],
+          events: [
+            {
+              id: 'analytics:pressure',
+              matchId: 'analytics',
+              sequence: 1,
+              eventName: 'BallHit',
+              receivedAt: '2026-08-08T00:01:00Z',
+              payload: {
+                Players: [{ Name: 'You', TeamNum: 0 }],
+                Ball: { Location: { X: 0, Y: 4000, Z: 100 } },
+              },
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Pressure' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Pressure' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Blue' }).parentElement,
+    ).toHaveTextContent('Pressure touches1');
+    expect(
+      screen.getByRole('table', {
+        name: 'Pressure and territory contribution by player',
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('keeps the previous view when persistence fails', async () => {
     render(
       <Harness save={() => Promise.reject(new Error('storage unavailable'))} />,
@@ -149,5 +206,16 @@ describe('match analytics view switch', () => {
     expect(
       screen.getByRole('heading', { name: 'Ball analytics' }),
     ).toBeInTheDocument();
+  });
+
+  it('silently falls back without exposing pressure for ineligible matches', () => {
+    render(<Harness initialView="pressure" />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Ball analytics' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('tab', { name: 'Pressure' }),
+    ).not.toBeInTheDocument();
   });
 });

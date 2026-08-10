@@ -17,6 +17,16 @@ function differenceTone(value: number): string {
   return 'text-main';
 }
 
+function percentage(value: number | undefined): string {
+  return value === undefined ? '—' : `${Math.round(value * 100)}%`;
+}
+
+function territory(value: number | undefined): string {
+  if (value === undefined) return '—';
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded > 0 ? '+' : ''}${rounded}%`;
+}
+
 function StatValue({ item }: { item: StatItem }) {
   return (
     <div className="min-w-0">
@@ -111,12 +121,42 @@ export function SessionDetailStats({ metrics }: { metrics: SessionMetrics }) {
         { label: 'Demos', value: metrics.demos, className: 'col-span-3' },
       ],
     },
+    ...(metrics.territorialImpact
+      ? [
+          {
+            title: 'Pressure',
+            gridClass: 'grid-cols-2',
+            items: [
+              {
+                label: 'Team field pressure',
+                value: percentage(metrics.territorialImpact.teamFieldPressure),
+              },
+              {
+                label: 'Your contribution',
+                value: percentage(
+                  metrics.territorialImpact.playerPressureContribution,
+                ),
+              },
+              {
+                label: 'Avg territory',
+                value: territory(
+                  metrics.territorialImpact.averageNetTerritoryPercent,
+                ),
+              },
+              {
+                label: 'Eligible games',
+                value: metrics.territorialImpact.eligibleMatches,
+              },
+            ],
+          },
+        ]
+      : []),
   ];
 
   return (
     <section
       aria-label="Session performance details"
-      className="grid gap-4 lg:grid-cols-3"
+      className={`grid gap-4 lg:grid-cols-2 ${metrics.territorialImpact ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`}
     >
       {groups.map((group) => (
         <article key={group.title} className="surface-flat rounded-2xl p-5">

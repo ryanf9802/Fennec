@@ -142,7 +142,6 @@ function demoMatch(
       updateStatePackets: 600,
       activePlayPackets: 580,
       ballSpeed: { samples: 580, sum: 580 * 8.25, min: 0, max: 17.2 },
-      lastTouchSamplesByTeam: { 0: won ? 330 : 250, 1: won ? 250 : 330 },
     },
     events: [
       {

@@ -1,7 +1,12 @@
 import { lazy, Suspense, useState } from 'react';
-import { observedBallSpeed, playerTouchAnalytics } from '../domain/analytics';
+import {
+  observedBallSpeed,
+  playerTouchAnalytics,
+  territorialImpactAnalytics,
+} from '../domain/analytics';
 import { formatSpeed } from '../domain/speed';
 import type { FennecSettings, MatchState } from '../domain/types';
+import { PressureAnalytics } from './PressureAnalytics';
 
 const BallTouchMap = lazy(() => import('./BallTouchMap'));
 
@@ -24,19 +29,10 @@ export function MatchAnalytics({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
-  const player = match.participants.find(
-    (value) => value.primaryId === profileId,
-  );
   const touches = playerTouchAnalytics(match, profileId);
   const ballSpeed = observedBallSpeed(match);
-  const lastTouchSamples = match.capture?.lastTouchSamplesByTeam ?? {};
-  const totalControl = Object.values(lastTouchSamples).reduce(
-    (sum, value) => sum + value,
-    0,
-  );
-  const ownControl = player
-    ? (lastTouchSamples[String(player.teamNumber)] ?? 0)
-    : 0;
+  const pressure = territorialImpactAnalytics(match);
+  const selectedView = view === 'pressure' && !pressure ? 'analytics' : view;
   const cards = [
     ['Your ball hits', profileId ? touches.touches : '—'],
     [
@@ -76,12 +72,6 @@ export function MatchAnalytics({
         source: 'meters-per-second',
       }),
     ],
-    [
-      'Last-touch control',
-      !player || !totalControl
-        ? '—'
-        : `${Math.round((ownControl * 100) / totalControl)}%`,
-    ],
   ];
 
   const selectView = async (next: FennecSettings['matchAnalyticsView']) => {
@@ -105,7 +95,11 @@ export function MatchAnalytics({
         <div>
           <div className="eyebrow">Normal-play telemetry</div>
           <h2 className="mt-1 text-xl font-extrabold">
-            {view === 'analytics' ? 'Ball analytics' : 'Ball touch map'}
+            {selectedView === 'analytics'
+              ? 'Ball analytics'
+              : selectedView === 'pressure'
+                ? 'Pressure'
+                : 'Ball touch map'}
           </h2>
         </div>
         <div
@@ -116,6 +110,7 @@ export function MatchAnalytics({
           {(
             [
               ['analytics', 'Ball analytics'],
+              ...(pressure ? ([['pressure', 'Pressure']] as const) : []),
               ['touch-map', 'Touch map'],
             ] as const
           ).map(([value, label]) => (
@@ -124,11 +119,11 @@ export function MatchAnalytics({
               type="button"
               role="tab"
               id={`ball-${value}-tab`}
-              aria-selected={view === value}
+              aria-selected={selectedView === value}
               aria-controls={`ball-${value}-panel`}
               disabled={saving}
               onClick={() => void selectView(value)}
-              className={`rounded-lg px-3 py-2 text-xs font-bold transition ${view === value ? 'bg-cyan-400/15 text-fennec-cyan' : 'text-muted hover:text-main'}`}
+              className={`rounded-lg px-3 py-2 text-xs font-bold transition ${selectedView === value ? 'bg-cyan-400/15 text-fennec-cyan' : 'text-muted hover:text-main'}`}
             >
               {label}
             </button>
@@ -142,7 +137,7 @@ export function MatchAnalytics({
         </p>
       )}
 
-      {view === 'analytics' ? (
+      {selectedView === 'analytics' ? (
         <div
           id="ball-analytics-panel"
           role="tabpanel"
@@ -161,10 +156,18 @@ export function MatchAnalytics({
           </div>
           {!match.capture && (
             <p className="text-muted text-xs">
-              Snapshot-derived speed and control analytics were not recorded for
-              this legacy match.
+              Snapshot-derived ball-speed analytics were not recorded for this
+              legacy match.
             </p>
           )}
+        </div>
+      ) : selectedView === 'pressure' && pressure ? (
+        <div
+          id="ball-pressure-panel"
+          role="tabpanel"
+          aria-labelledby="ball-pressure-tab"
+        >
+          <PressureAnalytics match={match} analytics={pressure} />
         </div>
       ) : (
         <div

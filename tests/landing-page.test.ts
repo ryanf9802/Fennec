@@ -45,6 +45,8 @@ describe('Fennec landing page', () => {
       'Passes',
       '50s',
       '3D touch map',
+      'Pressure',
+      'Territory gained',
     ]);
     expect(text[0]).toContain('next identifiable single-player touch');
     expect(text[1]).toContain('within 250 milliseconds');
@@ -52,6 +54,11 @@ describe('Fennec landing page', () => {
     expect(cards[2]?.querySelector('.feature-rule')?.textContent).toContain(
       'Map every touch, 50, save, and goal in a rotatable 3D arena',
     );
+    expect(text[3]).toContain('team field pressure');
+    expect(text[3]).toContain("opponent's defensive third");
+    expect(text[3]).toContain('50s and other multi-player contacts');
+    expect(text[4]).toContain('signed ball progress');
+    expect(text[4]).toContain('without being mislabeled as pressure');
   });
 
   it('pairs every featured analytic with a decorative schematic', () => {
@@ -64,6 +71,8 @@ describe('Fennec landing page', () => {
       'pass',
       'fifty',
       'touch-map',
+      'pressure',
+      'territory',
     ]);
     for (const diagram of diagrams) {
       expect(diagram.getAttribute('aria-hidden')).toBe('true');
@@ -72,5 +81,15 @@ describe('Fennec landing page', () => {
         diagram.querySelectorAll('path, circle, rect').length,
       ).toBeGreaterThan(3);
     }
+  });
+
+  it('presents pressure and territory in page metadata and summary copy', () => {
+    const page = landingDocument();
+    const text = (page.body.textContent ?? '').replace(/\s+/g, ' ');
+
+    expect(
+      page.querySelector('meta[name="description"]')?.getAttribute('content'),
+    ).toMatch(/pressure and territory analytics/);
+    expect(text).not.toContain('last-touch control');
   });
 });

@@ -1,4 +1,5 @@
 import type { MatchState, SessionMetrics } from './types';
+import { territorialImpactAnalytics } from './analytics';
 
 export function isWin(match: MatchState, profileId?: string): boolean {
   const player = match.participants.find(
@@ -11,6 +12,10 @@ export function isWin(match: MatchState, profileId?: string): boolean {
   );
 }
 
+/**
+ * Pools profile-relative outcomes and involvement across a session while
+ * excluding matches without eligible spatial telemetry from pressure ratios.
+ */
 export function sessionMetrics(
   matches: MatchState[],
   profileId?: string,
@@ -43,6 +48,37 @@ export function sessionMetrics(
   );
   const goals = profiles.reduce((total, item) => total + item.player!.goals, 0);
   const shots = profiles.reduce((total, item) => total + item.player!.shots, 0);
+  let eligibleTerritorialMatches = 0;
+  let teamPressureTouches = 0;
+  let totalPressureTouches = 0;
+  let playerPressureTouches = 0;
+  let playerTerritorySamples = 0;
+  let playerTerritorySum = 0;
+  for (const { match, player } of profiles) {
+    const analytics = territorialImpactAnalytics(match);
+    if (!analytics) continue;
+    eligibleTerritorialMatches += 1;
+    const team = analytics.teams.find(
+      (value) => value.teamNumber === player!.teamNumber,
+    );
+    const selected = analytics.players.find(
+      (value) => value.actor.primaryId === profileId,
+    );
+    teamPressureTouches += team?.pressureTouches ?? 0;
+    totalPressureTouches += analytics.teams.reduce(
+      (sum, value) => sum + value.pressureTouches,
+      0,
+    );
+    playerPressureTouches += selected?.pressureTouches ?? 0;
+    if (
+      selected?.averageNetTerritoryPercent !== undefined &&
+      selected.territorySamples
+    ) {
+      playerTerritorySamples += selected.territorySamples;
+      playerTerritorySum +=
+        selected.averageNetTerritoryPercent * selected.territorySamples;
+    }
+  }
   let streak = '—';
   if (completed.length) {
     const last = isWin(completed.at(-1)!.match, profileId);
@@ -79,5 +115,19 @@ export function sessionMetrics(
       : 0,
     demos: profiles.reduce((total, item) => total + item.player!.demos, 0),
     touches: profiles.reduce((total, item) => total + item.player!.touches, 0),
+    territorialImpact: eligibleTerritorialMatches
+      ? {
+          eligibleMatches: eligibleTerritorialMatches,
+          teamFieldPressure: totalPressureTouches
+            ? teamPressureTouches / totalPressureTouches
+            : undefined,
+          playerPressureContribution: teamPressureTouches
+            ? playerPressureTouches / teamPressureTouches
+            : undefined,
+          averageNetTerritoryPercent: playerTerritorySamples
+            ? playerTerritorySum / playerTerritorySamples
+            : undefined,
+        }
+      : undefined,
   };
 }
