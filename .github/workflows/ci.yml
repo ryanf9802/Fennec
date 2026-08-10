@@ -96,8 +96,10 @@ jobs:
         run: |
           BUCKET=$(aws cloudformation describe-stacks --stack-name FennecSite --query 'Stacks[0].Outputs[?OutputKey==`SiteBucketName`].OutputValue' --output text)
           DISTRIBUTION=$(aws cloudformation describe-stacks --stack-name FennecSite --query 'Stacks[0].Outputs[?OutputKey==`DistributionId`].OutputValue' --output text)
-          aws s3 sync dist "s3://$BUCKET" --delete --exclude index.html --exclude sw.js --exclude manifest.webmanifest --exclude registerSW.js --cache-control 'public,max-age=31536000,immutable'
-          aws s3 cp dist/index.html "s3://$BUCKET/index.html" --cache-control 'no-cache,no-store,must-revalidate' --content-type 'text/html; charset=utf-8'
+          aws s3 sync dist "s3://$BUCKET" --delete --exclude index.html --exclude landing/index.html --exclude sw.js --exclude manifest.webmanifest --exclude registerSW.js --cache-control 'public,max-age=31536000,immutable'
+          for FILE in index.html landing/index.html; do
+            aws s3 cp "dist/$FILE" "s3://$BUCKET/$FILE" --cache-control 'no-cache,no-store,must-revalidate' --content-type 'text/html; charset=utf-8'
+          done
           for FILE in sw.js manifest.webmanifest registerSW.js; do
             if [[ -f "dist/$FILE" ]]; then
               aws s3 cp "dist/$FILE" "s3://$BUCKET/$FILE" --cache-control 'no-cache,must-revalidate'
@@ -109,3 +111,10 @@ jobs:
         run: |
           SITE_URL=$(aws cloudformation describe-stacks --stack-name FennecSite --query 'Stacks[0].Outputs[?OutputKey==`SiteUrl`].OutputValue' --output text)
           curl --fail --retry 8 --retry-delay 10 "$SITE_URL"
+          if [[ -n "$FENNEC_REDIRECT_DOMAIN" ]]; then
+            LANDING_URL="https://$FENNEC_REDIRECT_DOMAIN"
+            LANDING_HTML=$(curl --fail --retry 8 --retry-delay 10 "$LANDING_URL/")
+            grep -q 'data-fennec-landing' <<< "$LANDING_HTML"
+            REDIRECT_LOCATION=$(curl --silent --show-error --output /dev/null --write-out '%{redirect_url}' "$LANDING_URL/settings?source=apex")
+            test "$REDIRECT_LOCATION" = "https://$FENNEC_APP_DOMAIN/settings?source=apex"
+          fi

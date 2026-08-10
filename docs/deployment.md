@@ -7,8 +7,9 @@ companion releases.
 
 AWS infrastructure is defined in TypeScript CDK and pinned to personal account
 `309418039962`. `FennecSite` creates a private S3 origin, CloudFront Origin
-Access Control, SPA routing, security headers, ACM and Route 53 records, and a
-permanent `fennec.gg` to `app.fennec.gg` redirect.
+Access Control, SPA routing, security headers, ACM and Route 53 records, and the
+`fennec.gg` landing page. The application remains at `app.fennec.gg`; non-root
+apex paths continue to redirect to their matching application routes.
 
 The distribution uses AWS-managed caching and dedicated CloudFront Functions so
 it remains compatible with CloudFront's flat-rate Free plan. The deployment
@@ -71,7 +72,7 @@ maintainer changes still use a green PR and direct pushes remain blocked.
 On a push or manual dispatch from `main`, the deployment job assumes the OIDC
 role, deploys the CDK site stack, synchronizes immutable assets and non-cached
 application entry files separately, invalidates CloudFront, and smoke-tests the
-deployed site URL.
+application, apex landing page, and compatibility redirect.
 
 ## Companion validation and releases
 

@@ -1,5 +1,35 @@
 import { expect, test } from '@playwright/test';
 
+test('landing page stays concise and usable across viewport sizes', async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 375, height: 760 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/landing/');
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: 'Your Rocket League games, remembered.',
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Open Fennec' }).first(),
+    ).toHaveAttribute('href', 'https://app.fennec.gg/');
+    await expect(
+      page.getByRole('link', { name: /GitHub/ }).first(),
+    ).toBeVisible();
+    await expect(page.getByText('MIT License').first()).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client);
+  }
+});
+
 for (const viewport of [
   { width: 375, height: 760 },
   { width: 960, height: 720 },

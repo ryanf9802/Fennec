@@ -64,10 +64,10 @@ export class FennecSiteStack extends cdk.Stack {
       });
     }
 
-    const redirectFunction =
+    const apexRoutingFunction =
       props.domainName && props.redirectDomain
-        ? new cloudfront.Function(this, 'ApexRedirect', {
-            comment: `Redirect ${props.redirectDomain} to ${props.domainName}`,
+        ? new cloudfront.Function(this, 'ApexRouting', {
+            comment: `Serve the Fennec landing page at ${props.redirectDomain}`,
             runtime: cloudfront.FunctionRuntime.JS_2_0,
             code: cloudfront.FunctionCode.fromInline(`
 function querySuffix(querystring) {
@@ -87,6 +87,17 @@ function handler(event) {
   var request = event.request;
   var host = request.headers.host && request.headers.host.value.toLowerCase();
   if (host === ${JSON.stringify(props.redirectDomain)}) {
+    if (request.uri === '/') {
+      request.uri = '/landing/index.html';
+      return request;
+    }
+    if (
+      request.uri.indexOf('/assets/') === 0 ||
+      request.uri.indexOf('/icons/') === 0 ||
+      request.uri.indexOf('/landing/') === 0
+    ) {
+      return request;
+    }
     return {
       statusCode: 308,
       statusDescription: 'Permanent Redirect',
@@ -149,11 +160,11 @@ function handler(event) {
         compress: true,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         functionAssociations: [
-          ...(redirectFunction
+          ...(apexRoutingFunction
             ? [
                 {
                   eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-                  function: redirectFunction,
+                  function: apexRoutingFunction,
                 },
               ]
             : []),

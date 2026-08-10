@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -47,7 +48,33 @@ function devTelemetry(): Plugin {
   };
 }
 
+function landingDocument(): Plugin {
+  return {
+    name: 'fennec-landing-document',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const document = bundle['landing/index.html'];
+      if (!document || document.type !== 'asset') return;
+      if (typeof document.source !== 'string') return;
+      document.source = document.source.replace(
+        '<link rel="manifest" href="/manifest.webmanifest">',
+        '',
+      );
+    },
+  };
+}
+
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      input: {
+        app: fileURLToPath(new URL('./index.html', import.meta.url)),
+        landing: fileURLToPath(
+          new URL('./landing/index.html', import.meta.url),
+        ),
+      },
+    },
+  },
   plugins: [
     devTelemetry(),
     react(),
@@ -93,6 +120,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
       },
     }),
+    landingDocument(),
   ],
   test: {
     environment: 'jsdom',

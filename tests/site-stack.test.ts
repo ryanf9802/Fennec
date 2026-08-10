@@ -16,7 +16,7 @@ function productionStack(webAclId?: string) {
 }
 
 describe('Fennec site infrastructure', () => {
-  it('serves the app domain and redirects the zone apex on one distribution', () => {
+  it('serves the app and apex landing page on one distribution', () => {
     const template = Template.fromStack(productionStack());
 
     template.hasResourceProperties('AWS::CertificateManager::Certificate', {
@@ -41,6 +41,14 @@ describe('Fennec site infrastructure', () => {
     });
     template.hasResourceProperties('AWS::CloudFront::Function', {
       FunctionCode: Match.stringLikeRegexp(
+        "request.uri = '/landing/index.html'",
+      ),
+    });
+    template.hasResourceProperties('AWS::CloudFront::Function', {
+      FunctionCode: Match.stringLikeRegexp('assets/[\\s\\S]*landing/'),
+    });
+    template.hasResourceProperties('AWS::CloudFront::Function', {
+      FunctionCode: Match.stringLikeRegexp(
         "'https://app.fennec.gg' \\+ request.uri \\+ querySuffix",
       ),
     });
@@ -55,6 +63,7 @@ describe('Fennec site infrastructure', () => {
       Object.keys(template.findResources('AWS::CloudFront::Function')),
     ).toEqual(
       expect.arrayContaining([
+        expect.stringMatching(/^ApexRouting/),
         expect.stringMatching(/^SecurityHeadersFunction/),
       ]),
     );
