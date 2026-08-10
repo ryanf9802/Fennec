@@ -775,6 +775,10 @@ test('paired setup exposes companion launch preferences', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Add Epic shortcut' }),
   ).toBeVisible();
+  await expect(
+    page.getByText('Use a compatible companion protocol'),
+  ).toHaveCount(0);
+  await expect(page.getByText(/protocol versions match/i)).toHaveCount(0);
   await page
     .getByRole('button', { name: 'Open dashboard with Rocket League' })
     .click();
@@ -790,6 +794,57 @@ test('paired setup exposes companion launch preferences', async ({ page }) => {
       'Companion setup is complete for Steam and Epic. Fennec can capture matches in the background.',
     ),
   ).toBeVisible();
+});
+
+test('companion incompatibility is an actionable pairing error', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-companion-token', 'e2e-token');
+  });
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/permission-probe') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        version: '0.1.0',
+        protocolVersion: 0,
+        paired: path === '/status',
+        gameRunning: false,
+        feedConnected: false,
+        stores: ['steam'],
+        configuredStores: ['steam'],
+        launchOnStartup: false,
+        updateStatus: 'downloading',
+      }),
+    });
+  });
+
+  await page.goto('/onboarding?demo=1');
+  await page.getByRole('button', { name: /With companion/ }).click();
+
+  const pairing = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Install and pair the companion' });
+  await expect(pairing.locator('svg.text-fennec-orange')).toBeVisible();
+  await expect(
+    pairing.getByText(
+      'Fennec needs to finish updating before setup can continue. Keep the companion running while it updates automatically, then reload Fennec.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Use a compatible companion protocol'),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Launch Fennec with Rocket League' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toHaveCount(0);
 });
 
 test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {

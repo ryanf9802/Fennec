@@ -263,11 +263,13 @@ export function OnboardingPage() {
           {path === 'companion' ? (
             <>
               <Requirement
-                complete={paired}
+                complete={paired && compatible}
                 title="Install and pair the companion"
               >
                 {paired
-                  ? `Companion ${health?.version} is paired and responding.`
+                  ? compatible
+                    ? `Companion ${health?.version} is paired and responding.`
+                    : 'Fennec needs to finish updating before setup can continue. Keep the companion running while it updates automatically, then reload Fennec.'
                   : health
                     ? `Companion ${health.version} is responding but is not paired with this browser.`
                     : 'The companion is not running or cannot be reached from this browser.'}
@@ -285,18 +287,6 @@ export function OnboardingPage() {
                     </a>
                   </div>
                 )}
-              </Requirement>
-              <Requirement
-                complete={compatible}
-                title="Use a compatible companion protocol"
-              >
-                {compatible
-                  ? 'Browser and companion protocol versions match.'
-                  : !health
-                    ? 'Protocol verification starts after the companion responds.'
-                    : !paired
-                      ? 'Pair this browser to verify protocol compatibility.'
-                      : 'Update the browser app or companion before synchronization.'}
               </Requirement>
               <Requirement
                 complete={storesConfigured}
