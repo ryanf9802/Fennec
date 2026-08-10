@@ -162,15 +162,6 @@ textarea:focus-visible {
     cubic-bezier(0.22, 0.72, 0.18, 1) both;
   transform-origin: center;
 }
-.app-entrance-overlay--minimal {
-  animation: app-entrance-minimal-overlay 140ms ease-out forwards;
-}
-.app-entrance-overlay--minimal .app-entrance-mark {
-  animation: none;
-}
-.app-entrance-content--minimal {
-  animation: app-entrance-minimal-content 140ms ease-out both;
-}
 .surface {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -465,20 +456,6 @@ textarea:focus-visible {
     filter: blur(0);
   }
 }
-@keyframes app-entrance-minimal-overlay {
-  to {
-    opacity: 0;
-  }
-}
-@keyframes app-entrance-minimal-content {
-  from {
-    opacity: 0.9;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

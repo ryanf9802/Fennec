@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveAppEntranceMode } from '../src/app/appEntranceMode';
 import { AppEntrance, useAppEntrance } from '../src/components/AppEntrance';
 
 function ReplayControl() {
@@ -14,16 +13,6 @@ describe('app entrance', () => {
     vi.useRealTimers();
   });
 
-  it.each([
-    ['navigate', 'cinematic'],
-    ['reload', 'minimal'],
-    ['back_forward', 'minimal'],
-    [undefined, 'minimal'],
-    [null, 'minimal'],
-  ])('maps %s navigation to the %s entrance', (navigationType, expected) => {
-    expect(resolveAppEntranceMode(navigationType)).toBe(expected);
-  });
-
   it('holds the artwork until ready and removes it after the reveal', () => {
     function StatefulDashboard() {
       const [count, setCount] = useState(0);
@@ -33,7 +22,7 @@ describe('app entrance', () => {
     }
 
     const view = render(
-      <AppEntrance mode="cinematic" ready={false}>
+      <AppEntrance ready={false}>
         <StatefulDashboard />
       </AppEntrance>,
     );
@@ -42,13 +31,14 @@ describe('app entrance', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
 
     view.rerender(
-      <AppEntrance mode="cinematic" ready>
+      <AppEntrance ready>
         <StatefulDashboard />
       </AppEntrance>,
     );
 
     const overlay = screen.getByTestId('app-entrance');
     expect(overlay).toHaveClass('app-entrance-overlay--cinematic');
+    expect(overlay).toHaveAccessibleName('Opening Fennec');
     fireEvent.click(screen.getByRole('button', { name: '0' }));
     expect(screen.getByRole('button', { name: '1' })).toBeInTheDocument();
     fireEvent.animationEnd(overlay);
@@ -60,13 +50,13 @@ describe('app entrance', () => {
   it('cannot leave the overlay blocking interaction if animation events fail', () => {
     vi.useFakeTimers();
     render(
-      <AppEntrance mode="minimal" ready>
+      <AppEntrance ready>
         <button>Continue</button>
       </AppEntrance>,
     );
 
     expect(screen.getByTestId('app-entrance')).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(500));
+    act(() => vi.advanceTimersByTime(1_200));
 
     expect(screen.queryByTestId('app-entrance')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
@@ -74,7 +64,7 @@ describe('app entrance', () => {
 
   it('can replay the cinematic entrance after the app is visible', () => {
     render(
-      <AppEntrance mode="minimal" ready>
+      <AppEntrance ready>
         <ReplayControl />
       </AppEntrance>,
     );
@@ -88,6 +78,23 @@ describe('app entrance', () => {
     expect(document.documentElement).toHaveAttribute(
       'data-app-entrance',
       'cinematic',
+    );
+  });
+
+  it('replays the cinematic entrance after a page cache restoration', () => {
+    render(
+      <AppEntrance ready>
+        <button>Continue</button>
+      </AppEntrance>,
+    );
+    fireEvent.animationEnd(screen.getByTestId('app-entrance'));
+
+    const pageShow = new Event('pageshow');
+    Object.defineProperty(pageShow, 'persisted', { value: true });
+    fireEvent(window, pageShow);
+
+    expect(screen.getByTestId('app-entrance')).toHaveClass(
+      'app-entrance-overlay--cinematic',
     );
   });
 });

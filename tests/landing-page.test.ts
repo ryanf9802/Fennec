@@ -48,7 +48,8 @@ describe('Fennec landing page', () => {
     ]);
     expect(text[0]).toContain('next identifiable single-player touch');
     expect(text[1]).toContain('within 250 milliseconds');
-    expect(text[2]).toContain(
+    expect(text[2]).toContain('Explore the observed locations of touches');
+    expect(cards[2]?.querySelector('.feature-rule')?.textContent).toContain(
       'Map every touch, 50, save, and goal in a rotatable 3D arena',
     );
   });

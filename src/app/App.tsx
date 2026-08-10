@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Navigate,
   Route,
@@ -18,7 +18,6 @@ import { PwaLifecycle } from '../pwa/PwaLifecycle';
 import { ProfilePage } from '../pages/ProfilePage';
 import { SessionPage } from '../pages/SessionPage';
 import { SettingsPage } from '../pages/SettingsPage';
-import { resolveAppEntranceMode } from './appEntranceMode';
 import { useFennec } from './FennecContext';
 import { matchBelongsToProfile } from '../domain/profileScope';
 import { RequireSetup } from './RequireSetup';
@@ -35,6 +34,7 @@ export function App() {
   );
 }
 
+/** Holds document-entry content until local data and setup checks are ready. */
 function AppContent() {
   const { activeMatch, profile, settings, ready, diagnostic } = useFennec();
   const visibleActiveMatch =
@@ -45,8 +45,8 @@ function AppContent() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const opened = useRef<string | undefined>(undefined);
-  const [entranceMode] = useState(resolveAppEntranceMode);
   const setup = useSetupStatus();
+  const entryReady = ready && setup.state !== 'checking';
   useEffect(() => {
     if (
       setup.state === 'complete' &&
@@ -77,7 +77,7 @@ function AppContent() {
       </div>
     );
   return (
-    <AppEntrance mode={entranceMode} ready={ready}>
+    <AppEntrance ready={entryReady}>
       <LiveWakeLock />
       <PwaLifecycle />
       <AppShell>

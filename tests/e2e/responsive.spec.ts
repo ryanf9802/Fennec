@@ -691,9 +691,7 @@ test('PWA identity uses only the Fennec name', async ({ page }) => {
   await expect(page).toHaveTitle('Fennec');
 });
 
-test('fresh launches are cinematic while refreshes use a minimal handoff', async ({
-  page,
-}) => {
+test('document loads use the cinematic app entrance', async ({ page }) => {
   await page.goto('/?demo=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('html')).toHaveAttribute(
     'data-app-entrance',
@@ -710,11 +708,22 @@ test('fresh launches are cinematic while refreshes use a minimal handoff', async
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('html')).toHaveAttribute(
     'data-app-entrance',
-    'minimal',
+    'cinematic',
   );
   await expect(
     page.getByRole('heading', { name: 'Game timeline' }),
   ).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+
+  await page.goto('/settings?demo=1', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance',
+    'cinematic',
+  );
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute(
     'data-app-entrance-state',
     'complete',

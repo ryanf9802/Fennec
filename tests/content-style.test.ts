@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const textFile = /\.(?:css|html|js|json|jsx|md|mjs|svg|ts|tsx|yaml|yml)$/;
 
@@ -13,7 +13,7 @@ describe('content style', () => {
       { encoding: 'utf8' },
     )
       .split('\0')
-      .filter((file) => textFile.test(file));
+      .filter((file) => textFile.test(file) && existsSync(file));
 
     for (const file of files) {
       const source = placeholders.reduce(

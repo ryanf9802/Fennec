@@ -7,12 +7,8 @@ import {
   type AnimationEvent,
   type ReactNode,
 } from 'react';
-import type { AppEntranceMode } from '../app/appEntranceMode';
 
-const COMPLETION_TIMEOUT_MS: Record<AppEntranceMode, number> = {
-  cinematic: 1_200,
-  minimal: 500,
-};
+const COMPLETION_TIMEOUT_MS = 1_200;
 
 const AppEntranceContext = createContext<(() => void) | undefined>(undefined);
 
@@ -26,29 +22,33 @@ export function useAppEntrance() {
 
 /**
  * Holds the loading artwork above the app until local state is ready, then
- * removes it after the launch-appropriate transition has completed.
+ * removes it after the cinematic transition has completed.
  */
 export function AppEntrance({
   children,
-  mode,
   ready,
 }: {
   children: ReactNode;
-  mode: AppEntranceMode;
   ready: boolean;
 }) {
   const [complete, setComplete] = useState(false);
-  const [activeMode, setActiveMode] = useState(mode);
   const revealing = ready;
 
   const replayCinematic = useCallback(() => {
-    setActiveMode('cinematic');
     setComplete(false);
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.appEntrance = activeMode;
-  }, [activeMode]);
+    document.documentElement.dataset.appEntrance = 'cinematic';
+  }, []);
+
+  useEffect(() => {
+    const replayRestoredPage = (event: PageTransitionEvent) => {
+      if (event.persisted) setComplete(false);
+    };
+    window.addEventListener('pageshow', replayRestoredPage);
+    return () => window.removeEventListener('pageshow', replayRestoredPage);
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.appEntranceState = complete
@@ -62,10 +62,10 @@ export function AppEntrance({
     if (!revealing || complete) return;
     const timeout = window.setTimeout(
       () => setComplete(true),
-      COMPLETION_TIMEOUT_MS[activeMode],
+      COMPLETION_TIMEOUT_MS,
     );
     return () => window.clearTimeout(timeout);
-  }, [activeMode, complete, revealing]);
+  }, [complete, revealing]);
 
   const finishReveal = (event: AnimationEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) setComplete(true);
@@ -75,7 +75,7 @@ export function AppEntrance({
     <AppEntranceContext.Provider value={replayCinematic}>
       {ready && (
         <div
-          className={`app-entrance-content ${!complete && revealing ? `app-entrance-content--${activeMode}` : ''}`}
+          className={`app-entrance-content ${!complete && revealing ? 'app-entrance-content--cinematic' : ''}`}
           inert={!complete}
         >
           {children}
@@ -83,8 +83,9 @@ export function AppEntrance({
       )}
       {!complete && (
         <div
-          aria-hidden="true"
-          className={`app-entrance-overlay app-backdrop ${revealing ? `app-entrance-overlay--${activeMode}` : ''}`}
+          role="status"
+          aria-label={revealing ? 'Opening Fennec' : 'Loading Fennec'}
+          className={`app-entrance-overlay app-backdrop ${revealing ? 'app-entrance-overlay--cinematic' : ''}`}
           data-testid="app-entrance"
           onAnimationEnd={finishReveal}
         >

@@ -43,7 +43,8 @@ vi.mock('../src/components/AppShell', () => ({
   AppShell: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock('../src/app/RequireSetup', () => ({
-  RequireSetup: () => <Outlet />,
+  RequireSetup: () =>
+    mocks.setupState === 'checking' ? <div>Checking setup…</div> : <Outlet />,
 }));
 vi.mock('../src/pages/GamesPage', () => ({
   GamesPage: () => <div>Games route</div>,
@@ -63,7 +64,7 @@ vi.mock('../src/components/LocalAccessModal', () => ({
 vi.mock('../src/pwa/LiveWakeLock', () => ({ LiveWakeLock: () => null }));
 vi.mock('../src/pwa/PwaLifecycle', () => ({ PwaLifecycle: () => null }));
 
-describe('live auto-open', () => {
+describe('app shell entry and live auto-open', () => {
   beforeEach(() => {
     mocks.setupState = 'complete';
   });
@@ -89,5 +90,20 @@ describe('live auto-open', () => {
 
     expect(await screen.findByText('Games route')).toBeInTheDocument();
     expect(screen.queryByText('Training')).not.toBeInTheDocument();
+  });
+
+  it('keeps setup checking behind the app entrance', () => {
+    mocks.setupState = 'checking';
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId('app-entrance')).toHaveAccessibleName(
+      'Loading Fennec',
+    );
+    expect(screen.queryByText('Checking setup…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Games route')).not.toBeInTheDocument();
   });
 });
