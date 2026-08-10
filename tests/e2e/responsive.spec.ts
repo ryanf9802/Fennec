@@ -463,22 +463,35 @@ test('settings show installation-relative Stats API instructions', async ({
 }) => {
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  const steps = page.getByRole('list', { name: 'Stats API setup steps' });
+  await expect(steps).toBeVisible();
+  expect(
+    await steps.evaluate((element) => getComputedStyle(element).color),
+  ).toBe(
+    await page.locator('body').evaluate((body) => getComputedStyle(body).color),
+  );
+  await expect(steps.locator('.surface-strong')).toHaveCount(0);
   await expect(
     page.getByText(
-      '1. In Steam or Epic, use Rocket League’s Manage or Browse option to open its installation folder.',
+      'Steam: Library → right-click Rocket League → Manage → Browse local files.',
     ),
   ).toBeVisible();
   await expect(
-    page.getByText(String.raw`2. Open TAGame\Config\TAStatsAPI.ini.`),
+    page.getByText(
+      'Epic: Library → Rocket League’s three-dot menu → Manage → select the folder icon next to Uninstall.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByText(String.raw`Open TAGame\Config\TAStatsAPI.ini.`),
   ).toBeVisible();
   await expect(
     page.getByText(
-      String.raw`If that file is not present, open TAGame\Config\DefaultStatsAPI.ini instead.`,
+      String.raw`If it is not present, open TAGame\Config\DefaultStatsAPI.ini instead.`,
     ),
   ).toBeVisible();
   await expect(
     page.getByText(
-      '3. Change PacketSendRate to 2, save the file, and restart Rocket League.',
+      'Change PacketSendRate to 2, save the file, and restart Rocket League.',
     ),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: /copy/i })).toHaveCount(0);
@@ -503,7 +516,7 @@ test('browser-only setup uses instructions and follows the Stats API connection'
   );
   await expect(requirement.locator('svg.text-emerald-400')).toBeVisible();
   await expect(
-    requirement.getByText(String.raw`2. Open TAGame\Config\TAStatsAPI.ini.`),
+    requirement.getByText(String.raw`Open TAGame\Config\TAStatsAPI.ini.`),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Choose Stats API file' }),
