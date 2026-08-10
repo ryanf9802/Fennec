@@ -150,7 +150,7 @@ describe('closed session presentation', () => {
     expect(screen.queryByText('Recurring teammates')).not.toBeInTheDocument();
   });
 
-  it('labels live training and explains that it is not saved', () => {
+  it('labels live training without extra history messaging', () => {
     renderPage(session(), true, {
       ...match,
       id: 'training',
@@ -164,9 +164,7 @@ describe('closed session presentation', () => {
     expect(
       screen.getByRole('heading', { name: 'Training' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Live only — not saved to history/),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/not saved to history/i)).not.toBeInTheDocument();
   });
 
   it('prompts for a player instead of showing unscoped history', () => {

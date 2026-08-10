@@ -168,7 +168,6 @@ export function GamesPage() {
                 </h2>
                 <p className="text-muted mt-1 text-sm">
                   {visibleActiveMatch.arena || 'Waiting for match state'}
-                  {trainingActive && ' · Live only — not saved to history'}
                 </p>
               </div>
             </div>

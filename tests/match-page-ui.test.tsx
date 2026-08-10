@@ -154,7 +154,7 @@ describe('historical match deletion', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('clearly identifies training as live-only activity', () => {
+  it('clearly identifies training without extra history messaging', () => {
     render(
       <MemoryRouter>
         <MatchPage
@@ -169,8 +169,8 @@ describe('historical match deletion', () => {
     );
 
     expect(screen.getByText('Live training')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Live only — this activity and its stats are not saved to game history.',
-    );
+    expect(
+      screen.queryByText(/not saved to game history/i),
+    ).not.toBeInTheDocument();
   });
 });

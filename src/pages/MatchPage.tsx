@@ -250,9 +250,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
     }
   };
   return (
-    <div
-      className={`space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:gap-6 xl:space-y-0 ${training ? 'xl:grid-rows-[auto_auto_auto_minmax(0,1fr)]' : 'xl:grid-rows-[auto_auto_minmax(0,1fr)]'}`}
-    >
+    <div className="space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-6 xl:space-y-0">
       <Link
         to="/"
         className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"
@@ -297,18 +295,6 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
           </div>
         </div>
       </header>
-      {training && (
-        <div
-          role="status"
-          className="surface-flat border-cyan-300/30 rounded-2xl px-4 py-3 text-sm"
-        >
-          <strong className="text-fennec-cyan">Training session</strong>
-          <span className="text-muted ml-2">
-            Live only — this activity and its stats are not saved to game
-            history.
-          </span>
-        </div>
-      )}
       <div className="grid min-w-0 gap-6 xl:min-h-0 xl:grid-cols-[minmax(0,7fr)_minmax(16.5rem,3fr)]">
         <section className="scoreboard-container min-w-0 xl:min-h-0 xl:overflow-y-auto">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
