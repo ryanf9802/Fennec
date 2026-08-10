@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <button
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="surface-flat hover-surface absolute top-[5.25rem] -right-4 z-10 hidden size-8 items-center justify-center rounded-full lg:flex"
+          className="surface-flat hover-surface absolute top-[4.75rem] -right-4 z-10 hidden size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full lg:flex"
           onClick={() =>
             void updateSettings({ ...settings, sidebarCollapsed: !collapsed })
           }

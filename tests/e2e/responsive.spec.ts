@@ -1093,13 +1093,18 @@ test('desktop sidebar connection status fits and stays meaningful when collapsed
   await expect(mark).toBeVisible();
   await expect(brandName).toBeVisible();
   await expect(brandRow.getByRole('button')).toHaveCount(0);
-  const [expandedMarkBox, expandedSidebarBox, collapseButtonBox] =
+  const [expandedMarkBox, expandedSidebarBox, brandRowBox, collapseButtonBox] =
     await Promise.all([
       mark.boundingBox(),
       sidebar.boundingBox(),
+      brandRow.boundingBox(),
       collapseButton.boundingBox(),
     ]);
   expect(expandedMarkBox).toMatchObject({ width: 44, height: 44 });
+  expect(collapseButtonBox!.y + collapseButtonBox!.height / 2).toBeCloseTo(
+    brandRowBox!.y + brandRowBox!.height,
+    0,
+  );
   expect(collapseButtonBox!.x).toBeLessThan(
     expandedSidebarBox!.x + expandedSidebarBox!.width,
   );
