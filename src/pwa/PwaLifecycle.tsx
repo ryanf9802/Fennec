@@ -1,7 +1,8 @@
-import { Download, RefreshCw } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { useFennec } from '../app/FennecContext';
+
+const UPDATE_CHECK_INTERVAL_MS = 60 * 1_000;
 
 interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -9,8 +10,8 @@ interface InstallPromptEvent extends Event {
 }
 
 export function PwaLifecycle() {
-  const { activeMatch } = useFennec();
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent>();
+  const [registration, setRegistration] = useState<ServiceWorkerRegistration>();
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -25,21 +26,32 @@ export function PwaLifecycle() {
     },
     onRegisteredSW(
       _url: string,
-      registration: ServiceWorkerRegistration | undefined,
+      nextRegistration: ServiceWorkerRegistration | undefined,
     ) {
-      if (!registration) return;
-      const check = () => void registration.update();
-      const timer = window.setInterval(check, 60 * 60 * 1_000);
-      window.addEventListener('online', check);
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') check();
-      });
-      void registration.update();
-      window.addEventListener('pagehide', () => window.clearInterval(timer), {
-        once: true,
-      });
+      setRegistration(nextRegistration);
     },
   });
+
+  useEffect(() => {
+    if (!registration) return;
+    const check = () => {
+      void registration.update().catch(() => {
+        // Update checks are best effort while the browser is offline.
+      });
+    };
+    const checkWhenVisible = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    const timer = window.setInterval(check, UPDATE_CHECK_INTERVAL_MS);
+    window.addEventListener('online', check);
+    document.addEventListener('visibilitychange', checkWhenVisible);
+    check();
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('online', check);
+      document.removeEventListener('visibilitychange', checkWhenVisible);
+    };
+  }, [registration]);
 
   useEffect(() => {
     if (!('BroadcastChannel' in window)) return;
@@ -51,8 +63,8 @@ export function PwaLifecycle() {
   }, [setNeedRefresh]);
 
   useEffect(() => {
-    if (needRefresh && !activeMatch) void updateServiceWorker(true);
-  }, [activeMatch, needRefresh, updateServiceWorker]);
+    if (needRefresh) void updateServiceWorker(true);
+  }, [needRefresh, updateServiceWorker]);
 
   useEffect(() => {
     const beforeInstall = (event: Event) => {
@@ -73,16 +85,6 @@ export function PwaLifecycle() {
 
   return (
     <>
-      {needRefresh && activeMatch && (
-        <div className="fixed right-4 bottom-24 z-50 max-w-sm rounded-2xl border border-cyan-400/30 bg-slate-950 p-4 shadow-2xl md:bottom-4">
-          <strong className="flex items-center gap-2">
-            <RefreshCw className="size-4" /> Update ready
-          </strong>
-          <p className="text-muted mt-1 text-sm">
-            Fennec will refresh automatically after the live match finishes.
-          </p>
-        </div>
-      )}
       {installPrompt && location.pathname === '/setup' && (
         <button
           className="button-secondary fixed right-4 bottom-24 z-40 shadow-xl md:bottom-4"

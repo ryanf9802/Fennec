@@ -105,12 +105,23 @@ jobs:
               aws s3 cp "dist/$FILE" "s3://$BUCKET/$FILE" --cache-control 'no-cache,must-revalidate'
             fi
           done
-          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths '/*'
+          INVALIDATION_ID=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths '/*' --query 'Invalidation.Id' --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION" --id "$INVALIDATION_ID"
       - name: Smoke test
         shell: bash
         run: |
           SITE_URL=$(aws cloudformation describe-stacks --stack-name FennecSite --query 'Stacks[0].Outputs[?OutputKey==`SiteUrl`].OutputValue' --output text)
-          curl --fail --retry 8 --retry-delay 10 "$SITE_URL"
+          DEPLOYED_INDEX="$RUNNER_TEMP/fennec-index-$GITHUB_SHA.html"
+          DEPLOYED_HEADERS="$RUNNER_TEMP/fennec-index-$GITHUB_SHA.headers"
+          curl --fail --retry 8 --retry-delay 10 --dump-header "$DEPLOYED_HEADERS" --output "$DEPLOYED_INDEX" "$SITE_URL/index.html"
+          cmp --silent dist/index.html "$DEPLOYED_INDEX" || {
+            echo "::error::CloudFront did not serve the index.html from this deployment."
+            exit 1
+          }
+          tr -d '\r' < "$DEPLOYED_HEADERS" | grep --ignore-case --quiet '^cache-control: no-cache,no-store,must-revalidate$' || {
+            echo "::error::The deployed SPA shell is missing its no-store cache policy."
+            exit 1
+          }
           if [[ -n "$FENNEC_REDIRECT_DOMAIN" ]]; then
             LANDING_URL="https://$FENNEC_REDIRECT_DOMAIN"
             LANDING_HTML=$(curl --fail --retry 8 --retry-delay 10 "$LANDING_URL/")
