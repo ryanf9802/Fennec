@@ -7,7 +7,7 @@ function landingDocument() {
 }
 
 describe('Fennec landing page', () => {
-  it('leads visitors to the app, demo, and public source', () => {
+  it('leads visitors to the app and public source without exposing demos', () => {
     const page = landingDocument();
     const links = Array.from(page.querySelectorAll('a'));
     const linksTo = (href: string) =>
@@ -17,7 +17,7 @@ describe('Fennec landing page', () => {
       'Your Rocket League games, remembered.',
     );
     expect(linksTo('https://app.fennec.gg/').length).toBeGreaterThanOrEqual(3);
-    expect(linksTo('https://app.fennec.gg/?demo=1')).toHaveLength(1);
+    expect(links.some((link) => link.href.includes('demo'))).toBe(false);
     expect(
       linksTo('https://github.com/ryanf9802/Fennec').length,
     ).toBeGreaterThanOrEqual(3);

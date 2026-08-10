@@ -21,6 +21,7 @@ test('landing page stays concise and usable across viewport sizes', async ({
     await expect(
       page.getByRole('link', { name: /GitHub/ }).first(),
     ).toBeVisible();
+    await expect(page.getByRole('link', { name: /demo/i })).toHaveCount(0);
     await expect(page.getByText('MIT License').first()).toBeVisible();
     const dimensions = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,

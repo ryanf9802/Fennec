@@ -31,6 +31,7 @@ export function LocalAccessProvider({ children }: { children: ReactNode }) {
   const demoMode = demoModeEnabled(
     location.search,
     import.meta.env.VITE_DEMO_FEED === 'true',
+    import.meta.env.PROD,
   );
   const [state, setState] = useState<LocalAccessState>(
     demoMode ? 'granted' : 'checking',

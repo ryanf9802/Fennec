@@ -241,16 +241,6 @@ h1 {
   margin-top: 2rem;
 }
 
-.demo-link {
-  display: inline-block;
-  margin-top: 1.15rem;
-  color: var(--muted);
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.demo-link:hover,
 .text-link:hover,
 .ownership-copy a:hover {
   color: var(--cyan);

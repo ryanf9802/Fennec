@@ -111,6 +111,7 @@ export function FennecProvider({
   const demoMode = demoModeEnabled(
     location.search,
     import.meta.env.VITE_DEMO_FEED === 'true',
+    import.meta.env.PROD,
   );
 
   useEffect(() => {
