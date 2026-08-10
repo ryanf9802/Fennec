@@ -78,6 +78,13 @@ Fennec derives passes and 50s from the order and identity of observed ball
 touches. This keeps those extra statistics tied to a consistent, inspectable
 definition instead of pretending the game reports values that it does not.
 
+- A **pass** is credited when the next identifiable single-player touch comes
+  from a different teammate during the same active play. An opponent touch,
+  ambiguous multi-player hit, or dead-ball transition breaks the sequence.
+- A **50** is credited to each identified player involved when opponents touch
+  the ball on the same hit or within 250 milliseconds of one another. Rapid
+  follow-up contacts within half a second count as the same challenge.
+
 ### Play sessions instead of isolated results
 
 Nearby games are automatically grouped into sessions. A session shows your
