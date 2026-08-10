@@ -21,6 +21,7 @@ const training: MatchState = {
   participants: [],
   events: [],
 };
+const mocks = vi.hoisted(() => ({ setupState: 'complete' }));
 
 vi.mock('../src/app/FennecContext', () => ({
   useFennec: () => ({
@@ -33,6 +34,10 @@ vi.mock('../src/app/FennecContext', () => ({
 }));
 vi.mock('../src/platform/LocalAccessContext', () => ({
   useLocalAccess: () => ({ satisfied: true }),
+}));
+vi.mock('../src/setup/SetupStatusContext', () => ({
+  SetupStatusProvider: ({ children }: { children: ReactNode }) => children,
+  useSetupStatus: () => ({ state: mocks.setupState }),
 }));
 vi.mock('../src/components/AppShell', () => ({
   AppShell: ({ children }: { children: ReactNode }) => children,
@@ -59,6 +64,10 @@ vi.mock('../src/pwa/LiveWakeLock', () => ({ LiveWakeLock: () => null }));
 vi.mock('../src/pwa/PwaLifecycle', () => ({ PwaLifecycle: () => null }));
 
 describe('live auto-open', () => {
+  beforeEach(() => {
+    mocks.setupState = 'complete';
+  });
+
   it('honors the existing auto-open preference for training', async () => {
     render(
       <MemoryRouter initialEntries={['/']}>
@@ -68,5 +77,17 @@ describe('live auto-open', () => {
 
     expect(await screen.findByText('Training')).toBeInTheDocument();
     expect(screen.queryByText('Games route')).not.toBeInTheDocument();
+  });
+
+  it('does not auto-open a live match while setup is locked', async () => {
+    mocks.setupState = 'incomplete';
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Games route')).toBeInTheDocument();
+    expect(screen.queryByText('Training')).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,7 @@
 import {
+  createContext,
+  useCallback,
+  useContext,
   useEffect,
   useState,
   type AnimationEvent,
@@ -10,6 +13,16 @@ const COMPLETION_TIMEOUT_MS: Record<AppEntranceMode, number> = {
   cinematic: 1_200,
   minimal: 500,
 };
+
+const AppEntranceContext = createContext<(() => void) | undefined>(undefined);
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useAppEntrance() {
+  const replayCinematic = useContext(AppEntranceContext);
+  if (!replayCinematic)
+    throw new Error('useAppEntrance must be used within AppEntrance');
+  return { replayCinematic };
+}
 
 /**
  * Holds the loading artwork above the app until local state is ready, then
@@ -25,11 +38,17 @@ export function AppEntrance({
   ready: boolean;
 }) {
   const [complete, setComplete] = useState(false);
+  const [activeMode, setActiveMode] = useState(mode);
   const revealing = ready;
 
+  const replayCinematic = useCallback(() => {
+    setActiveMode('cinematic');
+    setComplete(false);
+  }, []);
+
   useEffect(() => {
-    document.documentElement.dataset.appEntrance = mode;
-  }, [mode]);
+    document.documentElement.dataset.appEntrance = activeMode;
+  }, [activeMode]);
 
   useEffect(() => {
     document.documentElement.dataset.appEntranceState = complete
@@ -43,20 +62,20 @@ export function AppEntrance({
     if (!revealing || complete) return;
     const timeout = window.setTimeout(
       () => setComplete(true),
-      COMPLETION_TIMEOUT_MS[mode],
+      COMPLETION_TIMEOUT_MS[activeMode],
     );
     return () => window.clearTimeout(timeout);
-  }, [complete, mode, revealing]);
+  }, [activeMode, complete, revealing]);
 
   const finishReveal = (event: AnimationEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) setComplete(true);
   };
 
   return (
-    <>
+    <AppEntranceContext.Provider value={replayCinematic}>
       {ready && (
         <div
-          className={`app-entrance-content ${!complete && revealing ? `app-entrance-content--${mode}` : ''}`}
+          className={`app-entrance-content ${!complete && revealing ? `app-entrance-content--${activeMode}` : ''}`}
           inert={!complete}
         >
           {children}
@@ -65,7 +84,7 @@ export function AppEntrance({
       {!complete && (
         <div
           aria-hidden="true"
-          className={`app-entrance-overlay app-backdrop ${revealing ? `app-entrance-overlay--${mode}` : ''}`}
+          className={`app-entrance-overlay app-backdrop ${revealing ? `app-entrance-overlay--${activeMode}` : ''}`}
           data-testid="app-entrance"
           onAnimationEnd={finishReveal}
         >
@@ -77,6 +96,6 @@ export function AppEntrance({
           />
         </div>
       )}
-    </>
+    </AppEntranceContext.Provider>
   );
 }

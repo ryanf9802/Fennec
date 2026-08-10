@@ -144,6 +144,19 @@ export function SettingsPage() {
         </p>
       </header>
 
+      <section className="surface rounded-3xl p-5 sm:p-7">
+        <h2 className="text-xl font-extrabold">Setup center</h2>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+          <p className="text-muted max-w-2xl text-sm">
+            Verify browser permissions, Rocket League configuration, the
+            optional recommended companion, and live capture.
+          </p>
+          <Link className="button-primary" to="/setup">
+            Open setup
+          </Link>
+        </div>
+      </section>
+
       <section className="surface-flat rounded-3xl p-5 sm:p-7">
         <h2 className="text-xl font-extrabold">Sessions and behavior</h2>
         <div className="mt-5 grid gap-5 lg:grid-cols-3">
@@ -287,18 +300,6 @@ export function SettingsPage() {
 
       <section className="surface rounded-3xl p-5 sm:p-7">
         <h2 className="text-xl font-extrabold">Monitoring</h2>
-        <div className="surface-strong mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-4">
-          <div>
-            <strong>Setup center</strong>
-            <p className="text-muted mt-1 text-sm">
-              Verify browser permissions, Rocket League configuration, the
-              optional recommended companion, and live capture.
-            </p>
-          </div>
-          <Link className="button-primary" to="/setup">
-            Open setup
-          </Link>
-        </div>
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <label className="block">
             <span className="eyebrow">WebSocket port</span>

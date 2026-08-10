@@ -810,6 +810,111 @@ test('incomplete first launch opens Setup and completed setup links to Game time
   ).toBeVisible();
 });
 
+test('selected setup path reactively controls desktop and mobile navigation', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('fennec-setup-path-explicit-v2'))
+      localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
+    localStorage.setItem('fennec-stats-api-verified-v1', 'true');
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/settings?demo=0');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(
+    page.locator('aside').getByRole('link', { name: 'Setup' }),
+  ).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Open setup' }).click();
+  await expect(
+    page.locator('aside').getByRole('link', { name: 'Setup' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /With companion/ }).click();
+
+  await expect(page.locator('aside').getByLabel('Games')).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect(page.locator('aside').getByLabel('Profile')).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect(
+    page.locator('aside').getByRole('link', { name: 'Settings' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('aside').getByRole('link', { name: 'Fennec home' }),
+  ).toHaveAttribute('href', '/setup');
+  await page.locator('aside').getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await page.getByRole('link', { name: 'Open setup' }).click();
+
+  await page.setViewportSize({ width: 390, height: 760 });
+  await expect(page.locator('nav.fixed').getByLabel('Games')).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect(
+    page.locator('nav.fixed').getByRole('link', { name: 'Settings' }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: /Browser only/ }).click();
+  await expect(
+    page.locator('nav.fixed').getByRole('link', { name: 'Games' }),
+  ).toHaveAttribute('href', '/');
+  await page
+    .locator('nav.fixed')
+    .getByRole('link', { name: 'Profile' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+  await expect(
+    page.locator('nav.fixed').getByRole('link', { name: 'Setup' }),
+  ).toHaveCount(0);
+
+  await page
+    .locator('nav.fixed')
+    .getByRole('link', { name: 'Settings' })
+    .click();
+  await page.getByRole('link', { name: 'Open setup' }).click();
+  await page.getByRole('button', { name: /With companion/ }).click();
+  await page.evaluate(() => {
+    history.pushState(null, '', '/profile?demo=0');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(page).toHaveURL(/\/setup$/);
+});
+
+test('ready panel navigates through a cinematic entrance replay', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
+    localStorage.setItem('fennec-stats-api-verified-v1', 'true');
+  });
+  await page.goto('/setup?demo=0');
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+
+  await page
+    .getByRole('link', { name: 'Fennec is set up and ready to go' })
+    .click();
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance',
+    'cinematic',
+  );
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+  await expect(
+    page.getByRole('heading', { name: 'Game timeline' }),
+  ).toBeVisible();
+});
+
 test('settings companion pairing link selects the companion setup guide', async ({
   page,
 }) => {

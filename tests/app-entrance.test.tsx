@@ -2,7 +2,12 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveAppEntranceMode } from '../src/app/appEntranceMode';
-import { AppEntrance } from '../src/components/AppEntrance';
+import { AppEntrance, useAppEntrance } from '../src/components/AppEntrance';
+
+function ReplayControl() {
+  const { replayCinematic } = useAppEntrance();
+  return <button onClick={replayCinematic}>Replay</button>;
+}
 
 describe('app entrance', () => {
   afterEach(() => {
@@ -65,5 +70,24 @@ describe('app entrance', () => {
 
     expect(screen.queryByTestId('app-entrance')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
+
+  it('can replay the cinematic entrance after the app is visible', () => {
+    render(
+      <AppEntrance mode="minimal" ready>
+        <ReplayControl />
+      </AppEntrance>,
+    );
+    fireEvent.animationEnd(screen.getByTestId('app-entrance'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replay' }));
+
+    expect(screen.getByTestId('app-entrance')).toHaveClass(
+      'app-entrance-overlay--cinematic',
+    );
+    expect(document.documentElement).toHaveAttribute(
+      'data-app-entrance',
+      'cinematic',
+    );
   });
 });

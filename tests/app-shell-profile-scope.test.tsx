@@ -6,6 +6,7 @@ import { defaultSettings, type MatchState } from '../src/domain/types';
 
 const mocks = vi.hoisted(() => ({
   activeMatch: undefined as MatchState | undefined,
+  setupState: 'complete' as 'complete' | 'incomplete',
 }));
 
 vi.mock('../src/app/FennecContext', () => ({
@@ -17,6 +18,9 @@ vi.mock('../src/app/FennecContext', () => ({
     settings: defaultSettings,
     updateSettings: vi.fn(),
   }),
+}));
+vi.mock('../src/setup/SetupStatusContext', () => ({
+  useSetupStatus: () => ({ state: mocks.setupState }),
 }));
 
 function liveMatch(primaryId: string): MatchState {
@@ -57,6 +61,7 @@ function liveMatch(primaryId: string): MatchState {
 describe('profile-scoped live navigation', () => {
   beforeEach(() => {
     mocks.activeMatch = undefined;
+    mocks.setupState = 'complete';
   });
 
   it('hides a live match unrelated to the selected player', () => {
@@ -78,10 +83,8 @@ describe('profile-scoped live navigation', () => {
         <AppShell>Content</AppShell>
       </MemoryRouter>,
     );
-    expect(screen.getByRole('link', { name: 'Live match' })).toHaveAttribute(
-      'href',
-      '/live',
-    );
+    for (const link of screen.getAllByRole('link', { name: 'Live match' }))
+      expect(link).toHaveAttribute('href', '/live');
   });
 
   it('labels training separately from a live match', () => {
@@ -95,9 +98,54 @@ describe('profile-scoped live navigation', () => {
         <AppShell>Content</AppShell>
       </MemoryRouter>,
     );
-    expect(screen.getByRole('link', { name: 'Live training' })).toHaveAttribute(
-      'href',
-      '/live',
+    for (const link of screen.getAllByRole('link', { name: 'Live training' }))
+      expect(link).toHaveAttribute('href', '/live');
+  });
+
+  it('keeps setup and settings usable while game navigation is locked', () => {
+    mocks.setupState = 'incomplete';
+    mocks.activeMatch = liveMatch('Steam|you|0');
+    render(
+      <MemoryRouter>
+        <AppShell>Content</AppShell>
+      </MemoryRouter>,
     );
+
+    expect(
+      screen
+        .getAllByLabelText('Games')
+        .every((item) => item.getAttribute('aria-disabled') === 'true'),
+    ).toBe(true);
+    expect(
+      screen
+        .getAllByLabelText('Profile')
+        .every((item) => item.getAttribute('aria-disabled') === 'true'),
+    ).toBe(true);
+    expect(
+      screen
+        .getAllByLabelText('Live match')
+        .every((item) => item.getAttribute('aria-disabled') === 'true'),
+    ).toBe(true);
+    expect(screen.getAllByRole('link', { name: 'Setup' })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'Settings' })).toHaveLength(2);
+  });
+
+  it('hides Setup after a completed user leaves it', () => {
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <AppShell>Content</AppShell>
+      </MemoryRouter>,
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Setup' }),
+    ).not.toBeInTheDocument();
+
+    mocks.setupState = 'incomplete';
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <AppShell>Content</AppShell>
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByRole('link', { name: 'Setup' })).toHaveLength(2);
   });
 });

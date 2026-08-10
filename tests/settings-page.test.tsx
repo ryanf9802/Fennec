@@ -67,6 +67,22 @@ describe('settings CSV export', () => {
     expect(mocks.loadMatches).not.toHaveBeenCalled();
   });
 
+  it('puts Setup first and keeps its route available', () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const sections = screen.getAllByRole('heading', { level: 2 });
+    expect(sections[0]).toHaveTextContent('Setup center');
+    expect(sections[1]).toHaveTextContent('Sessions and behavior');
+    expect(screen.getByRole('link', { name: 'Open setup' })).toHaveAttribute(
+      'href',
+      '/setup',
+    );
+  });
+
   it('floats the save action only after a setting changes', () => {
     render(
       <MemoryRouter>

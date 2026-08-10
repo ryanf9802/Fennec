@@ -6,9 +6,10 @@ import {
   Monitor,
   TriangleAlert,
 } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
+import { useAppEntrance } from '../components/AppEntrance';
 import { CompanionLaunchControls } from '../components/CompanionSettings';
 import { StatsApiSetup } from '../components/StatsApiSetup';
 import {
@@ -17,21 +18,17 @@ import {
   companionDownloadUrl,
   companionOpenUrl,
 } from '../companion/client';
-import { useCompanionStatus } from '../companion/useCompanionStatus';
 import { isStatsApiConnected } from '../domain/connectionPresentation';
 import { useLocalAccess } from '../platform/LocalAccessContext';
 import {
   companionCompatible,
   companionStoresConfigured,
-  rememberCompanionCaptureVerification,
-  rememberCompanionSetupCompletion,
-  rememberSetupPath,
   requestedSetupPath,
-  setupComplete,
   storedCompanionCaptureVerification,
   storedCompanionSetupCompletion,
   type SetupPath,
 } from '../setup/setupStatus';
+import { useSetupStatus } from '../setup/SetupStatusContext';
 
 function Requirement({
   complete,
@@ -149,27 +146,22 @@ function SetupPathChooser({
 export function OnboardingPage() {
   const access = useLocalAccess();
   const { connection, statsApiVerified, demoMode } = useFennec();
-  const companion = useCompanionStatus();
-  const { health, recheck } = companion;
-  const [path, setPath] = useState<SetupPath | undefined>(requestedSetupPath);
+  const setup = useSetupStatus();
+  const { health, recheck } = setup.companion;
+  const path = setup.selectedPath;
+  const { replayCinematic } = useAppEntrance();
   const [configuring, setConfiguring] = useState<'steam' | 'epic'>();
   const [companionMessage, setCompanionMessage] = useState<string>();
-  const selectPath = useCallback((nextPath: SetupPath) => {
-    setPath(nextPath);
-  }, []);
   useEffect(() => {
-    if (path) rememberSetupPath(path);
-  }, [path]);
+    const requested = requestedSetupPath();
+    if (requested && requested !== path) setup.selectPath(requested);
+  }, [path, setup]);
   useEffect(() => {
     if (acceptCompanionPairing()) {
-      rememberSetupPath('companion');
+      setup.selectPath('companion');
       void recheck();
     }
-  }, [recheck]);
-  useEffect(() => {
-    if (health?.lastPacketAt && !demoMode)
-      rememberCompanionCaptureVerification();
-  }, [demoMode, health?.lastPacketAt]);
+  }, [recheck, setup]);
   const paired = Boolean(health?.paired);
   const compatible = companionCompatible(health);
   const statsApiConnected = isStatsApiConnected(connection);
@@ -177,28 +169,7 @@ export function OnboardingPage() {
   const companionCaptureVerified =
     Boolean(health?.lastPacketAt) || storedCompanionCaptureVerification();
   const companionSetupVerified = storedCompanionSetupCompletion();
-  const currentSetupComplete = setupComplete({
-    accessSatisfied: access.satisfied,
-    path,
-    statsApiVerified,
-    companionCaptureVerified,
-    companionSetupVerified: false,
-    health,
-  });
-  useEffect(() => {
-    if (path === 'companion' && currentSetupComplete && !demoMode)
-      rememberCompanionSetupCompletion();
-  }, [currentSetupComplete, demoMode, path]);
-  const isComplete =
-    currentSetupComplete ||
-    setupComplete({
-      accessSatisfied: access.satisfied,
-      path,
-      statsApiVerified,
-      companionCaptureVerified,
-      companionSetupVerified,
-      health,
-    });
+  const isComplete = demoMode || setup.state === 'complete';
   const pairingComplete = health ? compatible : companionSetupVerified;
   const installationConfigured = health
     ? storesConfigured
@@ -230,7 +201,7 @@ export function OnboardingPage() {
               time from the Setup page.
             </p>
           </header>
-          <SetupPathChooser onSelect={selectPath} />
+          <SetupPathChooser onSelect={setup.selectPath} />
         </div>
       </div>
     );
@@ -245,7 +216,7 @@ export function OnboardingPage() {
         </p>
       </header>
 
-      <SetupPathChooser path={path} onSelect={selectPath} />
+      <SetupPathChooser path={path} onSelect={setup.selectPath} />
 
       <section
         aria-labelledby="setup-instructions-title"
@@ -402,6 +373,16 @@ export function OnboardingPage() {
       {isComplete && (
         <Link
           to="/"
+          onClick={(event) => {
+            if (
+              event.button === 0 &&
+              !event.metaKey &&
+              !event.ctrlKey &&
+              !event.shiftKey &&
+              !event.altKey
+            )
+              replayCinematic();
+          }}
           aria-labelledby="setup-complete-title"
           className="block rounded-3xl border border-emerald-400/30 bg-emerald-400/8 p-5 transition hover:border-emerald-300/60 hover:bg-emerald-400/12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 sm:p-7"
         >
