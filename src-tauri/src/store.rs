@@ -197,7 +197,7 @@ pub fn launch(install: &StoreInstall) -> io::Result<()> {
                 "com.epicgames.launcher://apps/{}?action=launch&silent=true",
                 install.launch_id
             );
-            Command::new("cmd")
+            crate::hidden_windows_command("cmd")
                 .args(["/C", "start", "", &uri])
                 .spawn()?;
         }
@@ -296,7 +296,7 @@ pub fn create_shortcut(kind: StoreKind) -> io::Result<PathBuf> {
     let icon = format!("{},0", executable.to_string_lossy());
     let description = format!("Launch Rocket League ({label}) with Fennec");
     let script = r#"$shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut($args[0]); $shortcut.TargetPath = $args[1]; $shortcut.Arguments = $args[2]; $shortcut.WorkingDirectory = $args[3]; $shortcut.IconLocation = $args[4]; $shortcut.Description = $args[5]; $shortcut.Save()"#;
-    let status = Command::new("powershell.exe")
+    let status = crate::hidden_windows_command("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .arg(&path)
         .arg(&explorer)

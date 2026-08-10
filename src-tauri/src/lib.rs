@@ -17,6 +17,20 @@ use tauri::{
 };
 use tauri_plugin_deep_link::DeepLinkExt;
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Creates a child process without flashing a console window on Windows.
+pub(crate) fn hidden_windows_command(program: &str) -> Command {
+    #[cfg(windows)]
+    use std::os::windows::process::CommandExt;
+
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
+
 pub fn configure_path(path: &std::path::Path) -> std::io::Result<()> {
     config::configure_file(path)
 }
@@ -30,7 +44,7 @@ pub(crate) fn configure_with_elevation(path: &std::path::Path) -> std::io::Resul
                 let executable = std::env::current_exe()?;
                 let executable_arg = executable.to_string_lossy().into_owned();
                 let path_arg = path.to_string_lossy().into_owned();
-                let status = Command::new("powershell.exe")
+                let status = hidden_windows_command("powershell.exe")
                     .args([
                         "-NoProfile",
                         "-NonInteractive",
@@ -74,7 +88,9 @@ fn pairing_url(return_to: Option<&str>, token: &str) -> String {
 
 fn open_url(url: &str) {
     #[cfg(windows)]
-    let _ = Command::new("cmd").args(["/C", "start", "", url]).spawn();
+    let _ = hidden_windows_command("cmd")
+        .args(["/C", "start", "", url])
+        .spawn();
     #[cfg(not(windows))]
     let _ = Command::new("xdg-open").arg(url).spawn();
 }

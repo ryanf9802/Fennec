@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 
 const viteConfig = readFileSync('vite.config.ts', 'utf8');
 const companionSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
+const companionMainSource = readFileSync('src-tauri/src/main.rs', 'utf8');
+const companionStoreSource = readFileSync('src-tauri/src/store.rs', 'utf8');
 
 function readPngHeader(path: string) {
   const icon = readFileSync(path);
@@ -55,5 +57,28 @@ describe('PWA identity', () => {
       height: 64,
       colorType: 6,
     });
+  });
+
+  it('runs installed Windows companion processes without console windows', () => {
+    expect(companionMainSource).toContain(
+      'all(not(debug_assertions), target_os = "windows")',
+    );
+    expect(companionMainSource).toContain('windows_subsystem = "windows"');
+    expect(companionSource).toContain(
+      'const CREATE_NO_WINDOW: u32 = 0x0800_0000;',
+    );
+    expect(companionSource).toContain(
+      'command.creation_flags(CREATE_NO_WINDOW);',
+    );
+    expect(companionSource).toContain(
+      'hidden_windows_command("powershell.exe")',
+    );
+    expect(companionSource).toContain('hidden_windows_command("cmd")');
+    expect(companionStoreSource).toContain(
+      'crate::hidden_windows_command("powershell.exe")',
+    );
+    expect(companionStoreSource).toContain(
+      'crate::hidden_windows_command("cmd")',
+    );
   });
 });
