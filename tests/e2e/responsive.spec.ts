@@ -724,7 +724,7 @@ test('fresh launches are cinematic while refreshes use a minimal handoff', async
 test('setup starts with a centered route choice and expands after selection', async ({
   page,
 }) => {
-  await page.goto('/onboarding?demo=1');
+  await page.goto('/setup?demo=0');
   const companion = page.getByRole('button', { name: /With companion/ });
   const browser = page.getByRole('button', { name: /Browser only/ });
   await expect(companion).toBeVisible();
@@ -998,7 +998,7 @@ test('paired setup exposes companion launch preferences', async ({ page }) => {
     });
   });
 
-  await page.goto('/onboarding?demo=1');
+  await page.goto('/setup?demo=0');
   await page.getByRole('button', { name: /With companion/ }).click();
   await expect(
     page.getByRole('heading', { name: 'Launch Fennec with Rocket League' }),
@@ -1061,7 +1061,7 @@ test('companion incompatibility is an actionable pairing error', async ({
     });
   });
 
-  await page.goto('/onboarding?demo=1');
+  await page.goto('/setup?demo=0');
   await page.getByRole('button', { name: /With companion/ }).click();
 
   const pairing = page

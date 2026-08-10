@@ -63,28 +63,31 @@ not take effect until Rocket League is restarted.
 
 ## Validation
 
-Run the fast local gate before pushing:
+Run the fast local gate while iterating:
 
 ```bash
 pnpm check
 ```
 
 It checks formatting, lint, TypeScript, unit tests, and the production web
-bundle. A Husky pre-push hook installs with dependencies and runs the same
-command automatically. This keeps commits fast while preventing locally
-reproducible failures from reaching GitHub.
+bundle. The Husky pre-push hook runs this fast gate for ordinary branch and tag
+pushes.
+
+When any pushed ref targets `main`, the hook instead runs the full web gate:
+
+```bash
+pnpm check:web
+```
+
+That command adds account-neutral CDK synthesis and the complete responsive
+Playwright suite. Install the matching Chromium build once before pushing to
+`main`; GitHub Web validation runs the same full gate after installing Chromium
+on its hosted runner.
 
 Behavior changes should add or update focused automated tests. Bug fixes should
 include a regression test that demonstrates the failure when practical. Run
 the affected test while iterating, then run the complete fast gate before
 publishing.
-
-CI additionally provides these slower or environment-specific checks:
-
-```bash
-pnpm cdk:synth
-pnpm test:e2e
-```
 
 Run `pnpm format` to format repository-owned code, configuration,
 documentation, styles, and markup. ESLint requires explanatory JSDoc on named
