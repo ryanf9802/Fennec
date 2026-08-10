@@ -1,19 +1,6 @@
 name: Windows companion
 
 on:
-  push:
-    branches-ignore:
-      - main
-    paths:
-      - 'src-tauri/**'
-      - 'src/companion/**'
-      - 'src/components/CompanionSettings.tsx'
-      - 'src/pages/OnboardingPage.tsx'
-      - 'scripts/companion-release-version.mjs'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/companion.yml'
-      - '.github/workflows/release-companion.yml'
   pull_request:
   workflow_dispatch:
 

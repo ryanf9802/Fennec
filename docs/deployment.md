@@ -75,11 +75,12 @@ deployed site URL.
 
 ## Companion validation and releases
 
-`.github/workflows/companion.yml` builds and tests companion changes on Windows
-outside `main`. On pull requests it always reports `Windows companion gate`,
-but runs the Windows build only when companion or release inputs changed. The
-Windows job builds the web application, runs `cargo test --locked`, builds the
-current-user NSIS installer, and retains the installer as an artifact.
+`.github/workflows/companion.yml` validates pull requests and manual dispatches.
+It always reports `Windows companion gate` on pull requests, but runs the
+Windows build only when companion or release inputs changed. The Windows job
+builds the web application, runs `cargo test --locked`, builds the current-user
+NSIS installer, and retains the installer as an artifact. Branch pushes rely on
+the local pre-push gate until a pull request exists, avoiding duplicate CI runs.
 
 `.github/workflows/release-companion.yml` releases companion-related changes
 from `main`. It derives a patch version from the GitHub workflow run number,

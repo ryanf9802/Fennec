@@ -64,11 +64,13 @@ describe('companion release workflow', () => {
     );
     expect(prePushHook.trim()).toBe('pnpm check');
     expect(webWorkflow).toContain('name: Web validation');
+    expect(webWorkflow).toContain('push:\n    branches:\n      - main');
     expect(webWorkflow).toContain('run: pnpm check');
   });
 
   it('gates every pull request and validates all release-triggering paths', () => {
     expect(companionWorkflow).toContain('pull_request:\n  workflow_dispatch:');
+    expect(companionWorkflow).not.toContain('\n  push:');
     expect(companionWorkflow).toContain('name: Windows companion gate');
     expect(companionWorkflow).toContain(
       "if: needs.detect.outputs.relevant == 'true'",
@@ -78,7 +80,6 @@ describe('companion release workflow', () => {
     );
     for (const path of releasePaths) {
       expect(workflow).toContain(`- '${path}'`);
-      expect(companionWorkflow).toContain(`- '${path}'`);
       expect(companionWorkflow).toContain(`'${path.replace(/\*\*$/, '')}',`);
     }
     expect(companionWorkflow).toContain("'.github/workflows/companion.yml',");
