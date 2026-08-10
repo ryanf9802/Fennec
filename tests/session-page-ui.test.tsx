@@ -127,6 +127,11 @@ describe('session detail recurring teammates', () => {
     expect(
       screen.getByRole('button', { name: 'View profile for Bravo' }),
     ).toBeInTheDocument();
+    const recurring = screen.getByRole('group', {
+      name: 'Recurring teammates',
+    });
+    expect(recurring.closest('header')).toBeInTheDocument();
+    expect(recurring.parentElement?.tagName).toBe('P');
     expect(screen.queryByText('One game')).not.toBeInTheDocument();
     expect(screen.getByText('W/L diff')).toBeInTheDocument();
     expect(

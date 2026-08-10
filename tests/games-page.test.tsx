@@ -147,7 +147,9 @@ describe('closed session presentation', () => {
       screen.getByRole('link', { name: /Earlier today.*Games 1/ }),
     ).toBeInTheDocument();
     expect(screen.queryByText('In focus')).not.toBeInTheDocument();
-    expect(screen.queryByText('Recurring teammates')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('group', { name: 'Recurring teammates' }),
+    ).not.toBeInTheDocument();
   });
 
   it('labels live training without extra history messaging', () => {
@@ -245,11 +247,22 @@ describe('closed session presentation', () => {
     (_, ended) => {
       renderPage(recurringSession(ended));
 
-      const recurring = screen.getByText('Recurring teammates').parentElement!;
+      const recurring = screen.getByRole('group', {
+        name: 'Recurring teammates',
+      });
       expect(within(recurring).getByText('Alpha')).toBeInTheDocument();
       expect(within(recurring).getByText('Bravo')).toBeInTheDocument();
       expect(within(recurring).queryByText('Charlie')).not.toBeInTheDocument();
       expect(within(recurring).queryByText('One game')).not.toBeInTheDocument();
+      if (ended) {
+        expect(recurring.parentElement).toHaveTextContent(
+          /–.*with Alpha, Bravo/,
+        );
+      } else {
+        expect(recurring.parentElement).toContainElement(
+          screen.getByRole('heading', { name: 'Current session' }),
+        );
+      }
     },
   );
 });

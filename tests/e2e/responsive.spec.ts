@@ -1085,13 +1085,20 @@ test('session summaries expose recurring teammates and full history in place', a
   const currentSession = page.locator('section').filter({
     has: page.getByRole('heading', { name: 'Current session' }),
   });
-  const recurringTeammates = currentSession
-    .getByText('Recurring teammates', { exact: true })
-    .locator('..');
+  const recurringTeammates = currentSession.getByRole('group', {
+    name: 'Recurring teammates',
+  });
   await expect(recurringTeammates).toBeVisible();
   await expect(
     recurringTeammates.getByText('Luna', { exact: true }),
   ).toBeVisible();
+  expect(
+    await recurringTeammates.evaluate(
+      (element) =>
+        element.parentElement?.querySelector('#current-session-heading') !==
+        null,
+    ),
+  ).toBe(true);
 
   const sessionPanel = currentSession.getByRole('link', {
     name: 'View current session details',
@@ -1145,9 +1152,15 @@ test('session summaries expose recurring teammates and full history in place', a
       ),
     )
     .toBe(true);
-  await expect(
-    page.getByText('Recurring teammates', { exact: true }),
-  ).toBeVisible();
+  const detailTeammates = page.getByRole('group', {
+    name: 'Recurring teammates',
+  });
+  await expect(detailTeammates).toBeVisible();
+  expect(
+    await detailTeammates.evaluate(
+      (element) => element.parentElement?.tagName === 'P',
+    ),
+  ).toBe(true);
   await page.getByRole('button', { name: 'View profile for Luna' }).click();
   await expect(page).toHaveURL(sessionUrl);
   await expect(page.getByRole('dialog', { name: 'Luna' })).toBeVisible();

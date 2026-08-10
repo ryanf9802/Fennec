@@ -72,19 +72,18 @@ export function SessionPage() {
             hour: 'numeric',
             minute: '2-digit',
           })}
-          {session.endedManually ? ' · Ended manually' : ''}
+          {session.endedManually ? ' · Ended manually' : ''}{' '}
+          <RecurringTeammates
+            matches={session.matches}
+            profileId={profile?.primaryId}
+            onSelect={setProfilePlayer}
+          />
         </p>
       </header>
       <div className="surface rounded-3xl p-5 sm:p-6">
         <SessionSummaryStats metrics={metrics} />
       </div>
       <SessionDetailStats metrics={metrics} />
-      <RecurringTeammates
-        className="surface rounded-3xl p-5 sm:p-6"
-        matches={session.matches}
-        profileId={profile?.primaryId}
-        onSelect={setProfilePlayer}
-      />
       <section className="space-y-3">
         <h2 className="text-xl font-extrabold">Games</h2>
         {[...session.matches].reverse().map((match) => (

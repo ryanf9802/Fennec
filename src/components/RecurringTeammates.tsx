@@ -6,7 +6,7 @@ export interface RecurringTeammateSelection {
   playerName: string;
 }
 
-/** Shows session-local recurring teammates as text or inspectable player names. */
+/** Shows session-local recurring teammates inline with existing session metadata. */
 export function RecurringTeammates({
   matches,
   profileId,
@@ -24,15 +24,19 @@ export function RecurringTeammates({
   const visible = limit === undefined ? recurring : recurring.slice(0, limit);
   if (!visible.length) return null;
   return (
-    <div className={className}>
-      <div className="text-muted text-sm font-bold">Recurring teammates</div>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-2">
-        {visible.map((teammate: EncounterSummary) =>
-          onSelect ? (
+    <span
+      role="group"
+      aria-label="Recurring teammates"
+      className={`min-w-0 text-sm ${className}`}
+    >
+      <span className="text-muted">with </span>
+      {visible.map((teammate: EncounterSummary, index) => (
+        <span key={teammate.playerKey}>
+          {index > 0 && <span className="text-muted">, </span>}
+          {onSelect ? (
             <button
-              key={teammate.playerKey}
               type="button"
-              className="hover-surface cursor-pointer rounded-lg px-2 py-1 font-bold text-fennec-cyan"
+              className="cursor-pointer font-bold text-fennec-cyan hover:underline"
               aria-label={`View profile for ${teammate.latestName}`}
               onClick={() =>
                 onSelect({
@@ -44,12 +48,10 @@ export function RecurringTeammates({
               {teammate.latestName}
             </button>
           ) : (
-            <span key={teammate.playerKey} className="font-bold text-main">
-              {teammate.latestName}
-            </span>
-          ),
-        )}
-      </div>
-    </div>
+            <span className="font-bold text-main">{teammate.latestName}</span>
+          )}
+        </span>
+      ))}
+    </span>
   );
 }

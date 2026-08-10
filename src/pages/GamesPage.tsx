@@ -218,14 +218,22 @@ export function GamesPage() {
               />
               <div className="pointer-events-none relative">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="eyebrow text-fennec-cyan">In focus</div>
-                    <h2
-                      id="current-session-heading"
-                      className="mt-1 text-2xl font-extrabold"
-                    >
-                      Current session
-                    </h2>
+                    <div className="mt-1 flex min-w-0 flex-nowrap items-baseline gap-x-2 overflow-hidden">
+                      <h2
+                        id="current-session-heading"
+                        className="shrink-0 text-2xl font-extrabold"
+                      >
+                        Current session
+                      </h2>
+                      <RecurringTeammates
+                        className="inline-block max-w-full truncate align-baseline"
+                        matches={focusedSession.matches}
+                        profileId={profile?.primaryId}
+                        limit={2}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
@@ -256,12 +264,6 @@ export function GamesPage() {
                     )}
                   />
                 </div>
-                <RecurringTeammates
-                  className="mt-5 border-t border-ui pt-5"
-                  matches={focusedSession.matches}
-                  profileId={profile?.primaryId}
-                  limit={2}
-                />
               </div>
             </div>
             <div className="space-y-2">
@@ -313,23 +315,22 @@ export function GamesPage() {
                   className="surface-flat hover-surface group rounded-2xl p-5 transition"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 font-extrabold">
                         <CalendarDays className="text-fennec-cyan size-4" />
                         {sessionTitle(session.startedAt)}
                       </div>
-                      <div className="text-muted mt-1 text-sm">
-                        {sessionTimeRange(session.startedAt, session.endedAt)}
+                      <div className="text-muted mt-1 truncate text-sm">
+                        {sessionTimeRange(session.startedAt, session.endedAt)}{' '}
+                        <RecurringTeammates
+                          matches={session.matches}
+                          profileId={profile?.primaryId}
+                          limit={2}
+                        />
                       </div>
                     </div>
                     <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                   </div>
-                  <RecurringTeammates
-                    className="mt-4 border-t border-ui pt-4"
-                    matches={session.matches}
-                    profileId={profile?.primaryId}
-                    limit={2}
-                  />
                   <div className="mt-4">
                     <SessionSummaryStats metrics={metrics} />
                   </div>
