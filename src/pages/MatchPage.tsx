@@ -357,7 +357,7 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
         to={sessionOrigin ?? '/'}
         className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"
       >
-        <ArrowLeft className="size-4 shrink-0" />
+        <ArrowLeft className="size-4" />
         {sessionOrigin ? 'Session detail' : 'Game timeline'}
       </Link>
       <header className="flex flex-wrap items-start justify-between gap-5">
