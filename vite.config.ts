@@ -69,13 +69,13 @@ export default defineConfig({
         theme_color: '#07111f',
         icons: [
           {
-            src: '/icons/icon-192.png',
+            src: '/icons/icon-192-641d48af76a1.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icons/icon-512.png',
+            src: '/icons/icon-512-424e32769c63.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',

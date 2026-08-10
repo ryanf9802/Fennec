@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const viteConfig = readFileSync('vite.config.ts', 'utf8');
 const companionSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
@@ -17,6 +18,35 @@ function readPngHeader(path: string) {
   };
 }
 
+function manifestIconPath(size: number) {
+  const match = viteConfig.match(
+    new RegExp(
+      `src: '([^']+)',\\s+sizes: '${size}x${size}',\\s+type: 'image/png',\\s+purpose: 'any'`,
+    ),
+  );
+  if (!match) throw new Error(`missing ${size}px PWA icon`);
+  const webPath = match[1];
+  if (!webPath) throw new Error(`missing ${size}px PWA icon path`);
+  return webPath;
+}
+
+function expectContentAddressedIcon(size: number) {
+  const webPath = manifestIconPath(size);
+  const filePath = `public${webPath}`;
+  const digest = createHash('sha256')
+    .update(readFileSync(filePath))
+    .digest('hex')
+    .slice(0, 12);
+
+  expect(webPath).toBe(`/icons/icon-${size}-${digest}.png`);
+  expect(readPngHeader(filePath)).toEqual({
+    width: size,
+    height: size,
+    colorType: 6,
+  });
+  return webPath.slice('/icons/'.length);
+}
+
 describe('PWA identity', () => {
   it('uses only Fennec for both manifest names', () => {
     expect(viteConfig).toMatch(/^\s+name: 'Fennec',$/m);
@@ -30,22 +60,15 @@ describe('PWA identity', () => {
     );
   });
 
-  it('advertises transparent favicon-mark icons for installation', () => {
-    expect(viteConfig).toContain("src: '/icons/icon-192.png'");
-    expect(viteConfig).toContain("src: '/icons/icon-512.png'");
+  it('advertises content-addressed transparent icons for installation', () => {
     expect(viteConfig).not.toContain('icon-maskable');
     expect(viteConfig.match(/purpose: 'any'/g)).toHaveLength(2);
 
-    expect(readPngHeader('public/icons/icon-192.png')).toEqual({
-      width: 192,
-      height: 192,
-      colorType: 6,
-    });
-    expect(readPngHeader('public/icons/icon-512.png')).toEqual({
-      width: 512,
-      height: 512,
-      colorType: 6,
-    });
+    const icons = [
+      expectContentAddressedIcon(192),
+      expectContentAddressedIcon(512),
+    ].sort();
+    expect(readdirSync('public/icons').sort()).toEqual(icons);
   });
 
   it('uses a dedicated transparent favicon-mark icon for the companion tray', () => {
