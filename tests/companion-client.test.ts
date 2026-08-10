@@ -1,7 +1,10 @@
 import {
   companionCommand,
+  companionDeleteHistory,
   companionDownloadUrl,
   companionOpenUrl,
+  companionRestore,
+  companionSnapshot,
 } from '../src/companion/client';
 
 describe('companion pairing launch URL', () => {
@@ -48,6 +51,52 @@ describe('companion pairing launch URL', () => {
         method: 'POST',
         headers: { Authorization: 'Bearer paired-token' },
       }),
+    );
+  });
+
+  it('reads and replaces canonical companion data with authentication', async () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: vi.fn().mockReturnValue('paired-token'),
+        setItem: vi.fn(),
+      },
+    });
+    const snapshot = {
+      matches: [],
+      settings: { theme: 'dark' },
+      profile: { primaryId: 'Steam|1|0', displayName: 'Player' },
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => snapshot })
+      .mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(companionSnapshot()).resolves.toEqual(snapshot);
+    await companionRestore(snapshot as never);
+    await companionDeleteHistory();
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      'http://127.0.0.1:49125/data/snapshot',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer paired-token',
+        }),
+      }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      'http://127.0.0.1:49125/data/restore',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(snapshot),
+      }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      'http://127.0.0.1:49125/data/delete-history',
+      expect.objectContaining({ method: 'POST' }),
     );
   });
 });

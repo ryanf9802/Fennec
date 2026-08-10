@@ -582,6 +582,59 @@ test('settings keep companion after Sessions and omit timeline controls', async 
   );
 });
 
+test('settings merge data management with an authoritative companion', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-companion-token', 'e2e-token');
+  });
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/permission-probe') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        version: '0.3.0',
+        protocolVersion: 1,
+        dataSyncVersion: 1,
+        paired: path === '/status',
+        gameRunning: false,
+        feedConnected: false,
+        stores: ['steam'],
+        configuredStores: ['steam'],
+        launchOnStartup: true,
+        canonicalMatches: 42,
+        pendingFrames: 0,
+        databaseBytes: 2_097_152,
+        lastSyncedAt: '2026-08-10T12:00:00Z',
+        updateStatus: 'current',
+      }),
+    });
+  });
+
+  await page.goto('/settings?demo=1');
+
+  await expect(
+    page.getByRole('heading', { name: 'Data and companion' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/companion keeps the durable copy/i),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Rebuild browser cache' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Delete all history' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('42 matches · 2.0 MB in the companion'),
+  ).toBeVisible();
+  await expect(page.getByText(/stay in this browser/i)).toHaveCount(0);
+});
+
 test('browser-only setup uses instructions and follows the Stats API connection', async ({
   page,
 }) => {

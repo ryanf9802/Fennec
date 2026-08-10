@@ -1720,6 +1720,10 @@ export async function saveProfile(value: FennecProfile): Promise<void> {
   await db.profiles.put({ key: 'profile', ...value });
 }
 
+export async function clearProfile(): Promise<void> {
+  await db.profiles.delete('profile');
+}
+
 export async function clearHistory(): Promise<void> {
   await settleMatchWrites();
   await db.transaction(

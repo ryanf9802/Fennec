@@ -1,16 +1,21 @@
 import {
   Check,
+  Database,
   Download,
   FileJson,
   ListChecks,
   Save,
   Trash2,
   Upload,
+  RefreshCw,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
-import { CompanionSettings } from '../components/CompanionSettings';
+import {
+  CompanionLaunchControls,
+  CompanionSettings,
+} from '../components/CompanionSettings';
 import { StatsApiSetup } from '../components/StatsApiSetup';
 import { ConnectionStatus } from '../components/ConnectionStatus';
 import { LocalNetworkAccessHelp } from '../components/LocalNetworkAccessHelp';
@@ -25,6 +30,11 @@ import { historyRepository, loadMatches } from '../data/database';
 import { useStorageStatistics } from '../data/historyQueries';
 import type { FennecSettings } from '../domain/types';
 import { playerKeyForPrimaryId } from '../domain/playerIdentity';
+import { useCompanionStatus } from '../companion/useCompanionStatus';
+import {
+  companionDataSyncVersion,
+  companionSnapshot,
+} from '../companion/client';
 
 /**
  * Manages validated settings drafts, backup transfer, destructive history
@@ -37,9 +47,11 @@ export function SettingsPage() {
     settings,
     connection,
     diagnostic,
+    syncStatus,
     updateSettings,
     deleteHistory,
     restoreBackup,
+    rebuildBrowserCache,
   } = context;
   const [draft, setDraft] = useState(settings);
   const [message, setMessage] = useState<string>();
@@ -47,6 +59,14 @@ export function SettingsPage() {
   const fileInput = useRef<HTMLInputElement>(null);
   const storageQuery = useStorageStatistics();
   const storage = storageQuery.data;
+  const companion = useCompanionStatus();
+  const companionReady = Boolean(
+    companion.health?.paired &&
+    companion.health.dataSyncVersion === companionDataSyncVersion,
+  );
+  const syncBusy = ['connecting', 'restoring', 'reconciling'].includes(
+    syncStatus.mode,
+  );
   const patchDraft = (patch: Partial<FennecSettings>) =>
     setDraft((current) => ({ ...current, ...patch }));
 
@@ -56,11 +76,13 @@ export function SettingsPage() {
       const backup = parseBackup(await file.text());
       if (
         !confirm(
-          `Replace local Fennec data with ${backup.matches.length} matches from this backup?`,
+          companionReady
+            ? `Replace the companion's durable Fennec data and this browser cache with ${backup.matches.length} matches from this backup?`
+            : `Replace local Fennec data with ${backup.matches.length} matches from this backup?`,
         )
       )
         return;
-      await restoreBackup(backup);
+      await restoreBackup(backup, companionReady);
       setDraft(backup.settings);
       setMessage('Backup restored.');
     } catch (error) {
@@ -97,6 +119,23 @@ export function SettingsPage() {
   const exportJson = async () => {
     const filename = `fennec-backup-${new Date().toISOString().slice(0, 10)}`;
     try {
+      if (companionReady) {
+        const canonical = await companionSnapshot();
+        downloadText(
+          `${filename}.json`,
+          JSON.stringify(
+            createBackup(
+              canonical.matches,
+              canonical.settings ?? settings,
+              canonical.profile,
+            ),
+            null,
+            2,
+          ),
+          'application/json',
+        );
+        return;
+      }
       if (
         await streamBackup(
           `${filename}.ndjson`,
@@ -143,12 +182,120 @@ export function SettingsPage() {
     );
   };
 
+  const rebuildCache = async () => {
+    try {
+      await rebuildBrowserCache();
+      await storageQuery.refetch();
+      setMessage('Browser cache rebuilt from the companion.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const removeHistory = async () => {
+    try {
+      await deleteHistory(companionReady);
+      await storageQuery.refetch();
+      setMessage(
+        companionReady
+          ? 'History deleted from the companion and browser cache.'
+          : 'Match history deleted.',
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const dataControls = (
+    <>
+      {storage?.usage !== undefined && (
+        <p className="text-muted mt-2 text-sm">
+          Browser cache: {(storage.usage / 1_048_576).toFixed(1)} MB
+          {storage.quota
+            ? ` of ${(storage.quota / 1_073_741_824).toFixed(1)} GB available`
+            : ''}{' '}
+          ·{' '}
+          {storage.persisted
+            ? 'persistent storage granted'
+            : 'best-effort browser storage'}
+        </p>
+      )}
+      <div className="mt-5 flex flex-wrap gap-3">
+        {storage && !storage.persisted && (
+          <button
+            className="button-secondary"
+            onClick={() => void protectStorage()}
+          >
+            Protect offline cache
+          </button>
+        )}
+        <button className="button-secondary" onClick={() => void exportJson()}>
+          <FileJson className="size-4" />
+          Export backup
+        </button>
+        <button className="button-secondary" onClick={() => void exportCsv()}>
+          <Download className="size-4" />
+          Export CSV
+        </button>
+        <button
+          className="button-secondary"
+          disabled={
+            companionReady && (syncBusy || companion.health?.gameRunning)
+          }
+          onClick={() => fileInput.current?.click()}
+        >
+          <Upload className="size-4" />
+          Restore backup
+        </button>
+        <input
+          ref={fileInput}
+          className="hidden"
+          type="file"
+          accept="application/json,application/x-ndjson,.json,.ndjson"
+          onChange={(event) => void restore(event.target.files?.[0])}
+        />
+        {companionReady && (
+          <button
+            className="button-secondary"
+            disabled={syncBusy}
+            onClick={() => void rebuildCache()}
+          >
+            <RefreshCw className="size-4" />
+            Rebuild browser cache
+          </button>
+        )}
+        <button
+          className="button-danger"
+          disabled={
+            companionReady && (syncBusy || companion.health?.gameRunning)
+          }
+          onClick={() => {
+            const count = companionReady
+              ? (companion.health?.canonicalMatches ?? storage?.matches ?? 0)
+              : (storage?.matches ?? 0);
+            if (
+              confirm(
+                companionReady
+                  ? `Permanently delete ${count} matches from the companion and synchronized browsers? This cannot be undone.`
+                  : `Delete ${count} locally stored matches? This cannot be undone.`,
+              )
+            )
+              void removeHistory();
+          }}
+        >
+          <Trash2 className="size-4" />
+          {companionReady ? 'Delete all history' : 'Delete history'}
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="space-y-7">
       <header>
         <h1 className="text-3xl font-black sm:text-4xl">Settings</h1>
         <p className="text-muted mt-2">
-          Sessions, appearance, companion behavior, and browser-local data.
+          Sessions, appearance, capture, and durable Fennec data.
         </p>
       </header>
 
@@ -233,79 +380,71 @@ export function SettingsPage() {
         </label>
       </section>
 
-      <CompanionSettings />
-
-      <section className="surface-flat rounded-3xl p-5 sm:p-7">
-        <h2 className="text-xl font-extrabold">Local data</h2>
-        <p className="text-muted mt-2">
-          Match history and compact analytics stay in this browser. Full
-          technical payloads are retained for {storage?.rawRetentionDays ?? 90}{' '}
-          days.
-        </p>
-        {storage?.usage !== undefined && (
-          <p className="text-muted mt-2 text-sm">
-            Using {(storage.usage / 1_048_576).toFixed(1)} MB
-            {storage.quota
-              ? ` of ${(storage.quota / 1_073_741_824).toFixed(1)} GB available`
-              : ''}{' '}
-            ·{' '}
-            {storage.persisted
-              ? 'persistent storage granted'
-              : 'best-effort browser storage'}
+      {companionReady && companion.health ? (
+        <section className="surface rounded-3xl p-5 sm:p-7">
+          <h2 className="text-xl font-extrabold">Data and companion</h2>
+          <p className="text-muted mt-2 max-w-3xl">
+            The companion keeps the durable copy of your Fennec history,
+            selected player, and settings. This browser maintains a synchronized
+            offline cache for fast access.
           </p>
-        )}
-        <div className="mt-5 flex flex-wrap gap-3">
-          {storage && !storage.persisted && (
-            <button
-              className="button-secondary"
-              onClick={() => void protectStorage()}
-            >
-              Protect local history
-            </button>
-          )}
-          <button
-            className="button-secondary"
-            onClick={() => void exportJson()}
-          >
-            <FileJson className="size-4" />
-            Export backup
-          </button>
-          <button className="button-secondary" onClick={() => void exportCsv()}>
-            <Download className="size-4" />
-            Export CSV
-          </button>
-          <button
-            className="button-secondary"
-            onClick={() => fileInput.current?.click()}
-          >
-            <Upload className="size-4" />
-            Restore backup
-          </button>
-          <input
-            ref={fileInput}
-            className="hidden"
-            type="file"
-            accept="application/json,application/x-ndjson,.json,.ndjson"
-            onChange={(event) => void restore(event.target.files?.[0])}
-          />
-          <button
-            className="button-danger"
-            onClick={() => {
-              if (
-                confirm(
-                  `Delete ${storage?.matches ?? 0} locally stored matches? This cannot be undone.`,
-                )
-              )
-                void deleteHistory().then(() =>
-                  setMessage('Match history deleted.'),
-                );
-            }}
-          >
-            <Trash2 className="size-4" />
-            Delete history
-          </button>
-        </div>
-      </section>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="surface-strong rounded-2xl p-4">
+              <strong className="flex items-center gap-2">
+                <Database className="size-4 text-fennec-cyan" /> Durable data
+              </strong>
+              <p className="text-muted mt-2 text-sm" role="status">
+                {syncStatus.mode === 'restoring'
+                  ? `Restoring ${syncStatus.completedMatches ?? 0} of ${syncStatus.totalMatches ?? 0} matches…`
+                  : syncStatus.mode === 'reconciling'
+                    ? `Reconciling ${syncStatus.pendingFrames ?? companion.health.pendingFrames ?? 0} captured frames…`
+                    : syncStatus.mode === 'error'
+                      ? `Sync needs attention: ${syncStatus.error ?? 'Unknown error'}`
+                      : syncStatus.mode === 'connecting'
+                        ? 'Connecting to the durable data store…'
+                        : syncStatus.mode === 'unavailable'
+                          ? 'Companion sync is unavailable; browser capture continues locally.'
+                          : syncStatus.mode === 'synchronized'
+                            ? `Up to date${companion.health.lastSyncedAt ? ` · last synchronized ${new Date(companion.health.lastSyncedAt).toLocaleString()}` : ''}`
+                            : 'Waiting for companion synchronization.'}
+              </p>
+              <p className="text-muted mt-2 text-sm">
+                {companion.health.canonicalMatches ?? 0} matches ·{' '}
+                {((companion.health.databaseBytes ?? 0) / 1_048_576).toFixed(1)}{' '}
+                MB in the companion
+              </p>
+            </div>
+            <div className="surface-strong rounded-2xl p-4">
+              <strong>Offline browser cache</strong>
+              <p className="text-muted mt-2 text-sm">
+                Full technical payloads are retained for{' '}
+                {storage?.rawRetentionDays ?? 90} days. Clearing this cache is
+                recoverable while the companion data remains available.
+              </p>
+            </div>
+          </div>
+          {dataControls}
+          <div className="mt-7 border-t border-white/10 pt-6">
+            <CompanionLaunchControls
+              health={companion.health}
+              recheck={companion.recheck}
+            />
+          </div>
+        </section>
+      ) : (
+        <>
+          <CompanionSettings />
+          <section className="surface-flat rounded-3xl p-5 sm:p-7">
+            <h2 className="text-xl font-extrabold">Local data</h2>
+            <p className="text-muted mt-2">
+              Without a compatible paired companion, match history and compact
+              analytics stay in this browser. Full technical payloads are
+              retained for {storage?.rawRetentionDays ?? 90} days.
+            </p>
+            {dataControls}
+          </section>
+        </>
+      )}
 
       <section className="surface rounded-3xl p-5 sm:p-7">
         <h2 className="text-xl font-extrabold">Monitoring</h2>

@@ -1,3 +1,9 @@
+import type {
+  FennecProfile,
+  FennecSettings,
+  MatchState,
+} from '../domain/types';
+
 export interface CompanionHealth {
   version: string;
   protocolVersion: number;
@@ -19,9 +25,24 @@ export interface CompanionHealth {
     | 'retrying';
   availableUpdateVersion?: string;
   lastUpdateCheckAt?: string;
+  dataSyncVersion?: number;
+  instanceId?: string;
+  datasetGeneration?: number;
+  canonicalMatches?: number;
+  pendingFrames?: number;
+  materializedFrameId?: number;
+  databaseBytes?: number;
+  lastSyncedAt?: string;
+}
+
+export interface CanonicalCompanionData {
+  matches: MatchState[];
+  settings?: FennecSettings;
+  profile?: FennecProfile;
 }
 
 export const companionProtocolVersion = 1;
+export const companionDataSyncVersion = 1;
 export const companionDownloadUrl =
   'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe';
 
@@ -119,4 +140,51 @@ export async function companionCommand(
   } catch {
     return false;
   }
+}
+
+async function companionDataRequest(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const token = companionPairingToken();
+  if (!token) throw new Error('Pair the companion before managing its data.');
+  const response = await fetch(`http://127.0.0.1:49125${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init?.headers,
+    },
+    signal: init?.signal ?? AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `The companion returned ${response.status}.`);
+  }
+  return response;
+}
+
+export async function companionSnapshot(): Promise<CanonicalCompanionData> {
+  const response = await companionDataRequest('/data/snapshot', {
+    cache: 'no-store',
+  });
+  const value = (await response.json()) as CanonicalCompanionData;
+  return {
+    ...value,
+    settings: value.settings ?? undefined,
+    profile: value.profile ?? undefined,
+  };
+}
+
+export async function companionRestore(
+  data: CanonicalCompanionData,
+): Promise<void> {
+  await companionDataRequest('/data/restore', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function companionDeleteHistory(): Promise<void> {
+  await companionDataRequest('/data/delete-history', { method: 'POST' });
 }

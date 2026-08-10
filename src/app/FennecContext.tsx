@@ -21,6 +21,7 @@ import {
 } from '../domain/types';
 import {
   clearHistory,
+  clearProfile,
   deleteMatch as deleteStoredMatch,
   endCurrentSession,
   historyRepository,
@@ -36,9 +37,17 @@ import { historyKeys, queryClient } from '../data/historyQueries';
 import type { FennecBackup } from '../data/backup';
 import { SimulatedStatsFeed } from '../feed/SimulatedStatsFeed';
 import { HybridStatsFeed } from '../feed/HybridStatsFeed';
-import type { StatsFeedAdapter } from '../feed/StatsFeedAdapter';
+import type {
+  CompanionSyncStatus,
+  StatsFeedAdapter,
+} from '../feed/StatsFeedAdapter';
 import { createDemoHistory } from '../feed/demoHistory';
 import { demoModeEnabled } from '../platform/demoMode';
+import {
+  companionDeleteHistory,
+  companionRestore,
+  companionSnapshot,
+} from '../companion/client';
 
 interface FennecContextValue {
   ready: boolean;
@@ -48,13 +57,15 @@ interface FennecContextValue {
   connection: FeedConnectionState;
   statsApiVerified: boolean;
   diagnostic?: string;
+  syncStatus: CompanionSyncStatus;
   demoMode: boolean;
   updateSettings(next: FennecSettings): Promise<void>;
   selectProfile(next: FennecProfile): Promise<void>;
   deleteMatch(id: string): Promise<boolean>;
   endSession(): Promise<EndSessionResult>;
-  deleteHistory(): Promise<void>;
-  restoreBackup(backup: FennecBackup): Promise<void>;
+  deleteHistory(canonical?: boolean): Promise<void>;
+  restoreBackup(backup: FennecBackup, canonical?: boolean): Promise<void>;
+  rebuildBrowserCache(): Promise<void>;
 }
 
 const FennecContext = createContext<FennecContextValue | undefined>(undefined);
@@ -103,8 +114,12 @@ export function FennecProvider({
   );
   const statsApiVerifiedRef = useRef(statsApiVerified);
   const [diagnostic, setDiagnostic] = useState<string>();
+  const [syncStatus, setSyncStatus] = useState<CompanionSyncStatus>({
+    mode: 'browser-only',
+  });
   const activeRef = useRef<MatchState | undefined>(undefined);
   const profileRef = useRef<FennecProfile | undefined>(undefined);
+  const settingsRef = useRef<FennecSettings>(defaultSettings);
   const historyGenerationRef = useRef(0);
   const feedRef = useRef<StatsFeedAdapter | undefined>(undefined);
   const [historyGeneration, setHistoryGeneration] = useState(0);
@@ -141,6 +156,7 @@ export function FennecProvider({
       if (cancelled) return;
       activeRef.current = reducerMatch;
       profileRef.current = storedProfile;
+      settingsRef.current = storedSettings;
       setActiveMatch(recovered);
       setProfile(storedProfile);
       setSettings(storedSettings);
@@ -224,6 +240,11 @@ export function FennecProvider({
       onState: setConnection,
       onStatsApiVerified: markStatsApiVerified,
       onDiagnostic: setDiagnostic,
+      onSyncStatus: setSyncStatus,
+      onCanonicalReset: async () => {
+        await clearHistory();
+        await queryClient.invalidateQueries({ queryKey: historyKeys.all });
+      },
       onCheckpoint: async (match) => {
         if (!isHistoryEligibleMatch(match)) return;
         await saveMatch(match, settings.sessionGapMinutes);
@@ -231,6 +252,18 @@ export function FennecProvider({
       },
       onTombstone: async (matchId) => {
         await deleteStoredMatch(matchId);
+        await queryClient.invalidateQueries({ queryKey: historyKeys.all });
+      },
+      onPreferences: async (canonicalSettings, canonicalProfile) => {
+        const normalized = normalizeSettings(canonicalSettings);
+        await saveSettings(normalized);
+        if (canonicalProfile) await saveProfile(canonicalProfile);
+        else await clearProfile();
+        profileRef.current = canonicalProfile;
+        settingsRef.current = normalized;
+        setProfile(canonicalProfile);
+        setSettings(normalized);
+        applyTheme(normalized.theme);
         await queryClient.invalidateQueries({ queryKey: historyKeys.all });
       },
       /**
@@ -249,11 +282,15 @@ export function FennecProvider({
         const nextConnection =
           result.current.lifecycle === 'live' ? 'live' : 'waiting';
         setConnection(nextConnection);
-        if (isHistoryEligibleMatch(result.current))
-          feed.checkpoint?.(result.current);
         const addedEvent =
           result.current.events.length > (previous?.events.length ?? 0);
-        if (result.superseded) persist(result.superseded);
+        if (result.superseded) {
+          if (isHistoryEligibleMatch(result.superseded))
+            feed.checkpoint?.(result.superseded);
+          persist(result.superseded);
+        }
+        if (isHistoryEligibleMatch(result.current))
+          feed.checkpoint?.(result.current);
         schedule(
           result.current,
           addedEvent || result.current.lifecycle !== 'live',
@@ -276,6 +313,7 @@ export function FennecProvider({
           profileRef.current = next;
           setProfile(next);
           await saveProfile(next);
+          feed.preferences?.(settingsRef.current, next);
         } else if (demoMode && !selected) {
           const demoPlayer = result.current.participants.find(
             (player) => player.primaryId === 'Steam|demo-you|0',
@@ -313,14 +351,17 @@ export function FennecProvider({
   const updateSettings = useCallback(async (next: FennecSettings) => {
     const normalized = normalizeSettings(next);
     await saveSettings(normalized);
+    settingsRef.current = normalized;
     setSettings(normalized);
     applyTheme(normalized.theme);
+    feedRef.current?.preferences?.(normalized, profileRef.current);
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
   const selectProfile = useCallback(async (next: FennecProfile) => {
     profileRef.current = next;
     setProfile(next);
     await saveProfile(next);
+    feedRef.current?.preferences?.(settingsRef.current, next);
     await historyRepository.prepareProfileSessions(
       playerKeyForPrimaryId(next.primaryId)!,
     );
@@ -340,14 +381,14 @@ export function FennecProvider({
         ? activeRef.current.id
         : undefined;
     const result = await endCurrentSession(profileKey, activeMatchId);
+    const latest = await historyRepository.loadLatestMatch();
+    if (result !== 'unchanged' && latest) feedRef.current?.checkpoint?.(latest);
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
     return result;
   }, []);
-  const deleteHistory = useCallback(async () => {
+  const clearLocalHistory = useCallback(async () => {
     historyGenerationRef.current++;
     try {
-      for await (const match of historyRepository.iterateMatches())
-        feedRef.current?.tombstone?.(match.id);
       await clearHistory();
       activeRef.current = undefined;
       setActiveMatch(undefined);
@@ -356,7 +397,8 @@ export function FennecProvider({
     }
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
-  const restoreBackup = useCallback(async (backup: FennecBackup) => {
+
+  const applyReplacement = useCallback(async (backup: FennecBackup) => {
     historyGenerationRef.current++;
     try {
       const normalizedSettings = normalizeSettings(backup.settings);
@@ -364,6 +406,7 @@ export function FennecProvider({
       const active = recoverActiveMatch(backup.matches);
       activeRef.current = active;
       profileRef.current = backup.profile;
+      settingsRef.current = normalizedSettings;
       setActiveMatch(active);
       setSettings(normalizedSettings);
       setProfile(backup.profile);
@@ -373,6 +416,42 @@ export function FennecProvider({
     }
     await queryClient.invalidateQueries({ queryKey: historyKeys.all });
   }, []);
+
+  const deleteHistory = useCallback(
+    async (canonical = false) => {
+      if (canonical) await companionDeleteHistory();
+      else
+        for await (const match of historyRepository.iterateMatches())
+          feedRef.current?.tombstone?.(match.id);
+      await clearLocalHistory();
+    },
+    [clearLocalHistory],
+  );
+
+  const restoreBackup = useCallback(
+    async (backup: FennecBackup, canonical = false) => {
+      if (canonical)
+        await companionRestore({
+          matches: backup.matches,
+          settings: normalizeSettings(backup.settings),
+          profile: backup.profile,
+        });
+      await applyReplacement(backup);
+    },
+    [applyReplacement],
+  );
+
+  const rebuildBrowserCache = useCallback(async () => {
+    const snapshot = await companionSnapshot();
+    await applyReplacement({
+      format: 'fennec-backup',
+      version: 5,
+      exportedAt: new Date().toISOString(),
+      settings: normalizeSettings(snapshot.settings),
+      profile: snapshot.profile,
+      matches: snapshot.matches,
+    });
+  }, [applyReplacement]);
   const value = useMemo<FennecContextValue>(
     () => ({
       ready,
@@ -382,6 +461,7 @@ export function FennecProvider({
       connection,
       statsApiVerified,
       diagnostic,
+      syncStatus,
       demoMode,
       updateSettings,
       selectProfile,
@@ -389,6 +469,7 @@ export function FennecProvider({
       endSession,
       deleteHistory,
       restoreBackup,
+      rebuildBrowserCache,
     }),
     [
       ready,
@@ -398,6 +479,7 @@ export function FennecProvider({
       connection,
       statsApiVerified,
       diagnostic,
+      syncStatus,
       demoMode,
       updateSettings,
       selectProfile,
@@ -405,6 +487,7 @@ export function FennecProvider({
       endSession,
       deleteHistory,
       restoreBackup,
+      rebuildBrowserCache,
     ],
   );
   return (

@@ -202,11 +202,13 @@ pub fn run() {
             stores.sort();
             stores.dedup();
             let selected = (stores.len() == 1).then(|| stores[0].clone());
+            let storage = storage::Storage::open(&directory.join("fennec.sqlite3"))?;
+            let last_packet_at = storage.data_status()?.last_packet_at;
             let (frames, _) = tokio::sync::broadcast::channel(512);
             let (replicas, _) = tokio::sync::broadcast::channel(128);
             let state = Arc::new(AppState {
                 token: token.clone(),
-                storage: storage::Storage::open(&directory.join("fennec.sqlite3"))?,
+                storage,
                 health: RwLock::new(RuntimeHealth {
                     version: option_env!("FENNEC_BUILD_VERSION")
                         .unwrap_or(env!("CARGO_PKG_VERSION"))
@@ -218,7 +220,7 @@ pub fn run() {
                     configured_stores: store::configured_stores(),
                     game_running: false,
                     feed_connected: false,
-                    last_packet_at: None,
+                    last_packet_at,
                     launch_on_startup: store::launch_on_startup(),
                     open_dashboard_on_game_start: store::open_dashboard_on_game_start(),
                     update_status: UpdateStatus::Current,

@@ -40,15 +40,17 @@ model, and are made available through `FennecContext`. The adapter boundary lets
 the direct WebSocket feed and the optional companion use the same application
 model.
 
-Durable browser data is accessed through `HistoryRepository`. The current
-implementation uses Dexie and IndexedDB for versioned match summaries, compact
-events, player appearances, encounter relationships, sessions, preferences,
-and raw technical payload retention. History queries are indexed and cursor
-paged rather than loading the complete archive into memory.
+Browser data is accessed through `HistoryRepository`. Dexie and IndexedDB hold
+the offline replica used for versioned match summaries, compact events, player
+appearances, encounter relationships, sessions, preferences, and raw technical
+payload retention. History queries are indexed and cursor paged rather than
+loading the complete archive into memory.
 
 The browser-only and companion-assisted capture paths are intentionally
-independent. The companion collects into a SQLite journal and synchronizes
-frames, checkpoints, and deletions with a paired browser.
+independent. Once paired, the companion SQLite database is authoritative for
+history, preferences, and the selected player. It retains captured frames until
+a browser durably checkpoints and acknowledges them; browser-only changes are
+uploaded when the companion returns.
 
 ## Feed diagnostics
 

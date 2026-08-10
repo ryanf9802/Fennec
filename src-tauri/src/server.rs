@@ -1,8 +1,9 @@
 use crate::{
-    storage::{Frame, Storage},
+    storage::{CanonicalState, DataStatus, Frame, Storage},
     store::{self, StoreKind},
 };
 use axum::{
+    extract::DefaultBodyLimit,
     extract::{
         ws::{Message, WebSocket},
         Path, Query, State, WebSocketUpgrade,
@@ -52,6 +53,15 @@ pub struct RuntimeHealth {
     pub last_update_check_at: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompanionStatus {
+    #[serde(flatten)]
+    health: RuntimeHealth,
+    #[serde(flatten)]
+    data: DataStatus,
+}
+
 pub struct AppState {
     pub token: String,
     pub storage: Storage,
@@ -64,6 +74,7 @@ pub struct AppState {
 struct WsQuery {
     token: String,
     cursor: Option<i64>,
+    data_sync: Option<u8>,
 }
 
 #[derive(Deserialize)]
@@ -73,11 +84,31 @@ enum ClientMessage {
         match_id: String,
         revision: i64,
         payload: serde_json::Value,
+        through_frame_id: Option<i64>,
+        dataset_generation: Option<i64>,
     },
     Tombstone {
         match_id: String,
         deleted_at: String,
+        dataset_generation: Option<i64>,
     },
+    AcknowledgeFrame {
+        frame_id: i64,
+        dataset_generation: Option<i64>,
+    },
+    Preferences {
+        settings: serde_json::Value,
+        profile: Option<serde_json::Value>,
+        dataset_generation: Option<i64>,
+    },
+}
+
+fn accepts_generation(state: &AppState, durable_sync: bool, generation: Option<i64>) -> bool {
+    !durable_sync
+        || matches!(
+            (state.storage.dataset_generation(), generation),
+            (Ok(expected), Some(actual)) if expected == actual
+        )
 }
 
 fn authorized(headers: &HeaderMap, state: &AppState) -> bool {
@@ -102,9 +133,70 @@ async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Respo
     if !authorized(&headers, &state) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
-    let mut value = state.health.read().expect("health lock").clone();
-    value.paired = true;
-    Json(value).into_response()
+    let mut health = state.health.read().expect("health lock").clone();
+    health.paired = true;
+    match state.storage.data_status() {
+        Ok(data) => Json(CompanionStatus { health, data }).into_response(),
+        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    }
+}
+
+async fn data_snapshot(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if !authorized(&headers, &state) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    match state.storage.canonical_state() {
+        Ok(value) => Json(value).into_response(),
+        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    }
+}
+
+async fn restore_data(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(value): Json<CanonicalState>,
+) -> Response {
+    if !authorized(&headers, &state) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    if state.health.read().expect("health lock").game_running {
+        return (
+            StatusCode::CONFLICT,
+            "Close Rocket League before restoring Fennec data.",
+        )
+            .into_response();
+    }
+    match state.storage.replace_canonical(&value) {
+        Ok(()) => {
+            let _ = state
+                .replicas
+                .send(serde_json::json!({ "type": "resync" }).to_string());
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    }
+}
+
+async fn delete_history(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if !authorized(&headers, &state) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    if state.health.read().expect("health lock").game_running {
+        return (
+            StatusCode::CONFLICT,
+            "Close Rocket League before deleting Fennec history.",
+        )
+            .into_response();
+    }
+    match state.storage.delete_history() {
+        Ok(()) => {
+            let _ = state
+                .replicas
+                .send(serde_json::json!({ "type": "resync" }).to_string());
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    }
 }
 
 async fn command(
@@ -153,8 +245,7 @@ async fn command(
         state.health.write().expect("health lock").launch_on_startup = command == "enable-startup";
     }
     if result.is_ok()
-        && (command == "enable-dashboard-auto-open"
-            || command == "disable-dashboard-auto-open")
+        && (command == "enable-dashboard-auto-open" || command == "disable-dashboard-auto-open")
     {
         state
             .health
@@ -179,7 +270,14 @@ async fn websocket(
     if query.token != state.token {
         return StatusCode::UNAUTHORIZED.into_response();
     }
-    ws.on_upgrade(move |socket| serve_socket(socket, state, query.cursor.unwrap_or(0)))
+    ws.on_upgrade(move |socket| {
+        serve_socket(
+            socket,
+            state,
+            query.cursor.unwrap_or(0),
+            query.data_sync == Some(1),
+        )
+    })
 }
 
 async fn send_frame(
@@ -193,17 +291,36 @@ async fn send_frame(
         .is_ok()
 }
 
-async fn serve_socket(socket: WebSocket, state: Arc<AppState>, cursor: i64) {
+async fn serve_socket(socket: WebSocket, state: Arc<AppState>, cursor: i64, durable_sync: bool) {
     let (mut sender, mut receiver) = socket.split();
     let mut frames = state.frames.subscribe();
     let mut replicas = state.replicas.subscribe();
+    let canonical = state.storage.canonical_state().unwrap_or_default();
+    let status = state.storage.data_status().ok();
+    if durable_sync {
+        let start = serde_json::json!({
+            "type": "sync_start",
+            "totalMatches": canonical.matches.len(),
+            "settings": canonical.settings,
+            "profile": canonical.profile,
+            "status": status,
+        });
+        if sender
+            .send(Message::Text(start.to_string().into()))
+            .await
+            .is_err()
+        {
+            return;
+        }
+    }
     if let Ok(checkpoints) = state.storage.checkpoints() {
-        for checkpoint in checkpoints {
+        let total = checkpoints.len();
+        for (index, checkpoint) in checkpoints.into_iter().enumerate() {
             let Ok(match_value) = serde_json::from_str::<serde_json::Value>(&checkpoint.payload)
             else {
                 continue;
             };
-            let value = serde_json::json!({ "type": "checkpoint", "match": match_value });
+            let value = serde_json::json!({ "type": "checkpoint", "match": match_value, "completed": index + 1, "total": total });
             if sender
                 .send(Message::Text(value.to_string().into()))
                 .await
@@ -225,7 +342,21 @@ async fn serve_socket(socket: WebSocket, state: Arc<AppState>, cursor: i64) {
             }
         }
     }
-    let mut replay_cursor = cursor;
+    if durable_sync {
+        if sender
+            .send(Message::Text(
+                serde_json::json!({ "type": "sync_complete" })
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .is_err()
+        {
+            return;
+        }
+    }
+    let durable_cursor = state.storage.materialized_frame_id().unwrap_or(0);
+    let mut replay_cursor = if durable_sync { durable_cursor } else { cursor };
     loop {
         let Ok(backlog) = state.storage.frames_after(replay_cursor, 10_000) else {
             break;
@@ -264,15 +395,29 @@ async fn serve_socket(socket: WebSocket, state: Arc<AppState>, cursor: i64) {
             next = receiver.next() => {
                 let Some(Ok(Message::Text(text))) = next else { return };
                 match serde_json::from_str(&text) {
-                    Ok(ClientMessage::Checkpoint { match_id, revision, payload }) => {
-                        if state.storage.save_checkpoint(&match_id, revision, &payload.to_string()).unwrap_or(false) {
+                    Ok(ClientMessage::Checkpoint { match_id, revision, payload, through_frame_id, dataset_generation }) => {
+                        if accepts_generation(&state, durable_sync, dataset_generation)
+                            && state.storage.save_checkpoint(&match_id, revision, &payload.to_string(), through_frame_id).unwrap_or(false) {
                             let value = serde_json::json!({ "type": "checkpoint", "match": payload });
                             let _ = state.replicas.send(value.to_string());
                         }
                     }
-                    Ok(ClientMessage::Tombstone { match_id, deleted_at }) => {
-                        if state.storage.save_tombstone(&match_id, &deleted_at).is_ok() {
+                    Ok(ClientMessage::Tombstone { match_id, deleted_at, dataset_generation }) => {
+                        if accepts_generation(&state, durable_sync, dataset_generation)
+                            && state.storage.save_tombstone(&match_id, &deleted_at).is_ok() {
                             let value = serde_json::json!({ "type": "tombstone", "matchId": match_id, "deletedAt": deleted_at });
+                            let _ = state.replicas.send(value.to_string());
+                        }
+                    }
+                    Ok(ClientMessage::AcknowledgeFrame { frame_id, dataset_generation }) => {
+                        if accepts_generation(&state, durable_sync, dataset_generation) {
+                            let _ = state.storage.acknowledge_frames(frame_id);
+                        }
+                    }
+                    Ok(ClientMessage::Preferences { settings, profile, dataset_generation }) => {
+                        if accepts_generation(&state, durable_sync, dataset_generation)
+                            && state.storage.save_preferences(&settings, profile.as_ref()).is_ok() {
+                            let value = serde_json::json!({ "type": "preferences", "settings": settings, "profile": profile });
                             let _ = state.replicas.send(value.to_string());
                         }
                     }
@@ -300,7 +445,11 @@ pub async fn run(state: Arc<AppState>) -> std::io::Result<()> {
         .route("/health", get(health))
         .route("/status", get(status))
         .route("/commands/{command}", post(command))
+        .route("/data/snapshot", get(data_snapshot))
+        .route("/data/restore", post(restore_data))
+        .route("/data/delete-history", post(delete_history))
         .route("/ws", get(websocket))
+        .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
         .layer(cors)
         .with_state(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:49125").await?;

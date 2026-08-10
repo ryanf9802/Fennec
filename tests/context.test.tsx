@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   latestMatch: undefined as MatchState | undefined,
   profile: undefined as { primaryId: string; displayName: string } | undefined,
   endCurrentSession: vi.fn(async () => 'ended' as const),
+  saveProfile: vi.fn(),
+  saveSettings: vi.fn(),
+  clearProfile: vi.fn(),
 }));
 const storedBrowserValues = new Map<string, string>();
 
@@ -29,6 +32,7 @@ vi.mock('../src/feed/HybridStatsFeed', () => ({
 
 vi.mock('../src/data/database', () => ({
   clearHistory: vi.fn(),
+  clearProfile: mocks.clearProfile,
   deleteMatch: vi.fn(async () => true),
   endCurrentSession: mocks.endCurrentSession,
   historyRepository: {
@@ -58,8 +62,8 @@ vi.mock('../src/data/database', () => ({
         mocks.pendingSaves.push(resolve);
       }),
   ),
-  saveProfile: vi.fn(),
-  saveSettings: vi.fn(),
+  saveProfile: mocks.saveProfile,
+  saveSettings: mocks.saveSettings,
 }));
 
 vi.mock('../src/feed/WebSocketStatsFeed', () => ({
@@ -172,6 +176,9 @@ describe('Fennec live state', () => {
     mocks.profile = undefined;
     mocks.handlers = undefined;
     mocks.endCurrentSession.mockClear();
+    mocks.saveProfile.mockClear();
+    mocks.saveSettings.mockClear();
+    mocks.clearProfile.mockClear();
     window.localStorage.removeItem('fennec-stats-api-verified-v1');
   });
 
@@ -239,6 +246,42 @@ describe('Fennec live state', () => {
     ).toBeInTheDocument();
     expect(mocks.savedMatches).toEqual([]);
     expect(mocks.checkpoints).toEqual([]);
+  });
+
+  it('restores companion-owned settings and profile into a cleared browser', async () => {
+    render(
+      <FennecProvider>
+        <LiveStateProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    await act(async () => {
+      await mocks.handlers!.onPreferences?.(
+        {
+          webSocketPort: 49124,
+          sessionGapMinutes: 45,
+          autoOpenLiveMatch: false,
+          theme: 'light',
+          speedUnit: 'mph',
+          timelinePreset: 'curated',
+          enabledTimelineEvents: [],
+          timelineAttributes: {},
+          sidebarCollapsed: false,
+          matchAnalyticsView: 'analytics',
+          analytics: { playlistMode: 'ranked', groupByPlaylist: true },
+        },
+        { primaryId: 'Steam|restored|0', displayName: 'Restored' },
+      );
+    });
+
+    expect(mocks.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionGapMinutes: 45, speedUnit: 'mph' }),
+    );
+    expect(mocks.saveProfile).toHaveBeenCalledWith({
+      primaryId: 'Steam|restored|0',
+      displayName: 'Restored',
+    });
   });
 
   it('starts persistence after training rolls over into a game', async () => {

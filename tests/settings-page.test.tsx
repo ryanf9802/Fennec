@@ -6,6 +6,7 @@ import { SettingsPage } from '../src/pages/SettingsPage';
 const mocks = vi.hoisted(() => ({
   fennec: {} as Record<string, unknown>,
   loadMatches: vi.fn(),
+  companion: {} as Record<string, unknown>,
 }));
 
 vi.mock('../src/app/FennecContext', () => ({
@@ -24,6 +25,16 @@ vi.mock('../src/data/historyQueries', () => ({
 
 vi.mock('../src/components/CompanionSettings', () => ({
   CompanionSettings: () => null,
+  CompanionLaunchControls: () => <div>Companion controls</div>,
+}));
+
+vi.mock('../src/companion/useCompanionStatus', () => ({
+  useCompanionStatus: () => mocks.companion,
+}));
+
+vi.mock('../src/companion/client', () => ({
+  companionDataSyncVersion: 1,
+  companionSnapshot: vi.fn(),
 }));
 
 vi.mock('../src/components/ConnectionStatus', () => ({
@@ -46,9 +57,16 @@ describe('settings CSV export', () => {
       settings: defaultSettings,
       connection: 'waiting',
       diagnostic: undefined,
+      syncStatus: { mode: 'browser-only' },
       updateSettings: vi.fn(),
       deleteHistory: vi.fn(),
       restoreBackup: vi.fn(),
+      rebuildBrowserCache: vi.fn(),
+    };
+    mocks.companion = {
+      checking: false,
+      recheck: vi.fn(),
+      health: undefined,
     };
   });
 
@@ -126,5 +144,48 @@ describe('settings CSV export', () => {
       speedUnit: 'mph',
     });
     expect(await screen.findByText('Settings saved.')).toBeInTheDocument();
+  });
+
+  it('merges durable data and companion controls when canonical sync is available', () => {
+    mocks.fennec.syncStatus = {
+      mode: 'restoring',
+      completedMatches: 12,
+      totalMatches: 30,
+    };
+    mocks.companion = {
+      checking: false,
+      recheck: vi.fn(),
+      health: {
+        paired: true,
+        dataSyncVersion: 1,
+        canonicalMatches: 30,
+        databaseBytes: 2_097_152,
+        pendingFrames: 0,
+        gameRunning: false,
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Data and companion' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/companion keeps the durable copy/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Restoring 12 of 30 matches…')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Rebuild browser cache' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete all history' }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole('heading', { name: 'Local data' }),
+    ).not.toBeInTheDocument();
   });
 });

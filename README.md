@@ -35,32 +35,41 @@ result is a record of actual games rather than another public rank lookup.
 
 ## Your data stays local
 
-Fennec stores your match history in IndexedDB, the database built into your
-browser. Saved matches, sessions, player encounters, analytics, preferences,
-and your selected player remain on your device. Fennec does not require an
-account or upload that history to a Fennec service.
+With the recommended Windows companion, its local SQLite database is the
+durable source for saved matches, sessions, player encounters, analytics,
+preferences, and your selected player. Each paired browser keeps a synchronized
+IndexedDB cache so Fennec stays fast and remains useful while the companion is
+temporarily unavailable. Fennec does not require an account or upload that
+history to a Fennec service.
+
+Browser-only setup remains supported. In that mode, IndexedDB is the only copy
+until a companion is paired. Browser-only matches automatically join the
+companion history when it becomes available, while frames captured by the
+companion with no browser open remain in its journal until a browser has
+converted them into durable match history.
 
 Useful match, session, player, and analytics history is retained. High-volume
 technical event details are kept for 90 days and then removed without erasing
-the compact history you use in Fennec. When supported, **Protect local
-history** in Settings asks the browser to preserve this data instead of treating
-it as temporary site storage.
+the compact history you use in Fennec. When supported, **Protect offline cache**
+in Settings asks the browser to preserve its synchronized copy instead of
+treating it as temporary site storage.
 
 ### Back up and restore your history
 
-Local browser data can still be lost if you clear site data, remove the browser
-profile, or lose the device. Fennec does not create a cloud copy automatically,
-so export a backup periodically and before clearing browser data, moving to a
-different browser, or restoring an older backup.
+Clearing site data removes the browser cache. Pairing that browser again
+automatically restores companion-owned data. The companion remains local to the
+PC, so losing the device or removing its application data still requires an
+external backup; Fennec does not create a cloud copy automatically.
 
-Open **Settings** and find **Local data**:
+Open **Settings** and find **Data and companion** (or **Local data** in
+browser-only mode):
 
 - **Export backup** saves your match history, settings, and selected player in
   a restorable Fennec backup file. Keep it somewhere safe outside the browser.
-- **Restore backup** reads a previously exported Fennec backup. After you
-  confirm, it replaces the Fennec data currently stored in that browser; it
-  does not merge two histories. Export the current history first if you may
-  want to keep it.
+- **Restore backup** reads a previously exported Fennec backup. When paired, it
+  atomically replaces the companion's durable data and rebuilds the browser
+  cache; in browser-only mode it replaces that browser's data. It does not merge
+  two histories. Export the current history first if you may want to keep it.
 - **Export CSV** creates a selected-player spreadsheet for your own analysis.
   A CSV is not a Fennec backup and cannot be restored into the application.
 
@@ -179,8 +188,9 @@ background and installed after Rocket League capture is idle.
 Fennec is a React and TypeScript browser application built with Vite. It reads
 the local WebSocket Stats API through an adapter, reduces packets into a shared
 match model, and persists versioned history through a storage-neutral
-repository backed by Dexie and IndexedDB. The optional Tauri companion uses a
-durable SQLite journal for browser handoff.
+repository backed by Dexie and IndexedDB. The recommended Tauri companion uses
+SQLite as the durable source of truth and keeps unreconciled capture frames
+until a paired browser has acknowledged their match checkpoints.
 
 The application is tested with Vitest and Playwright and deployed to private S3
 storage behind CloudFront through TypeScript CDK. The companion is a Rust/Tauri
