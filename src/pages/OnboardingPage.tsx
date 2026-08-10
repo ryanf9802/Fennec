@@ -179,6 +179,21 @@ export function OnboardingPage() {
   const compatible =
     paired && health?.protocolVersion === companionProtocolVersion;
   const statsApiConnected = isStatsApiConnected(connection);
+  const storesConfigured = Boolean(
+    health?.stores?.length &&
+    health.stores.every((store) => health.configuredStores?.includes(store)),
+  );
+  const setupComplete =
+    access.satisfied &&
+    (path === 'browser'
+      ? statsApiConnected
+      : paired &&
+        compatible &&
+        storesConfigured &&
+        Boolean(health?.lastPacketAt));
+  const configuredStores = health?.stores
+    ?.map((store) => (store === 'steam' ? 'Steam' : 'Epic'))
+    .join(' and ');
   const configureStore = async (store: 'steam' | 'epic') => {
     setConfiguring(store);
     const configured = await companionCommand(`configure-${store}`);
@@ -220,9 +235,14 @@ export function OnboardingPage() {
 
       <SetupPathChooser path={path} onSelect={selectPath} />
 
-      <section className="surface rounded-3xl p-5 sm:p-7">
+      <section
+        aria-labelledby="setup-instructions-title"
+        className="surface rounded-3xl p-5 sm:p-7"
+      >
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-extrabold">Setup status</h2>
+          <h2 id="setup-instructions-title" className="text-xl font-extrabold">
+            Setup instructions
+          </h2>
           <button
             className="button-secondary"
             onClick={() => void Promise.all([recheck(), access.recheck()])}
@@ -288,12 +308,7 @@ export function OnboardingPage() {
                       : 'Update the browser app or companion before synchronization.'}
               </Requirement>
               <Requirement
-                complete={Boolean(
-                  health?.stores?.length &&
-                  health.stores.every((store) =>
-                    health.configuredStores?.includes(store),
-                  ),
-                )}
+                complete={storesConfigured}
                 title="Detect and configure Steam or Epic"
               >
                 {!health
@@ -369,21 +384,41 @@ export function OnboardingPage() {
             </div>
           </div>
         )}
+        <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
+          <a
+            className="button-secondary"
+            href="https://www.rocketleague.com/developer/stats-api"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Official Stats API guide <ExternalLink className="size-4" />
+          </a>
+          <span className="text-muted flex items-center gap-2 text-sm">
+            <Monitor className="size-4" /> Setup instructions remain available
+            from the navigation.
+          </span>
+        </div>
       </section>
-      <div className="flex flex-wrap gap-3">
-        <a
-          className="button-secondary"
-          href="https://www.rocketleague.com/developer/stats-api"
-          target="_blank"
-          rel="noreferrer"
+      {setupComplete && (
+        <section
+          aria-labelledby="setup-complete-title"
+          className="rounded-3xl border border-emerald-400/30 bg-emerald-400/8 p-5 sm:p-7"
         >
-          Official Stats API guide <ExternalLink className="size-4" />
-        </a>
-        <span className="text-muted flex items-center gap-2 text-sm">
-          <Monitor className="size-4" /> Setup remains available from the
-          navigation.
-        </span>
-      </div>
+          <div className="flex gap-3">
+            <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-emerald-400" />
+            <div>
+              <h2 id="setup-complete-title" className="text-xl font-extrabold">
+                Fennec is set up and ready to go
+              </h2>
+              <p className="text-muted mt-1 text-sm">
+                {path === 'companion'
+                  ? `Companion setup is complete${configuredStores ? ` for ${configuredStores}` : ''}. Fennec can capture matches in the background.`
+                  : 'Browser-only setup is complete. Keep Fennec open while you play to capture matches.'}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

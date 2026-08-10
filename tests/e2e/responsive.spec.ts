@@ -536,6 +536,25 @@ test('browser-only setup uses instructions and follows the Stats API connection'
     page.getByText('Keep Fennec open and verify the feed'),
   ).toHaveCount(0);
   await expect(page.getByText('Browser-only limitations:')).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Browser-only setup is complete. Keep Fennec open while you play to capture matches.',
+    ),
+  ).toBeVisible();
+  const instructions = page.getByRole('region', {
+    name: 'Setup instructions',
+  });
+  await expect(
+    instructions.getByRole('link', { name: 'Official Stats API guide' }),
+  ).toBeVisible();
+  await expect(
+    instructions.getByText(
+      'Setup instructions remain available from the navigation.',
+    ),
+  ).toBeVisible();
 });
 
 test('PWA identity uses only the Fennec name', async ({ page }) => {
@@ -599,12 +618,18 @@ test('setup starts with a centered route choice and expands after selection', as
   await expect(
     page.getByRole('heading', { name: 'Connect Fennec' }),
   ).toHaveCount(0);
-  await expect(page.getByText('Setup status')).toHaveCount(0);
+  await expect(page.getByText('Setup instructions')).toHaveCount(0);
 
   await companion.click();
   await expect(
     page.getByRole('heading', { name: 'Connect Fennec' }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Setup instructions' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toHaveCount(0);
   await expect(companion).toHaveAttribute('aria-pressed', 'true');
   expect(
     Number(
@@ -700,6 +725,14 @@ test('paired setup exposes companion launch preferences', async ({ page }) => {
   await expect.poll(() => dashboardCommandSeen).toBe(true);
   await expect(
     page.getByText('The dashboard will open when Rocket League starts.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Companion setup is complete for Steam and Epic. Fennec can capture matches in the background.',
+    ),
   ).toBeVisible();
 });
 
