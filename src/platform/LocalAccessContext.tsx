@@ -14,6 +14,7 @@ import {
   requestLocalAccess,
   type LocalAccessState,
 } from './localAccess';
+import { demoModeEnabled } from './demoMode';
 
 interface LocalAccessValue {
   state: LocalAccessState;
@@ -27,9 +28,10 @@ const LocalAccessContext = createContext<LocalAccessValue | undefined>(
 );
 
 export function LocalAccessProvider({ children }: { children: ReactNode }) {
-  const demoMode =
-    import.meta.env.VITE_DEMO_FEED === 'true' ||
-    new URLSearchParams(location.search).get('demo') === '1';
+  const demoMode = demoModeEnabled(
+    location.search,
+    import.meta.env.VITE_DEMO_FEED === 'true',
+  );
   const [state, setState] = useState<LocalAccessState>(
     demoMode ? 'granted' : 'checking',
   );
