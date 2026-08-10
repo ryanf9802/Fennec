@@ -981,6 +981,7 @@ test('desktop sidebar connection status fits and stays meaningful when collapsed
   const expandedIndicatorClass = await status
     .locator('[aria-hidden="true"]')
     .getAttribute('class');
+  const expandedHeight = (await status.boundingBox())!.height;
   await page.getByRole('button', { name: 'Collapse sidebar' }).click();
 
   await expect(status).toBeVisible();
@@ -994,6 +995,7 @@ test('desktop sidebar connection status fits and stays meaningful when collapsed
     'class',
     expandedIndicatorClass!,
   );
+  expect((await status.boundingBox())!.height).toBe(expandedHeight);
 });
 
 test('scoreboard columns align and the desktop timeline scrolls independently', async ({

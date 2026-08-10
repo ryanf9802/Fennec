@@ -125,7 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               connection={connection}
               demoMode={demoMode}
               showLabel={false}
-              className="surface-flat w-full justify-center rounded-full px-3 py-1.5 text-xs"
+              className="surface-flat min-h-[1.875rem] w-full justify-center rounded-full px-3 py-1.5 text-xs"
             />
           ) : (
             <>
@@ -133,7 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 connection={connection}
                 demoMode={demoMode}
                 showLabel={false}
-                className="surface-flat w-full justify-center rounded-full px-3 py-1.5 text-xs lg:hidden"
+                className="surface-flat min-h-[1.875rem] w-full justify-center rounded-full px-3 py-1.5 text-xs lg:hidden"
               />
               <ConnectionStatus
                 connection={connection}
