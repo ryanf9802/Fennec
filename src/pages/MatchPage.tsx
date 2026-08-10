@@ -1,6 +1,6 @@
 import { ArrowLeft, History, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { PlayerName } from '../components/PlayerName';
 import { PlayerProfileDialog } from '../components/PlayerProfileDialog';
@@ -289,6 +289,7 @@ function DeleteMatchDialog({
  */
 export function MatchPage({ match: supplied }: { match?: MatchState }) {
   const { matchId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { settings, profile, deleteMatch, updateSettings } = useFennec();
   const [profilePlayer, setProfilePlayer] = useState<{
@@ -310,6 +311,12 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
     match?.id,
   );
   const playersWithHistory = new Set(historyAvailabilityQuery.data ?? []);
+  const matchOrigin = (location.state as { matchOrigin?: unknown } | null)
+    ?.matchOrigin;
+  const sessionOrigin =
+    typeof matchOrigin === 'string' && /^\/sessions\/[^/]+$/.test(matchOrigin)
+      ? matchOrigin
+      : undefined;
   if (!supplied && matchQuery.isLoading)
     return <div className="surface rounded-3xl p-8">Loading match…</div>;
   if (!supplied && matchQuery.isError)
@@ -347,11 +354,11 @@ export function MatchPage({ match: supplied }: { match?: MatchState }) {
   return (
     <div className="space-y-6 xl:grid xl:h-[calc(100dvh-4rem)] xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-6 xl:space-y-0">
       <Link
-        to="/"
+        to={sessionOrigin ?? '/'}
         className="text-muted inline-flex items-center gap-2 text-sm font-bold hover:text-fennec-cyan"
       >
         <ArrowLeft className="size-4" />
-        Game timeline
+        {sessionOrigin ? 'Session detail' : 'Game timeline'}
       </Link>
       <header className="flex flex-wrap items-start justify-between gap-5">
         <div>

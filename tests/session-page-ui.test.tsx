@@ -162,4 +162,32 @@ describe('session detail recurring teammates', () => {
       '/sessions/session-one',
     );
   });
+
+  it('records the session as the origin when opening one of its matches', () => {
+    render(
+      <MemoryRouter initialEntries={['/sessions/session-one']}>
+        <Routes>
+          <Route path="/sessions/:sessionId" element={<SessionPage />} />
+          <Route path="/matches/:matchId" element={<LocationStateProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getAllByRole('link', { name: /Ranked Doubles/ })[0]);
+
+    expect(screen.getByTestId('location-state')).toHaveTextContent(
+      '/matches/match-2|/sessions/session-one',
+    );
+  });
 });
+
+function LocationStateProbe() {
+  const location = useLocation();
+  const matchOrigin = (location.state as { matchOrigin?: string } | null)
+    ?.matchOrigin;
+  return (
+    <div data-testid="location-state">
+      {location.pathname}|{matchOrigin}
+    </div>
+  );
+}

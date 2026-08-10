@@ -1,5 +1,5 @@
 import { ChevronRight, Radio } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { isWin } from '../domain/metrics';
 import {
   formatTeamScore,
@@ -107,6 +107,7 @@ export function MatchRow({
   profileId?: string;
   onNavigate?(): void;
 }) {
+  const location = useLocation();
   const profile = match.participants.find(
     (item) => item.primaryId === profileId,
   );
@@ -127,6 +128,11 @@ export function MatchRow({
   return (
     <Link
       to={match.lifecycle === 'live' ? '/live' : `/matches/${match.id}`}
+      state={
+        match.lifecycle === 'live'
+          ? undefined
+          : { matchOrigin: location.pathname }
+      }
       onClick={onNavigate}
       className="surface-flat hover-surface group grid min-w-0 gap-3 rounded-2xl p-4 transition sm:grid-cols-[7rem_1fr_auto] sm:items-center"
     >

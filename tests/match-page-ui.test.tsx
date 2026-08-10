@@ -70,6 +70,52 @@ function renderHistoricalMatch() {
   );
 }
 
+function renderHistoricalMatchFrom(
+  origin: string,
+  state?: { matchOrigin: string },
+) {
+  mocks.matchQuery.data = historicalMatch;
+  return render(
+    <MemoryRouter
+      initialEntries={[origin, { pathname: '/matches/history-one', state }]}
+      initialIndex={1}
+    >
+      <Routes>
+        <Route path="/matches/:matchId" element={<MatchPage />} />
+        <Route path="/" element={<h1>Game timeline destination</h1>} />
+        <Route
+          path="/sessions/:sessionId"
+          element={<h1>Session detail destination</h1>}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+describe('match back navigation', () => {
+  it('returns to the session recorded by the originating match row', () => {
+    renderHistoricalMatchFrom('/sessions/session-one', {
+      matchOrigin: '/sessions/session-one',
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'Session detail' }));
+
+    expect(
+      screen.getByRole('heading', { name: 'Session detail destination' }),
+    ).toBeInTheDocument();
+  });
+
+  it('returns to the game timeline for dashboard and direct navigation', () => {
+    renderHistoricalMatchFrom('/');
+
+    fireEvent.click(screen.getByRole('link', { name: 'Game timeline' }));
+
+    expect(
+      screen.getByRole('heading', { name: 'Game timeline destination' }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('historical match deletion', () => {
   beforeEach(() => {
     mocks.deleteMatch.mockReset();

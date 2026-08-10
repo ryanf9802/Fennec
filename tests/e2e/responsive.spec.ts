@@ -792,6 +792,25 @@ test('session summaries expose recurring teammates and full history in place', a
   );
 });
 
+test('match back navigation returns to its session or the game timeline', async ({
+  page,
+}) => {
+  await page.goto('/?demo=1');
+  await page
+    .getByRole('link', { name: 'View current session details' })
+    .click();
+  const sessionUrl = page.url();
+
+  await page.locator('a[href^="/matches/"]').first().click();
+  await page.getByRole('link', { name: 'Session detail' }).click();
+  await expect(page).toHaveURL(sessionUrl);
+
+  await page.getByRole('link', { name: 'Game timeline' }).click();
+  await page.locator('a[href^="/matches/"]').first().click();
+  await page.getByRole('link', { name: 'Game timeline' }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/');
+});
+
 test('profile player selection is searchable and explicit', async ({
   page,
 }) => {
