@@ -73,6 +73,10 @@ describe('companion release workflow', () => {
     expect(companionWorkflow).not.toContain('\n  push:');
     expect(companionWorkflow).toContain('name: Windows companion gate');
     expect(companionWorkflow).toContain(
+      'group: fennec-${{ github.workflow }}-${{ github.ref }}',
+    );
+    expect(companionWorkflow).toContain('cancel-in-progress: true');
+    expect(companionWorkflow).toContain(
       "if: needs.detect.outputs.relevant == 'true'",
     );
     expect(companionWorkflow).toContain(
