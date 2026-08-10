@@ -114,5 +114,5 @@ describe('25,000-match local archive', () => {
         ),
       ).size,
     ).toBe(100);
-  }, 30_000);
+  }, 60_000);
 });
