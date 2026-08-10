@@ -48,6 +48,7 @@ export class WebSocketStatsFeed implements StatsFeedAdapter {
       this.socket = socket;
       socket.addEventListener('open', () => {
         this.retryMs = 1000;
+        handlers.onStatsApiVerified?.();
         handlers.onState('waiting');
         this.telemetry('connected', { connection, endpoint: this.endpoint });
       });

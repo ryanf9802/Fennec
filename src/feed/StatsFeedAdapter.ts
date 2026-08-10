@@ -6,6 +6,8 @@ import type {
 
 export interface StatsFeedHandlers {
   onState(state: FeedConnectionState): void;
+  /** Reports authoritative Stats API access, not merely companion transport connectivity. */
+  onStatsApiVerified?(): void;
   onEnvelope(envelope: StatsEnvelope): void | Promise<void>;
   onCheckpoint?(match: MatchState): void | Promise<void>;
   onTombstone?(matchId: string, deletedAt: string): void | Promise<void>;

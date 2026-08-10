@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   profile: undefined as { primaryId: string; displayName: string } | undefined,
   endCurrentSession: vi.fn(async () => 'ended' as const),
 }));
+const storedBrowserValues = new Map<string, string>();
 
 vi.mock('../src/feed/HybridStatsFeed', () => ({
   HybridStatsFeed: class {
@@ -87,11 +88,14 @@ function ClockProbe() {
 }
 
 function LiveStateProbe() {
-  const { activeMatch, connection } = useFennec();
+  const { activeMatch, connection, statsApiVerified } = useFennec();
   return (
     <>
       <ConnectionStatus connection={connection} />
       <div>{activeMatch ? 'active match' : 'no active match'}</div>
+      <div>
+        {statsApiVerified ? 'Stats API verified' : 'Stats API unverified'}
+      </div>
     </>
   );
 }
@@ -147,6 +151,19 @@ function stateUpdate(playlistId: number, matchGuid = ''): StatsEnvelope {
 }
 
 describe('Fennec live state', () => {
+  beforeEach(() => {
+    storedBrowserValues.clear();
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => storedBrowserValues.get(key) ?? null,
+        setItem: (key: string, value: string) =>
+          storedBrowserValues.set(key, value),
+        removeItem: (key: string) => storedBrowserValues.delete(key),
+      },
+    });
+  });
+
   afterEach(() => {
     for (const resolve of mocks.pendingSaves.splice(0)) resolve();
     mocks.savedMatches.length = 0;
@@ -155,6 +172,35 @@ describe('Fennec live state', () => {
     mocks.profile = undefined;
     mocks.handlers = undefined;
     mocks.endCurrentSession.mockClear();
+    window.localStorage.removeItem('fennec-stats-api-verified-v1');
+  });
+
+  it('keeps successful Stats API verification after disconnection and remount', async () => {
+    const first = render(
+      <FennecProvider>
+        <LiveStateProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+    expect(screen.getByText('Stats API unverified')).toBeInTheDocument();
+
+    act(() => mocks.handlers!.onStatsApiVerified?.());
+    expect(screen.getByText('Stats API verified')).toBeInTheDocument();
+    expect(window.localStorage.getItem('fennec-stats-api-verified-v1')).toBe(
+      'true',
+    );
+
+    act(() => mocks.handlers!.onState('unavailable'));
+    expect(screen.getByText('Stats API verified')).toBeInTheDocument();
+    first.unmount();
+    mocks.handlers = undefined;
+
+    render(
+      <FennecProvider>
+        <LiveStateProbe />
+      </FennecProvider>,
+    );
+    expect(screen.getByText('Stats API verified')).toBeInTheDocument();
   });
 
   it('keeps training live without saving or checkpointing it', async () => {

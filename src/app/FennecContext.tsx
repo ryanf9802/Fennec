@@ -44,6 +44,7 @@ interface FennecContextValue {
   profile?: FennecProfile;
   settings: FennecSettings;
   connection: FeedConnectionState;
+  statsApiVerified: boolean;
   diagnostic?: string;
   demoMode: boolean;
   updateSettings(next: FennecSettings): Promise<void>;
@@ -55,6 +56,23 @@ interface FennecContextValue {
 }
 
 const FennecContext = createContext<FennecContextValue | undefined>(undefined);
+const statsApiVerifiedKey = 'fennec-stats-api-verified-v1';
+
+function storedStatsApiVerification(): boolean {
+  try {
+    return window.localStorage?.getItem(statsApiVerifiedKey) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function persistStatsApiVerification(): void {
+  try {
+    window.localStorage?.setItem(statsApiVerifiedKey, 'true');
+  } catch {
+    // Verification remains available for this visit when storage is blocked.
+  }
+}
 
 function applyTheme(theme: FennecSettings['theme']): void {
   const resolved =
@@ -78,6 +96,10 @@ export function FennecProvider({
   const [profile, setProfile] = useState<FennecProfile>();
   const [settings, setSettings] = useState<FennecSettings>(defaultSettings);
   const [connection, setConnection] = useState<FeedConnectionState>('stopped');
+  const [statsApiVerified, setStatsApiVerified] = useState(
+    storedStatsApiVerification,
+  );
+  const statsApiVerifiedRef = useRef(statsApiVerified);
   const [diagnostic, setDiagnostic] = useState<string>();
   const activeRef = useRef<MatchState | undefined>(undefined);
   const profileRef = useRef<FennecProfile | undefined>(undefined);
@@ -186,10 +208,17 @@ export function FennecProvider({
     const flush = () => {
       if (pending) persist(pending);
     };
+    const markStatsApiVerified = () => {
+      if (statsApiVerifiedRef.current) return;
+      statsApiVerifiedRef.current = true;
+      setStatsApiVerified(true);
+      if (!demoMode) persistStatsApiVerification();
+    };
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', flush);
     feed.start({
       onState: setConnection,
+      onStatsApiVerified: markStatsApiVerified,
       onDiagnostic: setDiagnostic,
       onCheckpoint: async (match) => {
         if (!isHistoryEligibleMatch(match)) return;
@@ -345,6 +374,7 @@ export function FennecProvider({
       profile,
       settings,
       connection,
+      statsApiVerified,
       diagnostic,
       demoMode,
       updateSettings,
@@ -360,6 +390,7 @@ export function FennecProvider({
       profile,
       settings,
       connection,
+      statsApiVerified,
       diagnostic,
       demoMode,
       updateSettings,

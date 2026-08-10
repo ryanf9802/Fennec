@@ -541,7 +541,7 @@ test('browser-only setup uses instructions and follows the Stats API connection'
   ).toBeVisible();
   await expect(
     page.getByText(
-      'Browser-only setup is complete. Keep Fennec open while you play to capture matches.',
+      'Browser-only setup is complete. Start Rocket League and keep Fennec open while you play to capture matches.',
     ),
   ).toBeVisible();
   const instructions = page.getByRole('region', {
@@ -558,6 +558,52 @@ test('browser-only setup uses instructions and follows the Stats API connection'
       'Setup instructions remain available from the navigation.',
     ),
   ).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem('fennec-stats-api-verified-v1'),
+    ),
+  ).toBeNull();
+});
+
+test('previously verified browser setup stays complete while Rocket League is closed', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
+    localStorage.setItem('fennec-stats-api-verified-v1', 'true');
+  });
+  await page.goto('/onboarding');
+
+  const requirement = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Enable the Rocket League Stats API' });
+  await expect(requirement.locator('svg.text-emerald-400')).toBeVisible();
+  await expect(
+    requirement.getByText(
+      'Fennec previously connected successfully. Start Rocket League to reconnect.',
+    ),
+  ).not.toBeVisible();
+  await requirement.getByText('Enable the Rocket League Stats API').click();
+  await expect(
+    requirement.getByText(
+      'Fennec previously connected successfully. Start Rocket League to reconnect.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Browser-only setup is complete. Start Rocket League and keep Fennec open while you play to capture matches.',
+    ),
+  ).toBeVisible();
+  const currentConnection = page.getByRole('status', {
+    name: /Connection status:/,
+  });
+  await expect(currentConnection).toBeVisible();
+  expect(['connecting', 'unavailable']).toContain(
+    await currentConnection.getAttribute('data-connection-state'),
+  );
 });
 
 test('PWA identity uses only the Fennec name', async ({ page }) => {

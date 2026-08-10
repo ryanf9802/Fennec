@@ -99,7 +99,9 @@ export class HybridStatsFeed implements StatsFeedAdapter {
         await this.handlers?.onTombstone?.(message.matchId, message.deletedAt);
         return;
       }
-      await this.handlers?.onEnvelope(parseEnvelope(message.payload));
+      const envelope = parseEnvelope(message.payload);
+      this.handlers?.onStatsApiVerified?.();
+      await this.handlers?.onEnvelope(envelope);
       saveCompanionCursor(message.id);
     } catch (error) {
       this.handlers?.onDiagnostic?.(

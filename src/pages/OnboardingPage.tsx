@@ -150,7 +150,7 @@ function SetupPathChooser({
 /** Presents both setup paths from live browser, companion, storefront, and feed evidence instead of user-checked documentation. */
 export function OnboardingPage() {
   const access = useLocalAccess();
-  const { connection } = useFennec();
+  const { connection, statsApiVerified } = useFennec();
   const companion = useCompanionStatus();
   const { health, recheck } = companion;
   const [path, setPath] = useState<SetupPath | undefined>(storedSetupPath);
@@ -185,7 +185,7 @@ export function OnboardingPage() {
   const setupComplete =
     access.satisfied &&
     (path === 'browser'
-      ? statsApiConnected
+      ? statsApiVerified
       : paired &&
         compatible &&
         storesConfigured &&
@@ -345,15 +345,17 @@ export function OnboardingPage() {
           ) : (
             <>
               <CollapsibleRequirement
-                key={statsApiConnected ? 'connected' : 'disconnected'}
-                complete={statsApiConnected}
-                defaultExpanded={!statsApiConnected}
+                key={statsApiVerified ? 'verified' : 'unverified'}
+                complete={statsApiVerified}
+                defaultExpanded={!statsApiVerified}
                 title="Enable the Rocket League Stats API"
               >
                 <p>
                   {statsApiConnected
                     ? "Fennec is connected to Rocket League's Stats API."
-                    : 'Follow these steps, restart Rocket League, and keep Fennec open. This step will complete automatically when the connection is ready.'}
+                    : statsApiVerified
+                      ? 'Fennec previously connected successfully. Start Rocket League to reconnect.'
+                      : 'Follow these steps, restart Rocket League, and keep Fennec open. This step will complete automatically when the connection is ready.'}
                 </p>
                 <StatsApiSetup />
               </CollapsibleRequirement>
@@ -404,7 +406,7 @@ export function OnboardingPage() {
               <p className="text-muted mt-1 text-sm">
                 {path === 'companion'
                   ? `Companion setup is complete${configuredStores ? ` for ${configuredStores}` : ''}. Fennec can capture matches in the background.`
-                  : 'Browser-only setup is complete. Keep Fennec open while you play to capture matches.'}
+                  : 'Browser-only setup is complete. Start Rocket League and keep Fennec open while you play to capture matches.'}
               </p>
             </div>
           </div>

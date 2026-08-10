@@ -110,7 +110,12 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
           await handlers.onEnvelope(envelope);
         }, delay),
       );
-    this.timers.push(window.setTimeout(() => handlers.onState('waiting'), 250));
+    this.timers.push(
+      window.setTimeout(() => {
+        handlers.onStatsApiVerified?.();
+        handlers.onState('waiting');
+      }, 250),
+    );
     emit(500, { event: 'MatchCreated', data: { MatchGuid: guid } });
     emit(650, { event: 'RoundStarted', data: { MatchGuid: guid } });
     emit(700, update(300, 1, 1));

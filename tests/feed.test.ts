@@ -29,6 +29,7 @@ describe('browser Stats API feed', () => {
   it('reports connection states and ignores malformed packets', async () => {
     const states: string[] = [];
     const events: string[] = [];
+    let verifications = 0;
     const diagnostics: string[] = [];
     const telemetry: Array<{
       event: string;
@@ -44,6 +45,9 @@ describe('browser Stats API feed', () => {
       onState: (state) => {
         states.push(state);
       },
+      onStatsApiVerified: () => {
+        verifications += 1;
+      },
       onEnvelope: (envelope) => {
         events.push(envelope.event);
       },
@@ -58,6 +62,7 @@ describe('browser Stats API feed', () => {
     socket.emit('message', { data: '{"Event":"GoalScored","Data":{}}' });
     await Promise.resolve();
     expect(states).toEqual(['connecting', 'waiting']);
+    expect(verifications).toBe(1);
     expect(events).toEqual(['GoalScored']);
     expect(diagnostics[0]).toMatch(/malformed/);
     expect(telemetry).toEqual(
