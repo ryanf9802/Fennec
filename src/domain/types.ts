@@ -228,6 +228,7 @@ export function normalizeSettings(
 }
 
 export interface SessionMetrics {
+  resultDifference: number;
   record: string;
   winRate: string;
   games: number;

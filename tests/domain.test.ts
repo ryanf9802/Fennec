@@ -1763,6 +1763,14 @@ describe('Stats API domain', () => {
     expect(history.against.player.goals).toBe(3);
     expect(sessionMetrics([together], 'Steam|1|0').passes).toBe(4);
     expect(sessionMetrics([together], 'Steam|1|0').fifties).toBe(2);
+    expect(sessionMetrics([together], 'Steam|1|0').resultDifference).toBe(1);
+    expect(
+      sessionMetrics([together, against], 'Steam|1|0').resultDifference,
+    ).toBe(0);
+    expect(sessionMetrics([against], 'Steam|1|0').resultDifference).toBe(-1);
+    expect(sessionMetrics([together, live], 'Steam|1|0').resultDifference).toBe(
+      1,
+    );
     expect(history.recent[0]?.result).toBe('incomplete');
     expect(isTrackablePrimaryId('Unknown|0|0')).toBe(false);
   });

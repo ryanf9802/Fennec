@@ -25,6 +25,7 @@ export function sessionMetrics(
     ({ match }) => match.lifecycle === 'completed',
   );
   const wins = completed.filter(({ match }) => isWin(match, profileId)).length;
+  const losses = completed.length - wins;
   const goalsFor = profiles.reduce(
     (total, { match, player }) =>
       total +
@@ -53,7 +54,8 @@ export function sessionMetrics(
     streak = `${last ? 'W' : 'L'}${count}`;
   }
   return {
-    record: `${wins}–${completed.length - wins}`,
+    resultDifference: wins - losses,
+    record: `${wins}–${losses}`,
     winRate: completed.length
       ? `${Math.round((wins * 100) / completed.length)}%`
       : '—',

@@ -678,8 +678,34 @@ test('session summaries expose recurring teammates and full history in place', a
     recurringTeammates.getByText('Luna', { exact: true }),
   ).toBeVisible();
 
-  await currentSession.getByRole('link', { name: /Full session/ }).click();
+  const sessionPanel = currentSession.getByRole('link', {
+    name: 'View current session details',
+  });
+  await expect(sessionPanel).toBeVisible();
+  const sectionWidth = (await currentSession.boundingBox())!.width;
+  const panelWidth = (await sessionPanel.boundingBox())!.width;
+  expect(Math.abs(sectionWidth - panelWidth)).toBeLessThan(2);
+  await expect(
+    currentSession.getByRole('link', { name: /Full session/ }),
+  ).toHaveCount(0);
+  await sessionPanel.click();
   const sessionUrl = page.url();
+  await expect(
+    page.getByRole('region', { name: 'Session performance details' }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Outcome' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Offense' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Involvement' }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
   await expect(
     page.getByText('Recurring teammates', { exact: true }),
   ).toBeVisible();

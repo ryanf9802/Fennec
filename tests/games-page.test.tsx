@@ -144,7 +144,7 @@ describe('closed session presentation', () => {
       screen.getByRole('heading', { name: 'Past sessions' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: /Earlier today.*1 game/ }),
+      screen.getByRole('link', { name: /Earlier today.*Games 1/ }),
     ).toBeInTheDocument();
     expect(screen.queryByText('In focus')).not.toBeInTheDocument();
     expect(screen.queryByText('Recurring teammates')).not.toBeInTheDocument();
@@ -196,7 +196,21 @@ describe('closed session presentation', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('In focus')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: /Earlier today.*1 game/ }),
+      screen.getByRole('link', { name: /Earlier today.*Games 1/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('uses the full-width current session panel as its detail link', () => {
+    renderPage();
+
+    expect(
+      screen.getByRole('link', { name: 'View current session details' }),
+    ).toHaveAttribute('href', '/sessions/latest-session');
+    expect(
+      screen.queryByRole('link', { name: /Full session/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'End session' }),
     ).toBeInTheDocument();
   });
 

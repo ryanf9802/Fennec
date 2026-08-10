@@ -128,6 +128,19 @@ describe('session detail recurring teammates', () => {
       screen.getByRole('button', { name: 'View profile for Bravo' }),
     ).toBeInTheDocument();
     expect(screen.queryByText('One game')).not.toBeInTheDocument();
+    expect(screen.getByText('W/L diff')).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Session performance details' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Outcome' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Offense' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Involvement' }),
+    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: 'View profile for Bravo' }),

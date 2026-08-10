@@ -3,12 +3,15 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { MatchRow } from '../components/MatchRow';
-import { MetricsGrid } from '../components/MetricsGrid';
 import { PlayerProfileDialog } from '../components/PlayerProfileDialog';
 import {
   RecurringTeammates,
   type RecurringTeammateSelection,
 } from '../components/RecurringTeammates';
+import {
+  SessionDetailStats,
+  SessionSummaryStats,
+} from '../components/SessionStats';
 import { sessionMetrics } from '../domain/metrics';
 import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 import { useSession } from '../data/historyQueries';
@@ -40,6 +43,7 @@ export function SessionPage() {
         </Link>
       </div>
     );
+  const metrics = sessionMetrics(session.matches, profile?.primaryId);
   return (
     <div className="space-y-6">
       <Link
@@ -72,10 +76,9 @@ export function SessionPage() {
         </p>
       </header>
       <div className="surface rounded-3xl p-5 sm:p-6">
-        <MetricsGrid
-          metrics={sessionMetrics(session.matches, profile?.primaryId)}
-        />
+        <SessionSummaryStats metrics={metrics} />
       </div>
+      <SessionDetailStats metrics={metrics} />
       <RecurringTeammates
         className="surface rounded-3xl p-5 sm:p-6"
         matches={session.matches}

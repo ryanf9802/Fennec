@@ -11,8 +11,8 @@ import { useFennec } from '../app/FennecContext';
 import { EmptyState } from '../components/EmptyState';
 import { ConnectionStatus } from '../components/ConnectionStatus';
 import { MatchRow } from '../components/MatchRow';
-import { MetricsGrid } from '../components/MetricsGrid';
 import { RecurringTeammates } from '../components/RecurringTeammates';
+import { SessionSummaryStats } from '../components/SessionStats';
 import { sessionMetrics } from '../domain/metrics';
 import { sessionIdleGapElapsed } from '../domain/sessions';
 import { formatClock, matchElapsedSeconds } from '../domain/timeline';
@@ -31,6 +31,15 @@ function sessionTitle(startedAt: string): string {
     day: 'numeric',
     year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric',
   }).format(date);
+}
+
+function sessionTimeRange(startedAt: string, endedAt: string): string {
+  const format = (value: string) =>
+    new Date(value).toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  return `${format(startedAt)} – ${format(endedAt)}`;
 }
 
 /**
@@ -214,12 +223,6 @@ export function GamesPage() {
                   <Square className="size-3.5 fill-current" />
                   {endingSession ? 'Ending…' : 'End session'}
                 </button>
-                <Link
-                  className="text-fennec-cyan flex items-center gap-1 text-sm font-bold"
-                  to={`/sessions/${focusedSession.id}`}
-                >
-                  Full session <ArrowUpRight className="size-4" />
-                </Link>
               </div>
             </div>
             {sessionMessage && (
@@ -231,21 +234,27 @@ export function GamesPage() {
                 {sessionMessage}
               </p>
             )}
-            <div className="surface rounded-3xl p-5 sm:p-6">
-              <MetricsGrid
-                metrics={sessionMetrics(
-                  focusedSession.matches,
-                  profile?.primaryId,
-                )}
-                abbreviateGoalsForAgainst
-              />
+            <Link
+              to={`/sessions/${focusedSession.id}`}
+              aria-label="View current session details"
+              className="surface hover-surface group relative block rounded-3xl p-5 transition sm:p-6"
+            >
+              <ArrowUpRight className="text-muted absolute top-5 right-5 size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              <div className="pr-8">
+                <SessionSummaryStats
+                  metrics={sessionMetrics(
+                    focusedSession.matches,
+                    profile?.primaryId,
+                  )}
+                />
+              </div>
               <RecurringTeammates
                 className="mt-5 border-t border-ui pt-5"
                 matches={focusedSession.matches}
                 profileId={profile?.primaryId}
                 limit={2}
               />
-            </div>
+            </Link>
             <div className="space-y-2">
               {[...focusedSession.matches].reverse().map((match) => (
                 <MatchRow
@@ -301,9 +310,7 @@ export function GamesPage() {
                         {sessionTitle(session.startedAt)}
                       </div>
                       <div className="text-muted mt-1 text-sm">
-                        {session.matches.length} game
-                        {session.matches.length === 1 ? '' : 's'} ·{' '}
-                        {metrics.record} · {metrics.winRate}
+                        {sessionTimeRange(session.startedAt, session.endedAt)}
                       </div>
                     </div>
                     <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -315,11 +322,7 @@ export function GamesPage() {
                     limit={2}
                   />
                   <div className="mt-4">
-                    <MetricsGrid
-                      metrics={metrics}
-                      compact
-                      abbreviateGoalsForAgainst
-                    />
+                    <SessionSummaryStats metrics={metrics} />
                   </div>
                 </Link>
               );
