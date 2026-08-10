@@ -94,7 +94,7 @@ describe('settings CSV export', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('defaults speed units to km/h and saves an mph preference', () => {
+  it('defaults speed units to km/h and saves an mph preference', async () => {
     render(
       <MemoryRouter>
         <SettingsPage />
@@ -110,5 +110,6 @@ describe('settings CSV export', () => {
       ...defaultSettings,
       speedUnit: 'mph',
     });
+    expect(await screen.findByText('Settings saved.')).toBeInTheDocument();
   });
 });

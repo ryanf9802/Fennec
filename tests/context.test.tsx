@@ -200,6 +200,7 @@ describe('Fennec live state', () => {
         <LiveStateProbe />
       </FennecProvider>,
     );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
     expect(screen.getByText('Stats API verified')).toBeInTheDocument();
   });
 

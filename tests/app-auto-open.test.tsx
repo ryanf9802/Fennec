@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Outlet } from 'react-router-dom';
 import { App } from '../src/app/App';
 import { defaultSettings, type MatchState } from '../src/domain/types';
 
@@ -36,6 +36,9 @@ vi.mock('../src/platform/LocalAccessContext', () => ({
 }));
 vi.mock('../src/components/AppShell', () => ({
   AppShell: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('../src/app/RequireSetup', () => ({
+  RequireSetup: () => <Outlet />,
 }));
 vi.mock('../src/pages/GamesPage', () => ({
   GamesPage: () => <div>Games route</div>,

@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Fennec Change Validation'
+  short_description: 'Validate Fennec changes before integration'
+  default_prompt: 'Use $fennec-change-validation to validate this Fennec change before integration.'
