@@ -87,10 +87,11 @@ definition instead of pretending the game reports values that it does not.
 
 ### Play sessions instead of isolated results
 
-Nearby games are automatically grouped into sessions. A session shows your
-record, win rate, current streak, goal difference, scoring totals, average
-score, touches, demos, passes, 50s, and recurring teammates. You can adjust the
-idle gap or end a session manually when one stretch of play is finished.
+Nearby games are automatically grouped into sessions. By default, a new session
+starts after a 30-minute gap between games; you can change that gap in Settings
+or end a session manually when one stretch of play is finished. A session shows
+your record, win rate, current streak, goal difference, scoring totals, average
+score, touches, demos, passes, 50s, and recurring teammates.
 
 ### Ball analytics and touch maps
 
