@@ -704,22 +704,23 @@ test('session summaries expose recurring teammates and full history in place', a
   await expect(
     page.getByRole('heading', { name: 'Involvement' }),
   ).toBeVisible();
-  await page.setViewportSize({ width: 900, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 900 });
   const detailRegion = page.getByRole('region', {
     name: 'Session performance details',
   });
+  const cardHeights: number[] = [];
   for (const heading of ['Outcome', 'Offense', 'Involvement']) {
-    const statLabels = detailRegion
+    const card = detailRegion
       .getByRole('heading', { name: heading })
-      .locator('..')
-      .locator('.eyebrow');
+      .locator('..');
+    cardHeights.push((await card.boundingBox())!.height);
+    const statLabels = card.locator('.eyebrow');
     const labelOffsets = await statLabels.evaluateAll((labels) =>
-      labels.map((label) => label.getBoundingClientRect().top),
+      labels.map((label) => Math.round(label.getBoundingClientRect().top)),
     );
-    expect(Math.max(...labelOffsets) - Math.min(...labelOffsets)).toBeLessThan(
-      2,
-    );
+    expect(new Set(labelOffsets).size).toBe(2);
   }
+  expect(Math.max(...cardHeights) - Math.min(...cardHeights)).toBeLessThan(2);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>

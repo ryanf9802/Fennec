@@ -4,6 +4,7 @@ import type { SessionMetrics } from '../domain/types';
 interface StatItem {
   label: string;
   value: ReactNode;
+  className?: string;
 }
 
 function signedValue(value: number): string {
@@ -67,24 +68,25 @@ export function SessionSummaryStats({ metrics }: { metrics: SessionMetrics }) {
 export function SessionDetailStats({ metrics }: { metrics: SessionMetrics }) {
   const groups: Array<{
     title: string;
-    columnsClass: string;
+    gridClass: string;
     items: StatItem[];
   }> = [
     {
       title: 'Outcome',
-      columnsClass: 'sm:grid-cols-3',
+      gridClass: 'grid-cols-2',
       items: [
         { label: 'Win rate', value: metrics.winRate },
         { label: 'Streak', value: metrics.streak },
         {
           label: 'Goals for / against',
           value: `${metrics.goalsFor}–${metrics.goalsAgainst}`,
+          className: 'col-span-2',
         },
       ],
     },
     {
       title: 'Offense',
-      columnsClass: 'sm:grid-cols-4',
+      gridClass: 'grid-cols-2',
       items: [
         { label: 'Goals', value: metrics.goals },
         { label: 'Assists', value: metrics.assists },
@@ -100,30 +102,33 @@ export function SessionDetailStats({ metrics }: { metrics: SessionMetrics }) {
     },
     {
       title: 'Involvement',
-      columnsClass: 'sm:grid-cols-5',
+      gridClass: 'grid-cols-6',
       items: [
-        { label: 'Passes', value: metrics.passes },
-        { label: 'Saves', value: metrics.saves },
-        { label: '50s', value: metrics.fifties },
-        { label: 'Touches', value: metrics.touches },
-        { label: 'Demos', value: metrics.demos },
+        { label: 'Passes', value: metrics.passes, className: 'col-span-2' },
+        { label: 'Saves', value: metrics.saves, className: 'col-span-2' },
+        { label: '50s', value: metrics.fifties, className: 'col-span-2' },
+        { label: 'Touches', value: metrics.touches, className: 'col-span-3' },
+        { label: 'Demos', value: metrics.demos, className: 'col-span-3' },
       ],
     },
   ];
 
   return (
-    <section aria-label="Session performance details" className="space-y-3">
+    <section
+      aria-label="Session performance details"
+      className="grid gap-4 lg:grid-cols-3"
+    >
       {groups.map((group) => (
-        <article
-          key={group.title}
-          className="surface-flat rounded-2xl p-5 lg:grid lg:grid-cols-[9rem_minmax(0,1fr)] lg:items-center lg:gap-6"
-        >
+        <article key={group.title} className="surface-flat rounded-2xl p-5">
           <h2 className="text-lg font-extrabold">{group.title}</h2>
-          <div
-            className={`mt-5 grid grid-cols-2 gap-x-5 gap-y-5 lg:mt-0 ${group.columnsClass}`}
-          >
+          <div className={`mt-4 grid gap-3 ${group.gridClass}`}>
             {group.items.map((item) => (
-              <StatValue key={item.label} item={item} />
+              <div
+                key={item.label}
+                className={`surface-strong rounded-xl p-3 ${item.className ?? ''}`}
+              >
+                <StatValue item={item} />
+              </div>
             ))}
           </div>
         </article>
