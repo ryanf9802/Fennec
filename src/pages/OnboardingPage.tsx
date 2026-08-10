@@ -6,8 +6,8 @@ import {
   Monitor,
   TriangleAlert,
 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { useAppEntrance } from '../components/AppEntrance';
 import { CompanionLaunchControls } from '../components/CompanionSettings';
@@ -147,21 +147,38 @@ export function OnboardingPage() {
   const access = useLocalAccess();
   const { connection, statsApiVerified, demoMode } = useFennec();
   const setup = useSetupStatus();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
   const { health, recheck } = setup.companion;
   const path = setup.selectedPath;
+  const selectPath = setup.selectPath;
   const { replayCinematic } = useAppEntrance();
   const [configuring, setConfiguring] = useState<'steam' | 'epic'>();
   const [companionMessage, setCompanionMessage] = useState<string>();
+  const selectSetupPath = useCallback(
+    (nextPath: SetupPath) => {
+      selectPath(nextPath);
+      const parameters = new URLSearchParams(search);
+      if (!parameters.has('path')) return;
+      parameters.delete('path');
+      const remainingSearch = parameters.toString();
+      void navigate(
+        { pathname, search: remainingSearch ? `?${remainingSearch}` : '' },
+        { replace: true },
+      );
+    },
+    [navigate, pathname, search, selectPath],
+  );
   useEffect(() => {
     const requested = requestedSetupPath();
-    if (requested && requested !== path) setup.selectPath(requested);
-  }, [path, setup]);
+    if (requested && requested !== path) selectPath(requested);
+  }, [path, search, selectPath]);
   useEffect(() => {
     if (acceptCompanionPairing()) {
-      setup.selectPath('companion');
+      selectPath('companion');
       void recheck();
     }
-  }, [recheck, setup]);
+  }, [recheck, selectPath]);
   const paired = Boolean(health?.paired);
   const compatible = companionCompatible(health);
   const statsApiConnected = isStatsApiConnected(connection);
@@ -201,7 +218,7 @@ export function OnboardingPage() {
               time from the Setup page.
             </p>
           </header>
-          <SetupPathChooser onSelect={setup.selectPath} />
+          <SetupPathChooser onSelect={selectSetupPath} />
         </div>
       </div>
     );
@@ -216,7 +233,7 @@ export function OnboardingPage() {
         </p>
       </header>
 
-      <SetupPathChooser path={path} onSelect={setup.selectPath} />
+      <SetupPathChooser path={path} onSelect={selectSetupPath} />
 
       <section
         aria-labelledby="setup-instructions-title"

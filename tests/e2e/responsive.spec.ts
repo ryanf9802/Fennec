@@ -953,6 +953,15 @@ test('settings companion pairing link selects the companion setup guide', async 
     page.getByRole('heading', { name: 'Setup instructions' }),
   ).toBeVisible();
   await expect(page.getByText('Install and pair the companion')).toBeVisible();
+
+  await page.getByRole('button', { name: /Browser only/ }).click();
+  await expect(page).toHaveURL(/\/setup$/);
+  await expect(
+    page.getByRole('button', { name: /Browser only/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByText('Enable the Rocket League Stats API'),
+  ).toBeVisible();
 });
 
 test('paired setup exposes companion launch preferences', async ({ page }) => {
