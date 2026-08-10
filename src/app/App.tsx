@@ -21,6 +21,7 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { resolveAppEntranceMode } from './appEntranceMode';
 import { useFennec } from './FennecContext';
 import { matchBelongsToProfile } from '../domain/profileScope';
+import { RequireSetup } from './RequireSetup';
 
 export function App() {
   const { activeMatch, profile, settings, ready, diagnostic } = useFennec();
@@ -67,27 +68,29 @@ export function App() {
       <PwaLifecycle />
       <AppShell>
         <Routes>
-          <Route path="/" element={<GamesPage />} />
-          <Route
-            path="/live"
-            element={
-              visibleActiveMatch ? (
-                <MatchPage match={visibleActiveMatch} />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            }
-          />
-          <Route path="/matches/:matchId" element={<MatchPage />} />
-          <Route path="/sessions/:sessionId" element={<SessionPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/setup" element={<OnboardingPage />} />
           <Route
             path="/onboarding"
             element={<Navigate to="/setup" replace />}
           />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route element={<RequireSetup />}>
+            <Route path="/" element={<GamesPage />} />
+            <Route
+              path="/live"
+              element={
+                visibleActiveMatch ? (
+                  <MatchPage match={visibleActiveMatch} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route path="/matches/:matchId" element={<MatchPage />} />
+            <Route path="/sessions/:sessionId" element={<SessionPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
         </Routes>
       </AppShell>
       {!localAccess.satisfied && pathname !== '/setup' && <LocalAccessModal />}

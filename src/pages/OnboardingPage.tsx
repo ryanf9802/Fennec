@@ -7,6 +7,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { CompanionLaunchControls } from '../components/CompanionSettings';
 import { StatsApiSetup } from '../components/StatsApiSetup';
@@ -15,27 +16,22 @@ import {
   companionCommand,
   companionDownloadUrl,
   companionOpenUrl,
-  companionProtocolVersion,
 } from '../companion/client';
 import { useCompanionStatus } from '../companion/useCompanionStatus';
 import { isStatsApiConnected } from '../domain/connectionPresentation';
 import { useLocalAccess } from '../platform/LocalAccessContext';
-
-type SetupPath = 'companion' | 'browser';
-const setupPathKey = 'fennec-setup-path-explicit-v2';
-
-function storedSetupPath(): SetupPath | undefined {
-  if (new URLSearchParams(location.hash.slice(1)).has('companion'))
-    return 'companion';
-  const requested = new URLSearchParams(location.search).get('path');
-  if (requested === 'browser' || requested === 'companion') return requested;
-  try {
-    const stored = window.localStorage?.getItem(setupPathKey);
-    return stored === 'browser' || stored === 'companion' ? stored : undefined;
-  } catch {
-    return undefined;
-  }
-}
+import {
+  companionCompatible,
+  companionStoresConfigured,
+  rememberCompanionCaptureVerification,
+  rememberCompanionSetupCompletion,
+  rememberSetupPath,
+  requestedSetupPath,
+  setupComplete,
+  storedCompanionCaptureVerification,
+  storedCompanionSetupCompletion,
+  type SetupPath,
+} from '../setup/setupStatus';
 
 function Requirement({
   complete,
@@ -152,46 +148,61 @@ function SetupPathChooser({
 /** Presents both setup paths from live browser, companion, storefront, and feed evidence instead of user-checked documentation. */
 export function OnboardingPage() {
   const access = useLocalAccess();
-  const { connection, statsApiVerified } = useFennec();
+  const { connection, statsApiVerified, demoMode } = useFennec();
   const companion = useCompanionStatus();
   const { health, recheck } = companion;
-  const [path, setPath] = useState<SetupPath | undefined>(storedSetupPath);
+  const [path, setPath] = useState<SetupPath | undefined>(requestedSetupPath);
   const [configuring, setConfiguring] = useState<'steam' | 'epic'>();
   const [companionMessage, setCompanionMessage] = useState<string>();
   const selectPath = useCallback((nextPath: SetupPath) => {
     setPath(nextPath);
-    try {
-      window.localStorage?.setItem(setupPathKey, nextPath);
-    } catch {
-      // Setup remains usable when browser storage is blocked.
-    }
   }, []);
   useEffect(() => {
+    if (path) rememberSetupPath(path);
+  }, [path]);
+  useEffect(() => {
     if (acceptCompanionPairing()) {
-      try {
-        window.localStorage?.setItem(setupPathKey, 'companion');
-      } catch {
-        // Pairing remains active for this visit when storage is blocked.
-      }
+      rememberSetupPath('companion');
       void recheck();
     }
   }, [recheck]);
+  useEffect(() => {
+    if (health?.lastPacketAt && !demoMode)
+      rememberCompanionCaptureVerification();
+  }, [demoMode, health?.lastPacketAt]);
   const paired = Boolean(health?.paired);
-  const compatible =
-    paired && health?.protocolVersion === companionProtocolVersion;
+  const compatible = companionCompatible(health);
   const statsApiConnected = isStatsApiConnected(connection);
-  const storesConfigured = Boolean(
-    health?.stores?.length &&
-    health.stores.every((store) => health.configuredStores?.includes(store)),
-  );
-  const setupComplete =
-    access.satisfied &&
-    (path === 'browser'
-      ? statsApiVerified
-      : paired &&
-        compatible &&
-        storesConfigured &&
-        Boolean(health?.lastPacketAt));
+  const storesConfigured = companionStoresConfigured(health);
+  const companionCaptureVerified =
+    Boolean(health?.lastPacketAt) || storedCompanionCaptureVerification();
+  const companionSetupVerified = storedCompanionSetupCompletion();
+  const currentSetupComplete = setupComplete({
+    accessSatisfied: access.satisfied,
+    path,
+    statsApiVerified,
+    companionCaptureVerified,
+    companionSetupVerified: false,
+    health,
+  });
+  useEffect(() => {
+    if (path === 'companion' && currentSetupComplete && !demoMode)
+      rememberCompanionSetupCompletion();
+  }, [currentSetupComplete, demoMode, path]);
+  const isComplete =
+    currentSetupComplete ||
+    setupComplete({
+      accessSatisfied: access.satisfied,
+      path,
+      statsApiVerified,
+      companionCaptureVerified,
+      companionSetupVerified,
+      health,
+    });
+  const pairingComplete = health ? compatible : companionSetupVerified;
+  const installationConfigured = health
+    ? storesConfigured
+    : companionSetupVerified;
   const configuredStores = health?.stores
     ?.map((store) => (store === 'steam' ? 'Steam' : 'Epic'))
     .join(' and ');
@@ -265,7 +276,7 @@ export function OnboardingPage() {
           {path === 'companion' ? (
             <>
               <Requirement
-                complete={paired && compatible}
+                complete={pairingComplete}
                 title="Install and pair the companion"
               >
                 {paired
@@ -291,11 +302,13 @@ export function OnboardingPage() {
                 )}
               </Requirement>
               <Requirement
-                complete={storesConfigured}
+                complete={installationConfigured}
                 title="Detect and configure Steam or Epic"
               >
                 {!health
-                  ? 'Storefront detection starts after the companion responds.'
+                  ? companionSetupVerified
+                    ? 'Installation configuration was verified previously. Start the companion to recheck it.'
+                    : 'Storefront detection starts after the companion responds.'
                   : health.stores?.length
                     ? `Detected ${health.stores.join(' and ')}. ${health.stores.every((store) => health.configuredStores?.includes(store)) ? 'Stats API configuration is verified.' : 'Configure each installation you use.'}`
                     : 'The companion did not find a supported Steam or Epic installation.'}
@@ -324,14 +337,16 @@ export function OnboardingPage() {
                 {companionMessage && <p className="mt-2">{companionMessage}</p>}
               </Requirement>
               <Requirement
-                complete={Boolean(health?.lastPacketAt)}
+                complete={companionCaptureVerified}
                 title="Verify live capture"
               >
                 {health?.lastPacketAt
                   ? `Feed connected${health.lastPacketAt ? `; last packet ${new Date(health.lastPacketAt).toLocaleTimeString()}` : ''}.`
-                  : health?.feedConnected
-                    ? 'Connected to Rocket League; waiting for the first Stats API packet.'
-                    : 'Start Rocket League after configuration and wait for the first Stats API packet.'}
+                  : companionCaptureVerified
+                    ? 'Live capture was verified previously. Start Rocket League to reconnect.'
+                    : health?.feedConnected
+                      ? 'Connected to Rocket League; waiting for the first Stats API packet.'
+                      : 'Start Rocket League after configuration and wait for the first Stats API packet.'}
               </Requirement>
             </>
           ) : (
@@ -384,10 +399,11 @@ export function OnboardingPage() {
           </span>
         </div>
       </section>
-      {setupComplete && (
-        <section
+      {isComplete && (
+        <Link
+          to="/"
           aria-labelledby="setup-complete-title"
-          className="rounded-3xl border border-emerald-400/30 bg-emerald-400/8 p-5 sm:p-7"
+          className="block rounded-3xl border border-emerald-400/30 bg-emerald-400/8 p-5 transition hover:border-emerald-300/60 hover:bg-emerald-400/12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 sm:p-7"
         >
           <div className="flex gap-3">
             <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-emerald-400" />
@@ -400,9 +416,12 @@ export function OnboardingPage() {
                   ? `Companion setup is complete${configuredStores ? ` for ${configuredStores}` : ''}. Fennec can capture matches in the background.`
                   : 'Browser-only setup is complete. Start Rocket League and keep Fennec open while you play to capture matches.'}
               </p>
+              <span className="mt-3 inline-block text-sm font-bold text-emerald-300">
+                Open Game timeline →
+              </span>
             </div>
           </div>
-        </section>
+        </Link>
       )}
     </div>
   );

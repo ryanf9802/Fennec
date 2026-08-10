@@ -752,6 +752,34 @@ test('setup starts with a centered route choice and expands after selection', as
   ).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('incomplete first launch opens Setup and completed setup links to Game timeline', async ({
+  page,
+}) => {
+  await page.goto('/?demo=0');
+
+  await expect(page).toHaveURL(/\/setup$/);
+  await expect(
+    page.getByRole('heading', { name: 'Choose your setup approach' }),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
+    localStorage.setItem('fennec-stats-api-verified-v1', 'true');
+  });
+  await page.goto('/setup?demo=0');
+
+  const readyLink = page.getByRole('link', {
+    name: 'Fennec is set up and ready to go',
+  });
+  await expect(readyLink).toHaveAttribute('href', '/');
+  await readyLink.click();
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    page.getByRole('heading', { name: 'Game timeline' }),
+  ).toBeVisible();
+});
+
 test('settings companion pairing link selects the companion setup guide', async ({
   page,
 }) => {
