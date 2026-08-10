@@ -148,54 +148,6 @@ export function SettingsPage() {
         </p>
       </header>
 
-      <section className="surface rounded-3xl p-5 sm:p-7">
-        <h2 className="text-xl font-extrabold">Monitoring</h2>
-        <div className="surface-strong mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-4">
-          <div>
-            <strong>Setup center</strong>
-            <p className="text-muted mt-1 text-sm">
-              Verify browser permissions, Rocket League configuration, the
-              optional recommended companion, and live capture.
-            </p>
-          </div>
-          <Link className="button-primary" to="/setup">
-            Open setup
-          </Link>
-        </div>
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
-          <label className="block">
-            <span className="eyebrow">WebSocket port</span>
-            <input
-              className="control mt-2"
-              type="number"
-              min="1024"
-              max="65535"
-              value={draft.webSocketPort}
-              onChange={(event) =>
-                patchDraft({ webSocketPort: Number(event.target.value) })
-              }
-            />
-          </label>
-          <div>
-            <div className="eyebrow">Connection</div>
-            <ConnectionStatus
-              connection={connection}
-              className="surface-strong mt-2 min-h-11 rounded-xl px-4"
-            />
-          </div>
-        </div>
-        <div className="mt-5">
-          <LocalNetworkAccessHelp />
-        </div>
-        <div className="mt-6">
-          <div className="eyebrow">Rocket League configuration</div>
-          <p className="text-muted mt-1 text-sm">
-            Update one Stats API setting from the game's installation directory.
-          </p>
-          <StatsApiSetup />
-        </div>
-      </section>
-
       <CompanionSettings />
 
       <section className="surface-flat rounded-3xl p-5 sm:p-7">
@@ -432,6 +384,54 @@ export function SettingsPage() {
             <Trash2 className="size-4" />
             Delete history
           </button>
+        </div>
+      </section>
+
+      <section className="surface rounded-3xl p-5 sm:p-7">
+        <h2 className="text-xl font-extrabold">Monitoring</h2>
+        <div className="surface-strong mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-4">
+          <div>
+            <strong>Setup center</strong>
+            <p className="text-muted mt-1 text-sm">
+              Verify browser permissions, Rocket League configuration, the
+              optional recommended companion, and live capture.
+            </p>
+          </div>
+          <Link className="button-primary" to="/setup">
+            Open setup
+          </Link>
+        </div>
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <label className="block">
+            <span className="eyebrow">WebSocket port</span>
+            <input
+              className="control mt-2"
+              type="number"
+              min="1024"
+              max="65535"
+              value={draft.webSocketPort}
+              onChange={(event) =>
+                patchDraft({ webSocketPort: Number(event.target.value) })
+              }
+            />
+          </label>
+          <div>
+            <div className="eyebrow">Connection</div>
+            <ConnectionStatus
+              connection={connection}
+              className="surface-strong mt-2 min-h-11 rounded-xl px-4"
+            />
+          </div>
+        </div>
+        <div className="mt-5">
+          <LocalNetworkAccessHelp />
+        </div>
+        <div className="mt-6">
+          <div className="eyebrow">Rocket League configuration</div>
+          <p className="text-muted mt-1 text-sm">
+            Update one Stats API setting from the game's installation directory.
+          </p>
+          <StatsApiSetup />
         </div>
       </section>
 

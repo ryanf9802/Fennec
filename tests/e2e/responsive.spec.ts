@@ -509,6 +509,19 @@ test('settings show installation-relative Stats API instructions', async ({
   ).toBeVisible();
 });
 
+test('settings place Monitoring below Local data', async ({ page }) => {
+  await page.goto('/settings?demo=1');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  const headings = await page
+    .getByRole('heading', { level: 2 })
+    .allTextContents();
+
+  expect(headings.indexOf('Local data')).toBeGreaterThanOrEqual(0);
+  expect(headings.indexOf('Monitoring')).toBeGreaterThan(
+    headings.indexOf('Local data'),
+  );
+});
+
 test('browser-only setup uses instructions and follows the Stats API connection', async ({
   page,
 }) => {
