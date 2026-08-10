@@ -511,19 +511,31 @@ test('browser-only setup uses instructions and follows the Stats API connection'
   const requirement = page
     .getByRole('listitem')
     .filter({ hasText: 'Enable the Rocket League Stats API' });
-  await expect(requirement).toContainText(
-    "Fennec is connected to Rocket League's Stats API.",
-  );
   await expect(requirement.locator('svg.text-emerald-400')).toBeVisible();
+  await expect(
+    requirement.getByText("Fennec is connected to Rocket League's Stats API."),
+  ).not.toBeVisible();
+  const disclosure = requirement.getByText(
+    'Enable the Rocket League Stats API',
+  );
+  await disclosure.click();
+  await expect(
+    requirement.getByText("Fennec is connected to Rocket League's Stats API."),
+  ).toBeVisible();
   await expect(
     requirement.getByText(String.raw`Open TAGame\Config\TAStatsAPI.ini.`),
   ).toBeVisible();
+  await disclosure.click();
+  await expect(
+    requirement.getByText(String.raw`Open TAGame\Config\TAStatsAPI.ini.`),
+  ).not.toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Choose Stats API file' }),
   ).toHaveCount(0);
   await expect(
     page.getByText('Keep Fennec open and verify the feed'),
   ).toHaveCount(0);
+  await expect(page.getByText('Browser-only limitations:')).toHaveCount(0);
 });
 
 test('PWA identity uses only the Fennec name', async ({ page }) => {

@@ -1,10 +1,10 @@
 import {
   CheckCircle2,
+  ChevronDown,
   Download,
   ExternalLink,
   Monitor,
   RefreshCw,
-  ShieldAlert,
   TriangleAlert,
 } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -58,6 +58,44 @@ function Requirement({
           <div className="text-muted mt-1 text-sm">{children}</div>
         </div>
       </div>
+    </li>
+  );
+}
+
+function CollapsibleRequirement({
+  complete,
+  title,
+  defaultExpanded,
+  children,
+}: {
+  complete: boolean;
+  title: string;
+  defaultExpanded: boolean;
+  children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  return (
+    <li className="surface-strong rounded-2xl p-4">
+      <details
+        open={expanded}
+        onToggle={(event) => setExpanded(event.currentTarget.open)}
+      >
+        <summary className="text-main flex cursor-pointer list-none gap-3">
+          {complete ? (
+            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-400" />
+          ) : (
+            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-fennec-orange" />
+          )}
+          <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+            <strong>{title}</strong>
+            <ChevronDown
+              aria-hidden="true"
+              className={`size-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            />
+          </span>
+        </summary>
+        <div className="text-muted mt-1 ml-8 text-sm">{children}</div>
+      </details>
     </li>
   );
 }
@@ -300,8 +338,10 @@ export function OnboardingPage() {
             </>
           ) : (
             <>
-              <Requirement
+              <CollapsibleRequirement
+                key={statsApiConnected ? 'connected' : 'disconnected'}
                 complete={statsApiConnected}
+                defaultExpanded={!statsApiConnected}
                 title="Enable the Rocket League Stats API"
               >
                 <p>
@@ -310,18 +350,7 @@ export function OnboardingPage() {
                     : 'Follow these steps, restart Rocket League, and keep Fennec open. This step will complete automatically when the connection is ready.'}
                 </p>
                 <StatsApiSetup />
-              </Requirement>
-              <li className="rounded-2xl border border-orange-400/30 bg-orange-400/8 p-4">
-                <div className="flex gap-3">
-                  <ShieldAlert className="size-5 shrink-0 text-fennec-orange" />
-                  <p className="text-sm">
-                    <strong>Browser-only limitations:</strong> closing this
-                    window stops capture; there is no tray collection, automatic
-                    storefront discovery, protected-file elevation, or Rocket
-                    League lifecycle shortcut.
-                  </p>
-                </div>
-              </li>
+              </CollapsibleRequirement>
             </>
           )}
         </ol>
