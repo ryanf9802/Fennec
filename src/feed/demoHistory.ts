@@ -156,8 +156,8 @@ function demoMatch(
         payload: {
           Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }],
           Ball: {
-            PreHitSpeed: 5.4,
-            PostHitSpeed: 11.2,
+            PreHitSpeed: 54,
+            PostHitSpeed: 112,
             Location: { X: -1200, Y: -900, Z: 170 },
           },
         },
@@ -194,8 +194,8 @@ function demoMatch(
             },
           ],
           Ball: {
-            PreHitSpeed: 7.2,
-            PostHitSpeed: 9.8,
+            PreHitSpeed: 72,
+            PostHitSpeed: 98,
             Location: { X: 300, Y: 1200, Z: 320 },
           },
         },
@@ -211,8 +211,8 @@ function demoMatch(
         payload: {
           Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }],
           Ball: {
-            PreHitSpeed: 8.6,
-            PostHitSpeed: 12.6,
+            PreHitSpeed: 86,
+            PostHitSpeed: 126,
             Location: { X: 480, Y: 3600, Z: 260 },
           },
         },
@@ -228,8 +228,8 @@ function demoMatch(
         payload: {
           Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }],
           Ball: {
-            PreHitSpeed: 8.6,
-            PostHitSpeed: 12.6,
+            PreHitSpeed: 86,
+            PostHitSpeed: 126,
             Location: { X: 480, Y: 3600, Z: 260 },
           },
         },

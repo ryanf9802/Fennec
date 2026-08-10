@@ -7,15 +7,14 @@ const milesPerHourPerKilometerPerHour = 0.621371192237334;
 
 /**
  * Converts Stats API speeds while preserving its inconsistent live WebSocket
- * behavior. Although the API documents ball speeds as uu/s, live UpdateState,
- * BallHit, and CrossbarHit values arrive in m/s, while GoalSpeed arrives in the
- * in-game km/h scale. Revisit both source mappings if Psyonix patches the
- * exporter or aligns its payloads with the documentation.
+ * behavior. Live UpdateState ball speeds arrive in m/s, while BallHit and
+ * GoalScored event speeds arrive on the in-game km/h scale. Revisit these
+ * source mappings if Psyonix aligns its payloads with the documentation.
  */
 export function convertSpeed(
   value: number,
   unit: SpeedUnit,
-  source: SpeedSource = 'meters-per-second',
+  source: SpeedSource,
 ): number {
   const kilometersPerHour =
     source === 'kilometers-per-hour'
@@ -29,7 +28,7 @@ export function convertSpeed(
 export function formatSpeed(
   value: number | undefined,
   unit: SpeedUnit,
-  options: { source?: SpeedSource; signed?: boolean } = {},
+  options: { source: SpeedSource; signed?: boolean },
 ): string {
   if (value === undefined) return '—';
   const converted = convertSpeed(value, unit, options.source);

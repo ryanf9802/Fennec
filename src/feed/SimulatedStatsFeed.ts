@@ -121,8 +121,8 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
         MatchGuid: guid,
         Players: [{ Name: 'You', Shortcut: 1, TeamNum: 0 }],
         Ball: {
-          PreHitSpeed: 6.2,
-          PostHitSpeed: 11.8,
+          PreHitSpeed: 62,
+          PostHitSpeed: 118,
           Location: { X: -1450, Y: -820, Z: 180 },
         },
       },
@@ -133,8 +133,8 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
         MatchGuid: guid,
         Players: [{ Name: 'Luna', Shortcut: 2, TeamNum: 0 }],
         Ball: {
-          PreHitSpeed: 8.3,
-          PostHitSpeed: 10.4,
+          PreHitSpeed: 83,
+          PostHitSpeed: 104,
           Location: { X: 620, Y: 1750, Z: 510 },
         },
       },
@@ -148,8 +148,8 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
           { Name: 'Drift', Shortcut: 3, TeamNum: 1 },
         ],
         Ball: {
-          PreHitSpeed: 10.4,
-          PostHitSpeed: 9.3,
+          PreHitSpeed: 104,
+          PostHitSpeed: 93,
           Location: { X: 700, Y: 1820, Z: 480 },
         },
       },

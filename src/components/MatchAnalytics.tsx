@@ -45,14 +45,37 @@ export function MatchAnalytics({
         ? '—'
         : `${Math.round(touches.touchShare * 100)}%`,
     ],
-    ['Average hit speed', formatSpeed(touches.averagePostHitSpeed, speedUnit)],
-    ['Fastest hit', formatSpeed(touches.maximumPostHitSpeed, speedUnit)],
+    [
+      'Average hit speed',
+      formatSpeed(touches.averagePostHitSpeed, speedUnit, {
+        source: 'kilometers-per-hour',
+      }),
+    ],
+    [
+      'Fastest hit',
+      formatSpeed(touches.maximumPostHitSpeed, speedUnit, {
+        source: 'kilometers-per-hour',
+      }),
+    ],
     [
       'Average speed gain',
-      formatSpeed(touches.averageSpeedChange, speedUnit, { signed: true }),
+      formatSpeed(touches.averageSpeedChange, speedUnit, {
+        source: 'kilometers-per-hour',
+        signed: true,
+      }),
     ],
-    ['Observed ball speed', formatSpeed(ballSpeed.average, speedUnit)],
-    ['Maximum ball speed', formatSpeed(ballSpeed.maximum, speedUnit)],
+    [
+      'Observed ball speed',
+      formatSpeed(ballSpeed.average, speedUnit, {
+        source: 'meters-per-second',
+      }),
+    ],
+    [
+      'Maximum ball speed',
+      formatSpeed(ballSpeed.maximum, speedUnit, {
+        source: 'meters-per-second',
+      }),
+    ],
     [
       'Last-touch control',
       !player || !totalControl

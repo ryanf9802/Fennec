@@ -52,65 +52,73 @@ function Harness({
 
 describe('match analytics view switch', () => {
   it.each([
-    ['kmh', '36 km/h', '+22 km/h'],
-    ['mph', '22 mph', '+13 mph'],
-  ] as const)('formats telemetry in %s', (speedUnit, maximum, gain) => {
-    render(
-      <Harness
-        speedUnit={speedUnit}
-        value={{
-          ...match,
-          capture: {
-            version: 1,
-            updateStatePackets: 1,
-            activePlayPackets: 1,
-            ballSpeed: { samples: 1, sum: 10, max: 10 },
-            lastTouchSamplesByTeam: {},
-          },
-          participants: [
-            {
-              name: 'You',
-              primaryId: 'Steam|1|0',
-              teamNumber: 0,
-              score: 0,
-              goals: 0,
-              assists: 0,
-              passes: 0,
-              fifties: 0,
-              saves: 0,
-              shots: 0,
-              touches: 1,
-              demos: 0,
+    ['kmh', '109 km/h', '+36 km/h', '36 km/h'],
+    ['mph', '68 mph', '+22 mph', '22 mph'],
+  ] as const)(
+    'formats event and snapshot telemetry in %s',
+    (speedUnit, maximum, gain, observed) => {
+      render(
+        <Harness
+          speedUnit={speedUnit}
+          value={{
+            ...match,
+            capture: {
+              version: 1,
+              updateStatePackets: 1,
+              activePlayPackets: 1,
+              ballSpeed: { samples: 1, sum: 10, max: 10 },
+              lastTouchSamplesByTeam: {},
             },
-          ],
-          events: [
-            {
-              id: 'analytics:1',
-              matchId: 'analytics',
-              sequence: 1,
-              eventName: 'BallHit',
-              receivedAt: '2026-08-09T00:01:00Z',
-              payload: {
-                Players: [{ Name: 'You', PrimaryId: 'Steam|1|0', TeamNum: 0 }],
-                Ball: {
-                  PreHitSpeed: 4,
-                  PostHitSpeed: 10,
-                  Location: { X: 0, Y: 0, Z: 0 },
+            participants: [
+              {
+                name: 'You',
+                primaryId: 'Steam|1|0',
+                teamNumber: 0,
+                score: 0,
+                goals: 0,
+                assists: 0,
+                passes: 0,
+                fifties: 0,
+                saves: 0,
+                shots: 0,
+                touches: 1,
+                demos: 0,
+              },
+            ],
+            events: [
+              {
+                id: 'analytics:1',
+                matchId: 'analytics',
+                sequence: 1,
+                eventName: 'BallHit',
+                receivedAt: '2026-08-09T00:01:00Z',
+                payload: {
+                  Players: [
+                    { Name: 'You', PrimaryId: 'Steam|1|0', TeamNum: 0 },
+                  ],
+                  Ball: {
+                    PreHitSpeed: 72.8,
+                    PostHitSpeed: 108.9,
+                    Location: { X: 0, Y: 0, Z: 0 },
+                  },
                 },
               },
-            },
-          ],
-        }}
-      />,
-    );
+            ],
+          }}
+        />,
+      );
 
-    expect(
-      screen.getByText('Fastest hit').nextElementSibling,
-    ).toHaveTextContent(maximum);
-    expect(
-      screen.getByText('Average speed gain').nextElementSibling,
-    ).toHaveTextContent(gain);
-  });
+      expect(
+        screen.getByText('Fastest hit').nextElementSibling,
+      ).toHaveTextContent(maximum);
+      expect(
+        screen.getByText('Average speed gain').nextElementSibling,
+      ).toHaveTextContent(gain);
+      expect(
+        screen.getByText('Observed ball speed').nextElementSibling,
+      ).toHaveTextContent(observed);
+    },
+  );
 
   it('mounts only the selected view and retains the controlled preference', async () => {
     render(<Harness />);

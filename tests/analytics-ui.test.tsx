@@ -76,8 +76,8 @@ const match: MatchState = {
       payload: {
         Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
         Ball: {
-          PreHitSpeed: 3,
-          PostHitSpeed: 9,
+          PreHitSpeed: 72.8,
+          PostHitSpeed: 108.9,
           Location: { X: 10, Y: 20, Z: 30 },
         },
       },
@@ -123,8 +123,8 @@ const match: MatchState = {
       payload: {
         Players: [{ Name: 'Them', Shortcut: 2, TeamNum: 1 }],
         Ball: {
-          PreHitSpeed: 5,
-          PostHitSpeed: 8,
+          PreHitSpeed: 50,
+          PostHitSpeed: 80,
           Location: { X: 40, Y: 50, Z: 60 },
         },
       },
@@ -314,7 +314,7 @@ describe('ball touch map', () => {
 
     const selectedTouch = screen.getByRole('button', { name: /Me · Save/ });
     expect(selectedTouch).toHaveAccessibleName(/Save, at 1:00/);
-    expect(selectedTouch).toHaveAccessibleName(/32 km\/h/);
+    expect(selectedTouch).toHaveAccessibleName(/109 km\/h/);
     expect(selectedTouch).toBeInTheDocument();
     fireEvent.focus(selectedTouch);
     expect(scene.props?.emphasizedIds).toEqual(['map:1']);
@@ -409,7 +409,7 @@ describe('ball touch map', () => {
     expect(scene.props?.emphasizedIds).toEqual(['map:5']);
   });
 
-  it('converts touch speeds from m/s but GoalSpeed from its km/h scale', () => {
+  it('converts BallHit and GoalSpeed values from their km/h scale', () => {
     render(
       <BallTouchMap
         match={{
@@ -438,7 +438,7 @@ describe('ball touch map', () => {
 
     expect(
       screen.getByRole('button', { name: /Me · touch/ }),
-    ).toHaveAccessibleName(/20 mph/);
+    ).toHaveAccessibleName(/68 mph/);
     expect(
       screen.getByRole('button', { name: /Them · Goal #1 scored/ }),
     ).toHaveAccessibleName(/62 mph/);
@@ -493,7 +493,7 @@ describe('ball touch map', () => {
           payload: {
             Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
             Ball: {
-              PostHitSpeed: 8,
+              PostHitSpeed: 80,
               Location: { X: 10, Y: 20, Z: 30 },
             },
           },
@@ -508,8 +508,8 @@ describe('ball touch map', () => {
           payload: {
             Players: [{ Name: 'Them', Shortcut: 2, TeamNum: 1 }],
             Ball: {
-              PreHitSpeed: 8,
-              PostHitSpeed: 12,
+              PreHitSpeed: 80,
+              PostHitSpeed: 120,
               Location: { X: 40, Y: 50, Z: 60 },
             },
           },

@@ -14,14 +14,28 @@ describe('speed preferences and formatting', () => {
   });
 
   it('converts live meters per second to the selected display unit', () => {
-    expect(convertSpeed(10, 'kmh')).toBeCloseTo(36);
-    expect(formatSpeed(10, 'kmh')).toBe('36 km/h');
-    expect(formatSpeed(10, 'mph')).toBe('22 mph');
-    expect(formatSpeed(-1, 'kmh', { signed: true })).toBe('-4 km/h');
-    expect(formatSpeed(1, 'kmh', { signed: true })).toBe('+4 km/h');
+    expect(convertSpeed(10, 'kmh', 'meters-per-second')).toBeCloseTo(36);
+    expect(formatSpeed(10, 'kmh', { source: 'meters-per-second' })).toBe(
+      '36 km/h',
+    );
+    expect(formatSpeed(10, 'mph', { source: 'meters-per-second' })).toBe(
+      '22 mph',
+    );
+    expect(
+      formatSpeed(-1, 'kmh', {
+        source: 'meters-per-second',
+        signed: true,
+      }),
+    ).toBe('-4 km/h');
+    expect(
+      formatSpeed(1, 'kmh', {
+        source: 'meters-per-second',
+        signed: true,
+      }),
+    ).toBe('+4 km/h');
   });
 
-  it('treats the Stats API GoalSpeed exception as km/h', () => {
+  it('treats Stats API event speeds as km/h', () => {
     expect(formatSpeed(100, 'kmh', { source: 'kilometers-per-hour' })).toBe(
       '100 km/h',
     );
