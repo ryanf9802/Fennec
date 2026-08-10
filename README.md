@@ -33,6 +33,37 @@ matches: passes, 50s, automatic sessions, recurring teammates, opponent
 history, ball interaction analytics, and a three-dimensional touch map. The
 result is a record of actual games rather than another public rank lookup.
 
+## Your data stays local
+
+Fennec stores your match history in IndexedDB, the database built into your
+browser. Saved matches, sessions, player encounters, analytics, preferences,
+and your selected player remain on your device. Fennec does not require an
+account or upload that history to a Fennec service.
+
+Useful match, session, player, and analytics history is retained. High-volume
+technical event details are kept for 90 days and then removed without erasing
+the compact history you use in Fennec. When supported, **Protect local
+history** in Settings asks the browser to preserve this data instead of treating
+it as temporary site storage.
+
+### Back up and restore your history
+
+Local browser data can still be lost if you clear site data, remove the browser
+profile, or lose the device. Fennec does not create a cloud copy automatically,
+so export a backup periodically and before clearing browser data, moving to a
+different browser, or restoring an older backup.
+
+Open **Settings** and find **Local data**:
+
+- **Export backup** saves your match history, settings, and selected player in
+  a restorable Fennec backup file. Keep it somewhere safe outside the browser.
+- **Restore backup** reads a previously exported Fennec backup. After you
+  confirm, it replaces the Fennec data currently stored in that browser; it
+  does not merge two histories. Export the current history first if you may
+  want to keep it.
+- **Export CSV** creates a selected-player spreadsheet for your own analysis.
+  A CSV is not a Fennec backup and cannot be restored into the application.
+
 ## What Fennec shows you
 
 ### Every game, live and after it ends
@@ -134,22 +165,6 @@ opt-in.
 [Download the latest Windows companion](https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe),
 then open Fennec's Setup page to pair it. Signed updates are downloaded in the
 background and installed after Rocket League capture is idle.
-
-## Your data stays local
-
-Fennec stores match summaries, sessions, player appearances, relationships,
-compact events, preferences, and profile selection in the current browser's
-IndexedDB database. Compact history and analytics are retained; full technical
-event payloads are kept for 90 days.
-
-Each browser origin has separate storage. In particular,
-`http://localhost:5173` and `https://app.fennec.gg` do not share a database. Use
-Settings to export and restore a versioned backup when moving history between
-origins or browsers. Fennec also exports selected-player match summaries as
-CSV.
-
-Browser storage is still local application data: clearing site data or losing
-the device can remove it. Use backups for history you want to keep.
 
 ## Technical overview
 
