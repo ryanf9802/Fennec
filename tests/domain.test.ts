@@ -194,6 +194,121 @@ describe('Stats API domain', () => {
     expect(goal.events[0]?.payload.GoalSpeed).toBe(123.4);
   });
 
+  it('excludes goal replay snapshots and gameplay events from match stats', () => {
+    const snapshot = (
+      bReplay: boolean,
+      touches: number,
+      score: number,
+      timeSeconds: number,
+    ) => ({
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'replay-stats',
+        Players: [
+          {
+            Name: 'Me',
+            PrimaryId: 'Steam|1|0',
+            Shortcut: 1,
+            TeamNum: 0,
+            Score: score * 100,
+            Goals: score,
+            Assists: score,
+            Saves: score,
+            Shots: score,
+            Touches: touches,
+            CarTouches: touches,
+            Demos: score,
+          },
+        ],
+        Game: {
+          PlaylistId: 11,
+          TimeSeconds: timeSeconds,
+          bReplay,
+          Teams: [
+            { TeamNum: 0, Score: score },
+            { TeamNum: 1, Score: 0 },
+          ],
+          Ball: { Speed: touches },
+        },
+      },
+    });
+    let value = reduceStatsEnvelope(
+      undefined,
+      snapshot(false, 10, 1, 180),
+    ).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'RoundStarted',
+      data: { MatchGuid: 'replay-stats' },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'BallHit',
+      data: {
+        MatchGuid: 'replay-stats',
+        Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+        Ball: { Location: { X: 0, Y: 0, Z: 100 } },
+      },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'GoalScored',
+      data: {
+        MatchGuid: 'replay-stats',
+        Scorer: { Name: 'Me', Shortcut: 1, TeamNum: 0 },
+      },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'GoalReplayStart',
+      data: { MatchGuid: 'replay-stats' },
+    }).current;
+
+    value = reduceStatsEnvelope(value, snapshot(true, 20, 2, 175)).current;
+    for (const eventName of [
+      'BallHit',
+      'CrossbarHit',
+      'StatfeedEvent',
+      'GoalScored',
+    ]) {
+      value = reduceStatsEnvelope(value, {
+        event: eventName,
+        data: {
+          MatchGuid: 'replay-stats',
+          Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+          Ball: { Location: { X: 100, Y: 100, Z: 100 } },
+        },
+      }).current;
+    }
+
+    expect(value.isReplay).toBe(true);
+    expect(value.timeSeconds).toBe(180);
+    expect(value.ball?.speed).toBe(10);
+    expect(value.teams[0]?.score).toBe(1);
+    expect(value.participants[0]).toMatchObject({
+      score: 100,
+      goals: 1,
+      assists: 1,
+      saves: 1,
+      shots: 1,
+      touches: 10,
+      carTouches: 10,
+      demos: 1,
+    });
+    expect(value.events.map((event) => event.eventName)).toEqual([
+      'RoundStarted',
+      'BallHit',
+      'GoalScored',
+      'GoalReplayStart',
+    ]);
+    expect(playerTouchAnalytics(value, 'Steam|1|0').touches).toBe(1);
+
+    value = reduceStatsEnvelope(value, {
+      event: 'GoalReplayEnd',
+      data: { MatchGuid: 'replay-stats' },
+    }).current;
+    value = reduceStatsEnvelope(value, snapshot(false, 11, 1, 175)).current;
+    expect(value.isReplay).toBe(false);
+    expect(value.timeSeconds).toBe(175);
+    expect(value.participants[0]?.touches).toBe(11);
+  });
+
   it('credits the prior toucher when the next valid touch is by a teammate', () => {
     let value = reduceStatsEnvelope(undefined, {
       event: 'UpdateState',
