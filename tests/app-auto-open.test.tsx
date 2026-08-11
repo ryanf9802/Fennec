@@ -21,12 +21,15 @@ const training: MatchState = {
   participants: [],
   events: [],
 };
-const mocks = vi.hoisted(() => ({ setupState: 'complete' }));
+const mocks = vi.hoisted(() => ({
+  profile: undefined as { primaryId: string; displayName: string } | undefined,
+  setupState: 'complete',
+}));
 
 vi.mock('../src/app/FennecContext', () => ({
   useFennec: () => ({
     activeMatch: training,
-    profile: { primaryId: 'Steam|you|0', displayName: 'You' },
+    profile: mocks.profile,
     settings: { ...defaultSettings, autoOpenLiveMatch: true },
     ready: true,
     diagnostic: undefined,
@@ -66,10 +69,23 @@ vi.mock('../src/pwa/PwaLifecycle', () => ({ PwaLifecycle: () => null }));
 
 describe('app shell entry and live auto-open', () => {
   beforeEach(() => {
+    mocks.profile = { primaryId: 'Steam|you|0', displayName: 'You' };
     mocks.setupState = 'complete';
   });
 
   it('honors the existing auto-open preference for training', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Training')).toBeInTheDocument();
+    expect(screen.queryByText('Games route')).not.toBeInTheDocument();
+  });
+
+  it('auto-opens a live match when no player is selected', async () => {
+    mocks.profile = undefined;
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />

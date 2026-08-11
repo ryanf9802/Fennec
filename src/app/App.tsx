@@ -19,7 +19,6 @@ import { ProfilePage } from '../pages/ProfilePage';
 import { SessionPage } from '../pages/SessionPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { useFennec } from './FennecContext';
-import { matchBelongsToProfile } from '../domain/profileScope';
 import { RequireSetup } from './RequireSetup';
 import {
   SetupStatusProvider,
@@ -36,11 +35,7 @@ export function App() {
 
 /** Holds document-entry content until local data and setup checks are ready. */
 function AppContent() {
-  const { activeMatch, profile, settings, ready, diagnostic } = useFennec();
-  const visibleActiveMatch =
-    activeMatch && matchBelongsToProfile(activeMatch, profile?.primaryId)
-      ? activeMatch
-      : undefined;
+  const { activeMatch, settings, ready, diagnostic } = useFennec();
   const localAccess = useLocalAccess();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -51,13 +46,13 @@ function AppContent() {
     if (
       setup.state === 'complete' &&
       settings.autoOpenLiveMatch &&
-      visibleActiveMatch &&
-      opened.current !== visibleActiveMatch.id
+      activeMatch &&
+      opened.current !== activeMatch.id
     ) {
-      opened.current = visibleActiveMatch.id;
+      opened.current = activeMatch.id;
       navigate('/live');
     }
-  }, [navigate, settings.autoOpenLiveMatch, setup.state, visibleActiveMatch]);
+  }, [activeMatch, navigate, settings.autoOpenLiveMatch, setup.state]);
 
   if (!ready && diagnostic)
     return (
@@ -93,8 +88,8 @@ function AppContent() {
             <Route
               path="/live"
               element={
-                visibleActiveMatch ? (
-                  <MatchPage match={visibleActiveMatch} />
+                activeMatch ? (
+                  <MatchPage match={activeMatch} />
                 ) : (
                   <Navigate to="/" replace />
                 )

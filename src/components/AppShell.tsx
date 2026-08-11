@@ -11,7 +11,6 @@ import type { ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { isTrainingMatch } from '../domain/playlists';
-import { matchBelongsToProfile } from '../domain/profileScope';
 import { ConnectionStatus } from './ConnectionStatus';
 import { useSetupStatus } from '../setup/SetupStatusContext';
 
@@ -21,26 +20,16 @@ const primaryNavigation = [
 ];
 
 /**
- * Renders responsive navigation and exposes live-match navigation only when
- * the active match belongs to the currently selected player profile.
+ * Renders responsive navigation and exposes the current live match independently
+ * from the player profile used to scope historical views.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const setup = useSetupStatus();
-  const {
-    activeMatch,
-    connection,
-    demoMode,
-    profile,
-    settings,
-    updateSettings,
-  } = useFennec();
-  const visibleActiveMatch =
-    activeMatch && matchBelongsToProfile(activeMatch, profile?.primaryId)
-      ? activeMatch
-      : undefined;
+  const { activeMatch, connection, demoMode, settings, updateSettings } =
+    useFennec();
   const liveLabel =
-    visibleActiveMatch && isTrainingMatch(visibleActiveMatch)
+    activeMatch && isTrainingMatch(activeMatch)
       ? 'Live training'
       : 'Live match';
   const collapsed = settings.sidebarCollapsed;
@@ -51,7 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     ...(showSetup ? [{ to: '/setup', label: 'Setup', icon: ListChecks }] : []),
     { to: '/settings', label: 'Settings', icon: Settings },
   ];
-  const mobileItemCount = navigation.length + (visibleActiveMatch ? 1 : 0);
+  const mobileItemCount = navigation.length + (activeMatch ? 1 : 0);
   const mobileGridClass =
     mobileItemCount >= 5
       ? 'grid-cols-5'
@@ -129,7 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </NavLink>
             );
           })}
-          {visibleActiveMatch &&
+          {activeMatch &&
             (locked ? (
               <span
                 aria-disabled="true"
@@ -233,7 +222,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </NavLink>
           );
         })}
-        {visibleActiveMatch &&
+        {activeMatch &&
           (locked ? (
             <span
               aria-disabled="true"

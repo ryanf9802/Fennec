@@ -173,6 +173,59 @@ test('demo feed opens a live match and settings remain usable', async ({
   await expect(page.getByLabel('WebSocket port')).toHaveValue('49124');
 });
 
+test('live match stays visible for an unrelated selected player', async ({
+  page,
+}) => {
+  await page.goto('/?demo=1');
+  await expect(page).toHaveURL(/\/live$/, { timeout: 5000 });
+  await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
+
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('fennec');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(
+          ['profiles', 'settings'],
+          'readwrite',
+        );
+        transaction.objectStore('profiles').put({
+          key: 'profile',
+          primaryId: 'Epic|archived-player|0',
+          displayName: 'Archived Player',
+        });
+        const settingsStore = transaction.objectStore('settings');
+        const settingsRequest = settingsStore.get('settings');
+        settingsRequest.onsuccess = () => {
+          settingsStore.put({
+            key: 'settings',
+            value: {
+              ...settingsRequest.result.value,
+              autoOpenLiveMatch: false,
+            },
+          });
+        };
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  await page.goto('/?demo=1');
+  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
+  const liveLink = page.getByRole('link', { name: 'Live match' }).first();
+  await expect(liveLink).toBeVisible();
+  await liveLink.click();
+  await expect(page).toHaveURL(/\/live$/);
+  await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
+});
+
 test('dark is the default while system and light remain opt-in', async ({
   page,
 }) => {
