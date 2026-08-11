@@ -17,7 +17,7 @@ import {
   acceptCompanionPairing,
   companionCommand,
   companionDownloadUrl,
-  companionOpenUrl,
+  pairInstalledCompanion,
 } from '../companion/client';
 import { isStatsApiConnected } from '../domain/connectionPresentation';
 import { useLocalAccess } from '../platform/LocalAccessContext';
@@ -156,6 +156,8 @@ export function OnboardingPage() {
   const { replayCinematic } = useAppEntrance();
   const [configuring, setConfiguring] = useState<'steam' | 'epic'>();
   const [companionMessage, setCompanionMessage] = useState<string>();
+  const [pairing, setPairing] = useState(false);
+  const [pairingMessage, setPairingMessage] = useState<string>();
   const selectSetupPath = useCallback(
     (nextPath: SetupPath) => {
       selectPath(nextPath);
@@ -213,6 +215,22 @@ export function OnboardingPage() {
     );
     await recheck();
     setConfiguring(undefined);
+  };
+  const pairCompanion = async () => {
+    setPairing(true);
+    setPairingMessage(undefined);
+    try {
+      const paired = await pairInstalledCompanion();
+      if (paired) {
+        await recheck();
+      } else {
+        setPairingMessage(
+          'Could not reach the installed companion. Start it or install the latest version, then try again.',
+        );
+      }
+    } finally {
+      setPairing(false);
+    }
   };
   if (!path)
     return (
@@ -289,9 +307,15 @@ export function OnboardingPage() {
                     : 'The companion is not running or cannot be reached from this browser.'}
                 {!paired && (
                   <div className="mt-3 flex flex-wrap gap-3">
-                    <a className="button-primary" href={companionOpenUrl()}>
-                      Open installed companion
-                    </a>
+                    <button
+                      className="button-primary"
+                      disabled={pairing}
+                      onClick={() => void pairCompanion()}
+                    >
+                      {pairing
+                        ? 'Pairing companion…'
+                        : 'Open installed companion'}
+                    </button>
                     <a
                       className="button-secondary"
                       href={companionDownloadUrl}
@@ -301,6 +325,7 @@ export function OnboardingPage() {
                     </a>
                   </div>
                 )}
+                {pairingMessage && <p className="mt-2">{pairingMessage}</p>}
               </Requirement>
               <Requirement
                 complete={installationConfigured}

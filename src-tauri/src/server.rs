@@ -67,6 +67,11 @@ struct CompanionStatus {
     resource_usage: Option<ResourceUsage>,
 }
 
+#[derive(Serialize)]
+struct PairingToken {
+    token: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResourceUsage {
@@ -227,6 +232,29 @@ async fn health(State(state): State<Arc<AppState>>) -> Json<RuntimeHealth> {
     let mut value = state.health.read().expect("health lock").clone();
     value.paired = false;
     Json(value)
+}
+
+fn pairing_origin_allowed(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(crate::is_trusted_web_origin)
+}
+
+async fn pair(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if !pairing_origin_allowed(&headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    pairing_token_response(state.token.clone())
+}
+
+fn pairing_token_response(token: String) -> Response {
+    let mut response = Json(PairingToken { token }).into_response();
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
+    response
 }
 
 async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -549,6 +577,7 @@ pub async fn run(state: Arc<AppState>) -> std::io::Result<()> {
     let app = Router::new()
         .route("/permission-probe", get(permission_probe))
         .route("/health", get(health))
+        .route("/pair", post(pair))
         .route("/status", get(status))
         .route("/commands/{command}", post(command))
         .route("/data/snapshot", get(data_snapshot))
@@ -611,7 +640,11 @@ pub async fn monitor_resources(state: Arc<AppState>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_process_cpu, ResourceSample, ResourceWindow};
+    use super::{
+        normalize_process_cpu, pairing_origin_allowed, pairing_token_response, ResourceSample,
+        ResourceWindow,
+    };
+    use axum::http::{header, HeaderMap, HeaderValue};
     use std::time::{Duration, Instant};
 
     #[test]
@@ -648,5 +681,29 @@ mod tests {
         });
         assert_eq!(expired.recent_peak_cpu_percent, 0.2);
         assert_eq!(expired.recent_peak_memory_bytes, 20);
+    }
+
+    #[test]
+    fn pairing_requires_a_trusted_browser_origin() {
+        let mut headers = HeaderMap::new();
+        assert!(!pairing_origin_allowed(&headers));
+
+        headers.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("https://attacker.example"),
+        );
+        assert!(!pairing_origin_allowed(&headers));
+
+        headers.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("https://app.fennec.gg"),
+        );
+        assert!(pairing_origin_allowed(&headers));
+    }
+
+    #[test]
+    fn pairing_token_response_cannot_be_cached() {
+        let response = pairing_token_response("secret".to_string());
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
     }
 }

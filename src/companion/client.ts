@@ -3,7 +3,6 @@ import type {
   FennecSettings,
   MatchState,
 } from '../domain/types';
-import { isLoopbackHostname } from '../platform/origin';
 
 export interface CompanionHealth {
   version: string;
@@ -56,19 +55,7 @@ export const companionProtocolVersion = 1;
 export const companionDataSyncVersion = 1;
 export const companionDownloadUrl =
   'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe';
-
-const productionSetupUrl = 'https://app.fennec.gg/setup';
-
-export function companionOpenUrl(): string {
-  const currentOrigin = new URL(location.origin);
-  const returnTo =
-    currentOrigin.origin === new URL(productionSetupUrl).origin ||
-    (currentOrigin.protocol === 'http:' &&
-      isLoopbackHostname(currentOrigin.hostname))
-      ? `${currentOrigin.origin}/setup`
-      : productionSetupUrl;
-  return `fennec://open?return_to=${encodeURIComponent(returnTo)}`;
-}
+export const companionPairingLaunchUrl = 'fennec://pair';
 
 function browserStorage(): Storage | undefined {
   try {
@@ -101,6 +88,46 @@ export function acceptCompanionPairing(): boolean {
   storage.setItem('fennec-companion-token', value);
   history.replaceState(null, '', `${location.pathname}${location.search}`);
   return true;
+}
+
+async function requestCompanionPairing(): Promise<boolean> {
+  const storage = browserStorage();
+  if (!storage) return false;
+  try {
+    const response = await fetch('http://127.0.0.1:49125/pair', {
+      method: 'POST',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(1_500),
+    });
+    if (!response.ok) return false;
+    const value = (await response.json()) as { token?: unknown };
+    if (typeof value.token !== 'string' || !value.token) return false;
+    storage.setItem('fennec-companion-token', value.token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function pairInstalledCompanion({
+  retryDelayMs = 500,
+  timeoutMs = 15_000,
+}: {
+  retryDelayMs?: number;
+  timeoutMs?: number;
+} = {}): Promise<boolean> {
+  if (await requestCompanionPairing()) return true;
+  try {
+    location.assign(companionPairingLaunchUrl);
+  } catch {
+    return false;
+  }
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => window.setTimeout(resolve, retryDelayMs));
+    if (await requestCompanionPairing()) return true;
+  }
+  return false;
 }
 
 export async function companionHealth(): Promise<CompanionHealth | undefined> {

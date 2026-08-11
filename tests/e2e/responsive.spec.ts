@@ -1141,13 +1141,8 @@ test('setup starts with a centered route choice and expands after selection', as
     'false',
   );
   await expect(
-    page.getByRole('link', { name: 'Open installed companion' }),
-  ).toHaveAttribute(
-    'href',
-    `fennec://open?return_to=${encodeURIComponent(
-      `${new URL(page.url()).origin}/setup`,
-    )}`,
-  );
+    page.getByRole('button', { name: 'Open installed companion' }),
+  ).toBeEnabled();
   await expect(
     page.getByRole('link', { name: 'Download latest companion' }),
   ).toHaveAttribute(
@@ -1162,6 +1157,63 @@ test('setup starts with a centered route choice and expands after selection', as
   await expect(
     page.getByRole('button', { name: /With companion/ }),
   ).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('setup pairs the installed companion in the current page', async ({
+  page,
+}) => {
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === '/pair' && request.method() === 'POST') {
+      await route.fulfill({ json: { token: 'in-place-token' } });
+      return;
+    }
+    if (pathname === '/status') {
+      await route.fulfill({
+        json: {
+          version: '0.2.0',
+          protocolVersion: 1,
+          paired: true,
+          gameRunning: false,
+          feedConnected: false,
+          stores: [],
+          configuredStores: [],
+          launchOnStartup: false,
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        version: '0.2.0',
+        protocolVersion: 1,
+        paired: false,
+        gameRunning: false,
+        feedConnected: false,
+        stores: [],
+        configuredStores: [],
+        launchOnStartup: false,
+      },
+    });
+  });
+  await page.goto('/setup?demo=0');
+  await page.getByRole('button', { name: /With companion/ }).click();
+  const setupUrl = page.url();
+  const pageCount = page.context().pages().length;
+
+  await page.getByRole('button', { name: 'Open installed companion' }).click();
+
+  await expect(
+    page.getByText('Companion 0.2.0 is paired and responding.'),
+  ).toBeVisible();
+  expect(page.url()).toBe(setupUrl);
+  expect(page.context().pages()).toHaveLength(pageCount);
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem('fennec-companion-token')),
+    )
+    .toBe('in-place-token');
 });
 
 test('incomplete first launch opens Setup and completed setup links to Game timeline', async ({

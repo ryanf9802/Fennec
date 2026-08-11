@@ -2,47 +2,87 @@ import {
   companionCommand,
   companionDeleteHistory,
   companionDownloadUrl,
-  companionOpenUrl,
+  companionPairingLaunchUrl,
+  pairInstalledCompanion,
   companionRestore,
   companionSnapshot,
 } from '../src/companion/client';
 
-describe('companion pairing launch URL', () => {
-  afterEach(() => vi.unstubAllGlobals());
+describe('companion pairing', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
-  it('returns to the current loopback development setup on any port', () => {
-    vi.stubGlobal('location', { origin: 'http://localhost:43217' });
+  it('pairs through loopback without launching another browser page', async () => {
+    const setItem = vi.fn();
+    const assign = vi.fn();
+    vi.stubGlobal('window', {
+      localStorage: { getItem: vi.fn(), setItem },
+      setTimeout,
+    });
+    vi.stubGlobal('location', { assign });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ token: 'paired-token' }),
+      }),
+    );
 
-    expect(companionOpenUrl()).toBe(
-      'fennec://open?return_to=http%3A%2F%2Flocalhost%3A43217%2Fsetup',
+    await expect(pairInstalledCompanion()).resolves.toBe(true);
+    expect(setItem).toHaveBeenCalledWith(
+      'fennec-companion-token',
+      'paired-token',
+    );
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('activates a stopped companion and retries pairing in place', async () => {
+    vi.useFakeTimers();
+    const setItem = vi.fn();
+    const assign = vi.fn();
+    vi.stubGlobal('window', {
+      localStorage: { getItem: vi.fn(), setItem },
+      setTimeout,
+    });
+    vi.stubGlobal('location', { assign });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error('not running'))
+        .mockResolvedValue({
+          ok: true,
+          json: async () => ({ token: 'started-token' }),
+        }),
+    );
+
+    const pairing = pairInstalledCompanion({
+      retryDelayMs: 100,
+      timeoutMs: 1_000,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+
+    await expect(pairing).resolves.toBe(true);
+    expect(assign).toHaveBeenCalledWith(companionPairingLaunchUrl);
+    expect(setItem).toHaveBeenCalledWith(
+      'fennec-companion-token',
+      'started-token',
     );
   });
 
-  it.each(['http://127.0.0.1:43217', 'http://[::1]:43217'])(
-    'returns to the loopback setup at %s',
-    (origin) => {
-      vi.stubGlobal('location', { origin });
+  it('reports failure after activating an unavailable companion', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('window', {
+      localStorage: { getItem: vi.fn(), setItem: vi.fn() },
+      setTimeout,
+    });
+    vi.stubGlobal('location', { assign });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
-      expect(companionOpenUrl()).toBe(
-        `fennec://open?return_to=${encodeURIComponent(`${origin}/setup`)}`,
-      );
-    },
-  );
-
-  it('falls back to production for an unknown browser origin', () => {
-    vi.stubGlobal('location', { origin: 'https://preview.example' });
-
-    expect(companionOpenUrl()).toBe(
-      'fennec://open?return_to=https%3A%2F%2Fapp.fennec.gg%2Fsetup',
-    );
-  });
-
-  it('keeps the canonical production setup destination', () => {
-    vi.stubGlobal('location', { origin: 'https://app.fennec.gg' });
-
-    expect(companionOpenUrl()).toBe(
-      'fennec://open?return_to=https%3A%2F%2Fapp.fennec.gg%2Fsetup',
-    );
+    await expect(pairInstalledCompanion({ timeoutMs: 0 })).resolves.toBe(false);
+    expect(assign).toHaveBeenCalledWith('fennec://pair');
   });
 
   it('uses the stable latest-release Windows installer asset', () => {
