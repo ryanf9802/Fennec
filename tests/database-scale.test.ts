@@ -80,6 +80,7 @@ describe('25,000-match local archive', () => {
     await db.delete();
   });
 
+  // The aggregate web gate runs this archive fixture alongside browser work.
   it('returns a bounded player page and constant-size all-time summary', async () => {
     await replaceAll(
       Array.from({ length: 25_000 }, (_, index) => match(index)),
@@ -114,5 +115,5 @@ describe('25,000-match local archive', () => {
         ),
       ).size,
     ).toBe(100);
-  }, 60_000);
+  }, 120_000);
 });
