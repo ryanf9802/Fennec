@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   fennec: {} as Record<string, unknown>,
   loadMatches: vi.fn(),
   companion: {} as Record<string, unknown>,
+  storageData: undefined as
+    { persisted?: boolean; rawRetentionDays?: number } | undefined,
+  storageRefetch: vi.fn(),
 }));
 
 vi.mock('../src/app/FennecContext', () => ({
@@ -19,7 +22,10 @@ vi.mock('../src/data/database', () => ({
 }));
 
 vi.mock('../src/data/historyQueries', () => ({
-  useStorageStatistics: () => ({ data: undefined, refetch: vi.fn() }),
+  useStorageStatistics: () => ({
+    data: mocks.storageData,
+    refetch: mocks.storageRefetch,
+  }),
   useTimelineCatalog: () => ({ data: {} }),
 }));
 
@@ -52,6 +58,8 @@ vi.mock('../src/components/StatsApiSetup', () => ({
 describe('settings CSV export', () => {
   beforeEach(() => {
     mocks.loadMatches.mockReset();
+    mocks.storageData = undefined;
+    mocks.storageRefetch.mockReset();
     mocks.fennec = {
       profile: undefined,
       settings: defaultSettings,
@@ -98,6 +106,34 @@ describe('settings CSV export', () => {
     const setupLink = screen.getByRole('link', { name: 'Open setup' });
     expect(setupLink).toHaveAttribute('href', '/setup');
     expect(setupLink.querySelector('svg')).toHaveClass('lucide-list-checks');
+  });
+
+  it('explains recommended browser data protection without warning styling', () => {
+    mocks.storageData = { persisted: false, rawRetentionDays: 90 };
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: { persist: vi.fn().mockResolvedValue(false) },
+    });
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const protection = screen
+      .getByText('Protect app data', { selector: 'strong' })
+      .closest('[data-storage-protection-state]');
+    expect(protection).toHaveAttribute(
+      'data-storage-protection-state',
+      'recommended',
+    );
+    expect(protection).toHaveTextContent('Highly recommended');
+    expect(protection).toHaveTextContent(/not a backup/i);
+    expect(protection?.querySelector('.lucide-shield')).toBeInTheDocument();
+    expect(
+      protection?.querySelector('.lucide-triangle-alert'),
+    ).not.toBeInTheDocument();
   });
 
   it('floats the save action only after a setting changes', () => {

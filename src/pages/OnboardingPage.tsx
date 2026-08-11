@@ -12,6 +12,7 @@ import { useFennec } from '../app/FennecContext';
 import { useAppEntrance } from '../components/AppEntrance';
 import { CompanionLaunchControls } from '../components/CompanionSettings';
 import { StatsApiSetup } from '../components/StatsApiSetup';
+import { StorageProtection } from '../components/StorageProtection';
 import {
   acceptCompanionPairing,
   companionCommand,
@@ -269,6 +270,10 @@ export function OnboardingPage() {
               </>
             )}
           </Requirement>
+          <StorageProtection
+            companionBacked={path === 'companion'}
+            layout="setup"
+          />
           {path === 'companion' ? (
             <>
               <Requirement

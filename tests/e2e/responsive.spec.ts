@@ -1,4 +1,37 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+async function disableAutomaticLiveMatch(page: Page) {
+  await page.goto('/settings?demo=1');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('fennec');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction('settings', 'readwrite');
+        const settings = transaction.objectStore('settings');
+        const request = settings.get('settings');
+        request.onsuccess = () => {
+          settings.put({
+            key: 'settings',
+            value: {
+              ...(request.result?.value ?? {}),
+              autoOpenLiveMatch: false,
+            },
+          });
+        };
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      });
+    } finally {
+      database.close();
+    }
+  });
+}
 
 test('landing page stays concise and usable across viewport sizes', async ({
   page,
@@ -1001,6 +1034,100 @@ test('incomplete first launch opens Setup and completed setup links to Game time
   await expect(page).toHaveURL(/\/$/);
   await expect(
     page.getByRole('heading', { name: 'Game timeline' }),
+  ).toBeVisible();
+});
+
+test('setup presents app data protection as optional and completes it when granted', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let protectedStorage = false;
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        estimate: async () => ({ usage: 0, quota: 1_073_741_824 }),
+        persisted: async () => protectedStorage,
+        persist: async () => {
+          protectedStorage = true;
+          return true;
+        },
+      },
+    });
+  });
+  await disableAutomaticLiveMatch(page);
+  await page.goto('/setup?demo=1');
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+  await page.getByRole('button', { name: /Browser only/ }).click();
+
+  const protection = page.locator('[data-storage-protection-state]');
+  await expect(protection).toHaveAttribute(
+    'data-storage-protection-state',
+    'recommended',
+  );
+  await expect(protection.getByText('Highly recommended')).toBeVisible();
+  await expect(protection.locator('svg.text-fennec-cyan')).toBeVisible();
+  await expect(protection.locator('.lucide-triangle-alert')).toHaveCount(0);
+  await expect(protection.getByText(/not a backup/i)).toBeVisible();
+  await expect(
+    protection.getByText(/match history, selected player, and settings/i),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toBeVisible();
+
+  await protection.getByRole('button', { name: 'Protect app data' }).click();
+  await expect(protection).toHaveAttribute(
+    'data-storage-protection-state',
+    'protected',
+  );
+  await expect(
+    protection.getByText('Browser storage protection is on.'),
+  ).toBeVisible();
+  await expect(protection.locator('svg.text-emerald-400')).toBeVisible();
+
+  await page.getByRole('button', { name: /With companion/ }).click();
+  await expect(
+    protection.getByText(/companion remains the durable copy/i),
+  ).toBeVisible();
+});
+
+test('declined app data protection stays neutral and does not block setup', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        estimate: async () => ({ usage: 0, quota: 1_073_741_824 }),
+        persisted: async () => false,
+        persist: async () => false,
+      },
+    });
+  });
+  await disableAutomaticLiveMatch(page);
+  await page.goto('/setup?demo=1');
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+  await page.getByRole('button', { name: /Browser only/ }).click();
+
+  const protection = page.locator('[data-storage-protection-state]');
+  await protection.getByRole('button', { name: 'Protect app data' }).click();
+  await expect(
+    protection.getByText(/browser did not grant protection/i),
+  ).toBeVisible();
+  await expect(protection).toHaveAttribute(
+    'data-storage-protection-state',
+    'recommended',
+  );
+  await expect(protection.locator('svg.text-fennec-cyan')).toBeVisible();
+  await expect(protection.locator('.lucide-triangle-alert')).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
   ).toBeVisible();
 });
 

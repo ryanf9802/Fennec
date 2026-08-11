@@ -19,6 +19,7 @@ import {
 import { StatsApiSetup } from '../components/StatsApiSetup';
 import { ConnectionStatus } from '../components/ConnectionStatus';
 import { LocalNetworkAccessHelp } from '../components/LocalNetworkAccessHelp';
+import { StorageProtection } from '../components/StorageProtection';
 import {
   createBackup,
   downloadText,
@@ -171,17 +172,6 @@ export function SettingsPage() {
     );
   };
 
-  const protectStorage = async () => {
-    if (!navigator.storage?.persist) return;
-    const granted = await navigator.storage.persist();
-    await storageQuery.refetch();
-    setMessage(
-      granted
-        ? 'Persistent browser storage granted.'
-        : 'The browser kept this origin in best-effort storage.',
-    );
-  };
-
   const rebuildCache = async () => {
     try {
       await rebuildBrowserCache();
@@ -208,6 +198,7 @@ export function SettingsPage() {
 
   const dataControls = (
     <>
+      <StorageProtection companionBacked={companionReady} layout="settings" />
       {storage?.usage !== undefined && (
         <p className="text-muted mt-2 text-sm">
           Browser cache: {(storage.usage / 1_048_576).toFixed(1)} MB
@@ -221,14 +212,6 @@ export function SettingsPage() {
         </p>
       )}
       <div className="mt-5 flex flex-wrap gap-3">
-        {storage && !storage.persisted && (
-          <button
-            className="button-secondary"
-            onClick={() => void protectStorage()}
-          >
-            Protect offline cache
-          </button>
-        )}
         <button className="button-secondary" onClick={() => void exportJson()}>
           <FileJson className="size-4" />
           Export backup
