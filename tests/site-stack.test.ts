@@ -71,42 +71,15 @@ describe('Fennec site infrastructure', () => {
     template.hasOutput('SiteUrl', { Value: 'https://app.fennec.gg' });
   }, 10_000);
 
-  it('retains privacy-limited access logs and exposes a traffic dashboard', () => {
+  it('keeps Free-plan monitoring within supported default metrics', () => {
     const template = Template.fromStack(productionStack());
 
-    template.hasResourceProperties('AWS::Logs::LogGroup', {
-      LogGroupName: '/aws/cloudfront/fennec-access',
-      RetentionInDays: 30,
-    });
-    template.hasResourceProperties('AWS::Logs::DeliverySource', {
-      Name: 'fennec-cloudfront-access',
-      LogType: 'ACCESS_LOGS',
-      ResourceArn: Match.anyValue(),
-    });
-    template.hasResourceProperties('AWS::Logs::DeliveryDestination', {
-      Name: 'fennec-cloudfront-access',
-      DeliveryDestinationType: 'CWL',
-      OutputFormat: 'json',
-    });
-    template.hasResourceProperties('AWS::Logs::Delivery', {
-      RecordFields: Match.arrayWith([
-        'c-ip',
-        'cs-uri-stem',
-        'cs(Referer)',
-        'cs(User-Agent)',
-        'x-host-header',
-        'sc-content-type',
-        'c-country',
-      ]),
-    });
-    const delivery = Object.values(
-      template.findResources('AWS::Logs::Delivery'),
-    )[0];
-    if (!delivery)
-      throw new Error('CloudFront log delivery was not synthesized');
-    expect(delivery.Properties.RecordFields).not.toEqual(
-      expect.arrayContaining(['cs-uri-query', 'cs(Cookie)', 'x-forwarded-for']),
-    );
+    template.resourceCountIs('AWS::Logs::LogGroup', 0);
+    template.resourceCountIs('AWS::Logs::DeliverySource', 0);
+    template.resourceCountIs('AWS::Logs::DeliveryDestination', 0);
+    template.resourceCountIs('AWS::Logs::Delivery', 0);
+    template.resourceCountIs('AWS::CloudFront::MonitoringSubscription', 0);
+    template.resourceCountIs('AWS::CloudWatch::Dashboard', 1);
     template.hasResourceProperties('AWS::CloudWatch::Dashboard', {
       DashboardName: 'FennecTraffic',
     });
@@ -118,12 +91,13 @@ describe('Fennec site infrastructure', () => {
       .filter((fragment: unknown) => typeof fragment === 'string')
       .join('');
     expect(dashboardFragments).toContain('"start":"-P30D"');
-    expect(dashboardFragments).toContain('Estimated unique visitors per day');
-    expect(dashboardFragments).toContain('count_distinct(visitor)');
-    expect(dashboardFragments).toContain(
-      'Estimated visitors by country and hostname',
-    );
-    expect(dashboardFragments).toContain('c-country');
+    expect(dashboardFragments.match(/"type":"metric"/g)).toHaveLength(2);
+    expect(dashboardFragments.match(/"type":/g)).toHaveLength(2);
+    expect(dashboardFragments).toContain('Requests');
+    expect(dashboardFragments).toContain('BytesDownloaded');
+    expect(dashboardFragments).toContain('TotalErrorRate');
+    expect(dashboardFragments).toContain('4xxErrorRate');
+    expect(dashboardFragments).toContain('5xxErrorRate');
     template.hasOutput('TrafficDashboardName', { Value: Match.anyValue() });
   });
 

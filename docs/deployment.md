@@ -82,26 +82,17 @@ application, apex landing page, and compatibility redirect.
 
 ## Traffic monitoring
 
-`FennecSite` sends selected CloudFront standard access-log fields to the
-`/aws/cloudfront/fennec-access` CloudWatch log group and retains them for 30
-days. The `FennecTraffic` CloudWatch dashboard separates `fennec.gg` from
-`app.fennec.gg` and shows estimated daily visitors, page loads, requests,
-countries, entry paths, external referrers, transfer, cache efficiency, and
-error rates. CloudFront can take about four hours after initial enablement to
-begin delivering access logs reliably.
+The `FennecTraffic` CloudWatch dashboard uses the default metrics included for
+every CloudFront distribution: requests, downloaded bytes, and total, 4xx, and
+5xx error rates. It keeps a 30-day operational view without enabling paid
+additional metrics.
 
-The unique-visitor widget is deliberately labeled as an estimate. It counts
-distinct IP-address and user-agent combinations for successful HTML requests
-and filters common crawler user agents. Shared or changing addresses, VPNs,
-multiple devices, and unidentified bots can undercount or overcount people.
-The logs retain the source IP and user agent for this query, but exclude
-CloudFront's request query-string, cookie, and forwarded-IP fields. Fennec does
-not add a browser analytics script or identifier.
-
-The flat-rate plan includes ingestion for standard CloudFront access logs, but
-CloudWatch retention and Logs Insights queries can incur small usage charges.
-Real-time CloudFront logging remains disabled because it is unsupported by the
-flat-rate plan.
+Fennec's CloudFront Free plan does not support access logs. Detailed visitor,
+country, path, referrer, and cache-hit analytics therefore remain unavailable
+unless the distribution is upgraded to Pro or above. The Free plan still
+provides CloudFront's security dashboard for security events. See AWS's
+[flat-rate feature matrix](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/flat-rate-pricing-plan.html#flat-rate-pricing-plan-features)
+and [default metric reference](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/viewing-cloudfront-metrics.html).
 
 ## Companion validation and releases
 
