@@ -46,8 +46,9 @@ complete observed `sub` claim when redeploying the access stack.
    assumes `FennecGitHubDeployRole`, deploys `FennecSite`, publishes `dist`,
    invalidates CloudFront, and smoke-tests the URL.
 5. In CloudFront, subscribe the distribution to the Free flat-rate plan and
-   attach the `fennec.gg` hosted zone. Do not enable paid add-ons or separately
-   billed logging.
+   attach the `fennec.gg` hosted zone. Do not enable paid add-ons or real-time
+   logging. Standard access-log ingestion into CloudWatch Logs is included in
+   the plan; storage and queries remain separately billable.
 6. Copy the plan WAF ARN into the `FENNEC_WEB_ACL_ARN` repository variable and
    dispatch the workflow again. CloudFormation then declares the plan-managed
    association so later deployments do not drift.
@@ -78,6 +79,29 @@ On a push or manual dispatch from `main`, the deployment job assumes the OIDC
 role, deploys the CDK site stack, synchronizes immutable assets and non-cached
 application entry files separately, invalidates CloudFront, and smoke-tests the
 application, apex landing page, and compatibility redirect.
+
+## Traffic monitoring
+
+`FennecSite` sends selected CloudFront standard access-log fields to the
+`/aws/cloudfront/fennec-access` CloudWatch log group and retains them for 30
+days. The `FennecTraffic` CloudWatch dashboard separates `fennec.gg` from
+`app.fennec.gg` and shows estimated daily visitors, page loads, requests,
+countries, entry paths, external referrers, transfer, cache efficiency, and
+error rates. CloudFront can take about four hours after initial enablement to
+begin delivering access logs reliably.
+
+The unique-visitor widget is deliberately labeled as an estimate. It counts
+distinct IP-address and user-agent combinations for successful HTML requests
+and filters common crawler user agents. Shared or changing addresses, VPNs,
+multiple devices, and unidentified bots can undercount or overcount people.
+The logs retain the source IP and user agent for this query, but exclude
+CloudFront's request query-string, cookie, and forwarded-IP fields. Fennec does
+not add a browser analytics script or identifier.
+
+The flat-rate plan includes ingestion for standard CloudFront access logs, but
+CloudWatch retention and Logs Insights queries can incur small usage charges.
+Real-time CloudFront logging remains disabled because it is unsupported by the
+flat-rate plan.
 
 ## Companion validation and releases
 

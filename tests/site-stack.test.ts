@@ -71,6 +71,59 @@ describe('Fennec site infrastructure', () => {
     template.hasOutput('SiteUrl', { Value: 'https://app.fennec.gg' });
   }, 10_000);
 
+  it('retains privacy-limited access logs and exposes a traffic dashboard', () => {
+    const template = Template.fromStack(productionStack());
+
+    template.hasResourceProperties('AWS::Logs::LogGroup', {
+      LogGroupName: '/aws/cloudfront/fennec-access',
+      RetentionInDays: 30,
+    });
+    template.hasResourceProperties('AWS::Logs::DeliverySource', {
+      Name: 'fennec-cloudfront-access',
+      LogType: 'ACCESS_LOGS',
+      ResourceArn: Match.anyValue(),
+    });
+    template.hasResourceProperties('AWS::Logs::DeliveryDestination', {
+      Name: 'fennec-cloudfront-access',
+      DeliveryDestinationType: 'CWL',
+      OutputFormat: 'json',
+    });
+    template.hasResourceProperties('AWS::Logs::Delivery', {
+      RecordFields: Match.arrayWith([
+        'c-ip',
+        'cs-uri-stem',
+        'cs(Referer)',
+        'cs(User-Agent)',
+        'x-host-header',
+        'sc-content-type',
+        'c-country',
+      ]),
+    });
+    const delivery = Object.values(
+      template.findResources('AWS::Logs::Delivery'),
+    )[0];
+    expect(delivery.Properties.RecordFields).not.toEqual(
+      expect.arrayContaining(['cs-uri-query', 'cs(Cookie)', 'x-forwarded-for']),
+    );
+    template.hasResourceProperties('AWS::CloudWatch::Dashboard', {
+      DashboardName: 'FennecTraffic',
+    });
+    const dashboard = Object.values(
+      template.findResources('AWS::CloudWatch::Dashboard'),
+    )[0];
+    const dashboardFragments = dashboard.Properties.DashboardBody['Fn::Join'][1]
+      .filter((fragment: unknown) => typeof fragment === 'string')
+      .join('');
+    expect(dashboardFragments).toContain('"start":"-P30D"');
+    expect(dashboardFragments).toContain('Estimated unique visitors per day');
+    expect(dashboardFragments).toContain('count_distinct(visitor)');
+    expect(dashboardFragments).toContain(
+      'Estimated visitors by country and hostname',
+    );
+    expect(dashboardFragments).toContain('c-country');
+    template.hasOutput('TrafficDashboardName', { Value: Match.anyValue() });
+  });
+
   it('adopts the web ACL created by the flat-rate plan', () => {
     const webAclId =
       'arn:aws:wafv2:us-east-1:309418039962:global/webacl/fennec/example';
