@@ -146,6 +146,21 @@ describe('settings CSV export', () => {
     expect(await screen.findByText('Settings saved.')).toBeInTheDocument();
   });
 
+  it('defaults automatic live monitor opening to on', () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('checkbox', {
+        name: /Automatically open the live monitor/i,
+      }),
+    ).toBeChecked();
+    expect(screen.getByText(/on by default/i)).toBeInTheDocument();
+  });
+
   it('merges durable data and companion controls when canonical sync is available', () => {
     mocks.fennec.syncStatus = {
       mode: 'restoring',

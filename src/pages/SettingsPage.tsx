@@ -373,8 +373,8 @@ export function SettingsPage() {
           <span>
             <strong>Automatically open the live monitor</strong>
             <span className="text-muted mt-1 block text-sm">
-              Off by default. An active game is otherwise highlighted until you
-              open it.
+              On by default. Turn this off to keep an active game highlighted
+              until you open it.
             </span>
           </span>
         </label>

@@ -83,6 +83,19 @@ const match = (id: string, start: string, end: string): MatchState => ({
 });
 
 describe('settings', () => {
+  it('opens the live monitor by default while preserving an explicit opt-out', () => {
+    expect(defaultSettings.autoOpenLiveMatch).toBe(true);
+    expect(normalizeSettings().autoOpenLiveMatch).toBe(true);
+    expect(
+      normalizeSettings({ autoOpenLiveMatch: false }).autoOpenLiveMatch,
+    ).toBe(false);
+    expect(
+      normalizeSettings({
+        autoOpenLiveMatch: 'invalid' as unknown as boolean,
+      }).autoOpenLiveMatch,
+    ).toBe(true);
+  });
+
   it('preserves the pressure analytics preference', () => {
     expect(normalizeSettings({ matchAnalyticsView: 'pressure' })).toMatchObject(
       {

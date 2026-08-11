@@ -1834,12 +1834,7 @@ test('mobile scoreboard scroll stays inside the page', async ({ page }) => {
   }
 });
 
-test('auto-open remains opt-in and navigates when enabled', async ({
-  page,
-}) => {
+test('auto-open navigates to the live monitor by default', async ({ page }) => {
   await page.goto('/settings?demo=1');
-  await expect(page).toHaveURL(/settings/);
-  await page.getByLabel('Automatically open the live monitor').check();
-  await page.getByRole('button', { name: 'Save settings' }).click();
   await expect(page).toHaveURL(/\/live/, { timeout: 5000 });
 });
