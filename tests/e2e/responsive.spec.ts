@@ -926,6 +926,9 @@ test('incomplete first launch opens Setup and completed setup links to Game time
 test('empty game timeline focuses on playing the first match', async ({
   page,
 }) => {
+  await page.routeWebSocket(/^ws:\/\/127\.0\.0\.1:\d+\/?$/, (socket) =>
+    socket.close({ code: 1001, reason: 'E2E unavailable' }),
+  );
   await page.addInitScript(() => {
     const fetch = window.fetch.bind(window);
     window.fetch = (input, init) =>
@@ -945,17 +948,26 @@ test('empty game timeline focuses on playing the first match', async ({
   });
   await page.goto('/?demo=0');
 
+  const unavailableStatus = page
+    .locator('[role="status"][data-connection-state="unavailable"]:visible')
+    .first();
+  await expect(unavailableStatus).toHaveAccessibleName(
+    'Connection status: Stats API unavailable',
+  );
+  const emptyTimeline = page.getByRole('region', {
+    name: 'Ready for kickoff',
+  });
   await expect(
-    page.getByRole('heading', { name: 'Ready for kickoff' }),
+    emptyTimeline.getByRole('heading', { name: 'Ready for kickoff' }),
   ).toBeVisible();
   await expect(
-    page.getByText(
+    emptyTimeline.getByText(
       'Start Rocket League and play a match. Fennec will automatically build your game timeline and sessions.',
     ),
   ).toBeVisible();
-  await expect(page.getByText(/Stats API/i)).toHaveCount(0);
+  await expect(emptyTimeline.getByText(/Stats API/i)).toHaveCount(0);
   await expect(
-    page.getByRole('link', { name: 'Open setup guide' }),
+    emptyTimeline.getByRole('link', { name: 'Open setup guide' }),
   ).toHaveCount(0);
 });
 

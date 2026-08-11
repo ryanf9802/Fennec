@@ -25,12 +25,17 @@ export function validationScriptForPush(input) {
 
 export function runPrePush(
   input,
-  { runner = spawnSync, platform = process.platform } = {},
+  {
+    environment = process.env,
+    runner = spawnSync,
+    platform = process.platform,
+  } = {},
 ) {
   const command = platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-  const result = runner(command, [validationScriptForPush(input)], {
-    stdio: 'inherit',
-  });
+  const script = validationScriptForPush(input);
+  const options = { stdio: 'inherit' };
+  if (script === 'check:web') options.env = { ...environment, CI: 'true' };
+  const result = runner(command, [script], options);
   if (result.error) throw result.error;
   return result.status ?? 1;
 }

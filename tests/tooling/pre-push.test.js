@@ -41,12 +41,28 @@ describe('pre-push validation selection', () => {
   it('runs the selected pnpm script and preserves its status', () => {
     const runner = vi.fn(() => ({ status: 7 }));
     const status = runPrePush(update('refs/heads/main', 'refs/heads/main'), {
+      environment: { CI: 'false', PATH: '/test/bin' },
       runner,
       platform: 'linux',
     });
 
     expect(status).toBe(7);
     expect(runner).toHaveBeenCalledWith('pnpm', ['check:web'], {
+      env: { CI: 'true', PATH: '/test/bin' },
+      stdio: 'inherit',
+    });
+  });
+
+  it('does not force the CI environment for an ordinary branch push', () => {
+    const runner = vi.fn(() => ({ status: 0 }));
+
+    runPrePush(update('refs/heads/feature', 'refs/heads/feature'), {
+      environment: { CI: 'false', PATH: '/test/bin' },
+      runner,
+      platform: 'linux',
+    });
+
+    expect(runner).toHaveBeenCalledWith('pnpm', ['check'], {
       stdio: 'inherit',
     });
   });

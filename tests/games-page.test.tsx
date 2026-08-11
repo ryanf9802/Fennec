@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { GamesPage } from '../src/pages/GamesPage';
 import {
   defaultSettings,
+  type FeedConnectionState,
   type MatchState,
   type SessionGroup,
 } from '../src/domain/types';
@@ -98,13 +99,14 @@ function renderPage(
   value: SessionGroup | null = session(),
   withProfile = true,
   activeMatch?: MatchState,
+  connection: FeedConnectionState = 'waiting',
 ) {
   mocks.fennec = {
     activeMatch,
     profile: withProfile
       ? { primaryId: 'Steam|you|0', displayName: 'You' }
       : undefined,
-    connection: 'waiting',
+    connection,
     endSession: vi.fn(),
     settings: defaultSettings,
   };
@@ -183,19 +185,26 @@ describe('closed session presentation', () => {
   });
 
   it('treats an empty timeline as ready to capture the first match', () => {
-    renderPage(null);
+    renderPage(null, true, undefined, 'unavailable');
 
     expect(
-      screen.getByRole('heading', { name: 'Ready for kickoff' }),
+      screen.getByRole('status', {
+        name: 'Connection status: Stats API unavailable',
+      }),
     ).toBeInTheDocument();
+    const emptyTimeline = screen.getByRole('region', {
+      name: 'Ready for kickoff',
+    });
     expect(
-      screen.getByText(
+      within(emptyTimeline).getByText(
         'Start Rocket League and play a match. Fennec will automatically build your game timeline and sessions.',
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Stats API/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'Open setup guide' }),
+      within(emptyTimeline).queryByText(/Stats API/i),
+    ).not.toBeInTheDocument();
+    expect(
+      within(emptyTimeline).queryByRole('link', { name: 'Open setup guide' }),
     ).not.toBeInTheDocument();
   });
 
