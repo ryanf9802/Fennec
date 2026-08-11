@@ -238,6 +238,7 @@ textarea:focus-visible {
   color: #ff9292;
 }
 .button-primary:hover,
+.button-loaded:not(:disabled):hover,
 .button-secondary:hover,
 .button-danger:hover {
   filter: brightness(1.07);

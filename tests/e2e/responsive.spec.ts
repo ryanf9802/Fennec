@@ -1229,6 +1229,80 @@ test('paired setup exposes companion launch preferences', async ({ page }) => {
   ).toBeVisible();
 });
 
+test('one configured storefront completes its companion setup step and remains reconfigurable', async ({
+  page,
+}) => {
+  let configuredStores: Array<'steam' | 'epic'> = [];
+  let steamConfigureCommands = 0;
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-companion-token', 'e2e-token');
+  });
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/permission-probe') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    if (path === '/commands/configure-steam') {
+      steamConfigureCommands += 1;
+      configuredStores = ['steam'];
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        version: '0.2.1',
+        protocolVersion: 1,
+        paired: path === '/status',
+        gameRunning: false,
+        feedConnected: false,
+        lastPacketAt: '2026-08-09T00:00:00Z',
+        stores: ['steam', 'epic'],
+        configuredStores,
+        launchOnStartup: false,
+        updateStatus: 'current',
+      }),
+    });
+  });
+
+  await page.goto('/setup?demo=0');
+  await page.getByRole('button', { name: /With companion/ }).click();
+
+  const installationStep = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Detect and configure Steam or Epic' });
+  await expect(
+    installationStep.locator('svg.text-fennec-orange'),
+  ).toBeVisible();
+  await installationStep
+    .getByRole('button', { name: 'Configure Steam' })
+    .click();
+
+  const reconfigureSteam = installationStep.getByRole('button', {
+    name: 'Reconfigure Steam',
+  });
+  await expect(installationStep.locator('svg.text-emerald-400')).toBeVisible();
+  await expect(reconfigureSteam).toHaveClass(/button-loaded/);
+  await expect(reconfigureSteam).toBeEnabled();
+  await expect(
+    installationStep.getByRole('button', { name: 'Configure Epic' }),
+  ).toBeVisible();
+  await expect(
+    installationStep.getByText(
+      'Detected Steam and Epic. Steam configuration is verified. Configure Epic too if you use it.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Companion setup is complete for Steam. Fennec can capture matches in the background.',
+    ),
+  ).toBeVisible();
+
+  await reconfigureSteam.click();
+  await expect.poll(() => steamConfigureCommands).toBe(2);
+});
+
 test('companion incompatibility is an actionable pairing error', async ({
   page,
 }) => {

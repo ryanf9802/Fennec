@@ -78,10 +78,10 @@ export function companionCompatible(
   );
 }
 
-export function companionStoresConfigured(health?: CompanionHealth): boolean {
+export function companionHasConfiguredStore(health?: CompanionHealth): boolean {
   return Boolean(
     health?.stores?.length &&
-    health.stores.every((store) => health.configuredStores?.includes(store)),
+    health.stores.some((store) => health.configuredStores?.includes(store)),
   );
 }
 
@@ -105,7 +105,7 @@ export function setupComplete({
   if (!health) return companionSetupVerified;
   return (
     companionCompatible(health) &&
-    companionStoresConfigured(health) &&
+    companionHasConfiguredStore(health) &&
     companionCaptureVerified
   );
 }
