@@ -97,7 +97,7 @@ function matchesFilter(
 }
 
 class SceneErrorBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; onSettled?(): void },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -108,6 +108,7 @@ class SceneErrorBoundary extends Component<
 
   componentDidCatch() {
     // The inline fallback keeps the analytics tab available when WebGL fails.
+    this.props.onSettled?.();
   }
 
   render() {
@@ -133,10 +134,12 @@ export function BallTouchMap({
   match,
   profileId,
   speedUnit,
+  onReady,
 }: {
   match: MatchState;
   profileId?: string;
   speedUnit: SpeedUnit;
+  onReady?(): void;
 }) {
   const points = useMemo(
     () =>
@@ -393,7 +396,7 @@ export function BallTouchMap({
         onPointerCancel={stopDrag}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <SceneErrorBoundary>
+        <SceneErrorBoundary onSettled={onReady}>
           <BallTouchScene
             profile={arena}
             teams={teams}
@@ -404,6 +407,7 @@ export function BallTouchMap({
             activeId={active}
             emphasizedIds={[...emphasizedIds]}
             onActivate={setActive}
+            onReady={onReady}
           />
         </SceneErrorBoundary>
 

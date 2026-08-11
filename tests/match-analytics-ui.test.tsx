@@ -1,10 +1,17 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { MatchAnalytics } from '../src/components/MatchAnalytics';
 import type { FennecSettings, MatchState } from '../src/domain/types';
 
+const touchMap = vi.hoisted(() => ({
+  onReady: undefined as (() => void) | undefined,
+}));
+
 vi.mock('../src/components/BallTouchMap', () => ({
-  default: () => <div role="img" aria-label="Mock 3D ball touch map" />,
+  default: ({ onReady }: { onReady?(): void }) => {
+    touchMap.onReady = onReady;
+    return <div role="img" aria-label="Mock 3D ball touch map" />;
+  },
 }));
 
 const match: MatchState = {
@@ -136,6 +143,28 @@ describe('match analytics view switch', () => {
     expect(
       await screen.findByRole('img', { name: /3d ball touch map/i }),
     ).toBeInTheDocument();
+  });
+
+  it('covers the touch map until its first scene is ready', async () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Touch map' }));
+    await screen.findByRole('img', { name: /3d ball touch map/i });
+
+    const content = screen.getByTestId('ball-touch-map-content');
+    const overlay = screen.getByTestId('ball-touch-map-loading-overlay');
+    expect(content).toHaveAttribute('inert');
+    expect(overlay).toHaveAccessibleName('Loading 3D touch map');
+
+    act(() => touchMap.onReady?.());
+    expect(overlay).toHaveAccessibleName('Opening 3D touch map');
+    expect(overlay).toHaveClass('fennec-loading-overlay--cinematic');
+
+    fireEvent.animationEnd(overlay);
+    expect(
+      screen.queryByTestId('ball-touch-map-loading-overlay'),
+    ).not.toBeInTheDocument();
+    expect(content).not.toHaveAttribute('inert');
   });
 
   it('offers pressure as a separate view when spatial telemetry is eligible', async () => {

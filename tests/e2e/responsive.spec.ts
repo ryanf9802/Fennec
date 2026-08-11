@@ -569,6 +569,40 @@ test('custom team identity uses exact accents and theme-colored text', async ({
   ).toHaveCSS('background-color', 'rgb(101, 217, 238)');
 });
 
+test('touch map stays behind the cinematic loader until its scene is ready', async ({
+  page,
+}) => {
+  let releaseModule = () => undefined;
+  const moduleGate = new Promise<void>((resolve) => {
+    releaseModule = resolve;
+  });
+  await page.route('**/src/components/BallTouchMap.tsx*', async (route) => {
+    await moduleGate;
+    await route.continue();
+  });
+
+  await page.goto('/matches/demo-current-2?demo=1');
+  await page.getByRole('tab', { name: 'Touch map' }).click();
+
+  const loader = page.getByTestId('ball-touch-map-loading-overlay');
+  await expect(loader).toHaveAccessibleName('Loading 3D touch map');
+  await expect(page.getByTestId('ball-touch-map-content')).toHaveAttribute(
+    'inert',
+    '',
+  );
+
+  releaseModule();
+  await expect(
+    page.getByRole('img', { name: /3d ball touch map/i }),
+  ).toBeVisible();
+  await expect(loader).toHaveAccessibleName('Opening 3D touch map');
+  await expect(loader).toHaveCount(0);
+  await expect(page.getByTestId('ball-touch-map-content')).not.toHaveAttribute(
+    'inert',
+    '',
+  );
+});
+
 test('completed matches show continuous elapsed time', async ({ page }) => {
   await page.goto('/matches/demo-current-2?demo=1');
   await expect(

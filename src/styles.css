@@ -109,16 +109,24 @@ textarea:focus-visible {
     ),
     var(--background);
 }
-.app-entrance-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
+.fennec-loading-overlay {
   display: grid;
   place-items: center;
   overflow: hidden;
   isolation: isolate;
 }
-.app-entrance-mark {
+.fennec-loading-overlay--screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+.fennec-loading-overlay--contained {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: inherit;
+}
+.fennec-loading-mark {
   position: relative;
   z-index: 1;
   width: 4rem;
@@ -127,7 +135,7 @@ textarea:focus-visible {
   filter: drop-shadow(0 0 1rem rgba(101, 217, 238, 0.18));
   will-change: transform, opacity, filter;
 }
-.app-entrance-bloom {
+.fennec-loading-bloom {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -145,15 +153,15 @@ textarea:focus-visible {
   transform: translate(-50%, -50%) scale(0.25);
   will-change: transform, opacity;
 }
-.app-entrance-overlay--cinematic {
+.fennec-loading-overlay--cinematic {
   animation: app-entrance-cinematic-overlay 720ms
     cubic-bezier(0.22, 0.72, 0.18, 1) forwards;
 }
-.app-entrance-overlay--cinematic .app-entrance-mark {
+.fennec-loading-overlay--cinematic .fennec-loading-mark {
   animation: app-entrance-cinematic-mark 720ms cubic-bezier(0.22, 0.72, 0.18, 1)
     forwards;
 }
-.app-entrance-overlay--cinematic .app-entrance-bloom {
+.fennec-loading-overlay--cinematic .fennec-loading-bloom {
   animation: app-entrance-cinematic-bloom 720ms
     cubic-bezier(0.22, 0.72, 0.18, 1) forwards;
 }
@@ -465,7 +473,7 @@ textarea:focus-visible {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
-  .app-entrance-bloom {
+  .fennec-loading-bloom {
     display: none;
   }
 }
