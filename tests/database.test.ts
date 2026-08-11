@@ -364,6 +364,27 @@ describe('IndexedDB storage', () => {
     ).toBeDefined();
   });
 
+  it('resolves a queued match write to its profile session', async () => {
+    const profileKey = 'id:Steam|you|0';
+    const queuedWrite = saveMatch(
+      playedMatch('just-finished', '2026-08-01T00:00:00Z', true, true),
+    );
+    const sessionId = historyRepository.getMatchSessionId(
+      'just-finished',
+      profileKey,
+    );
+
+    await queuedWrite;
+    const sessions = await historyRepository.listSessions(profileKey);
+    await expect(sessionId).resolves.toBe(sessions.items[0]?.id);
+    await expect(
+      historyRepository.getMatchSessionId(
+        'just-finished',
+        'id:Epic|unrelated|0',
+      ),
+    ).resolves.toBeUndefined();
+  });
+
   it('builds and caches session boundaries independently for selected players', async () => {
     const first = playedMatch('first', '2026-08-01T00:00:00Z', true, true);
     const bridge = playedMatch('bridge', '2026-08-01T00:20:00Z', true, true);

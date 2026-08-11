@@ -69,6 +69,10 @@ export interface HistoryRepository {
     id: string,
     profileKey?: string,
   ): Promise<SessionGroup | undefined>;
+  getMatchSessionId(
+    matchId: string,
+    profileKey: string,
+  ): Promise<string | undefined>;
   listMatches(query?: MatchHistoryQuery): Promise<HistoryPage<MatchState>>;
   getMatch(id: string, profileKey?: string): Promise<MatchState | undefined>;
   loadLatestMatch(): Promise<MatchState | undefined>;

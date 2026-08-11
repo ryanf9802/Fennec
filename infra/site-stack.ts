@@ -2,6 +2,8 @@ import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -182,6 +184,159 @@ function handler(event) {
       })),
     });
 
+    const accessLogGroup = new logs.LogGroup(this, 'AccessLogGroup', {
+      logGroupName: '/aws/cloudfront/fennec-access',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    const logDeliverySource = new logs.CfnDeliverySource(
+      this,
+      'AccessLogDeliverySource',
+      {
+        name: 'fennec-cloudfront-access',
+        resourceArn: distribution.distributionArn,
+        logType: 'ACCESS_LOGS',
+      },
+    );
+    const logDeliveryDestination = new logs.CfnDeliveryDestination(
+      this,
+      'AccessLogDeliveryDestination',
+      {
+        name: 'fennec-cloudfront-access',
+        deliveryDestinationType: 'CWL',
+        destinationResourceArn: accessLogGroup.logGroupArn,
+        outputFormat: 'json',
+      },
+    );
+    const logDelivery = new logs.CfnDelivery(this, 'AccessLogDelivery', {
+      deliverySourceName: logDeliverySource.name,
+      deliveryDestinationArn: logDeliveryDestination.attrArn,
+      recordFields: [
+        'date',
+        'time',
+        'x-edge-location',
+        'sc-bytes',
+        'c-ip',
+        'cs-method',
+        'cs-uri-stem',
+        'sc-status',
+        'cs(Referer)',
+        'cs(User-Agent)',
+        'x-edge-result-type',
+        'x-host-header',
+        'time-taken',
+        'x-edge-response-result-type',
+        'time-to-first-byte',
+        'x-edge-detailed-result-type',
+        'sc-content-type',
+        'sc-content-len',
+        'c-country',
+      ],
+    });
+    logDelivery.node.addDependency(logDeliverySource, logDeliveryDestination);
+
+    const logGroupNames = [accessLogGroup.logGroupName];
+    const humanHtmlFilters = [
+      'filter `x-host-header` in ["fennec.gg", "app.fennec.gg"]',
+      'filter `sc-status` = "200" and `sc-content-type` like /^text\\/html/',
+      'fields tolower(`cs(User-Agent)`) as userAgent, concat(`c-ip`, "|", `cs(User-Agent)`) as visitor',
+      'filter userAgent not like /bot|crawler|spider|slurp|preview|facebookexternalhit|headlesschrome/',
+    ];
+    const dashboard = new cloudwatch.Dashboard(this, 'TrafficDashboard', {
+      dashboardName: 'FennecTraffic',
+      start: '-P30D',
+    });
+    dashboard.addWidgets(
+      new cloudwatch.LogQueryWidget({
+        title: 'Estimated unique visitors per day',
+        logGroupNames,
+        queryLines: [
+          ...humanHtmlFilters,
+          'stats count_distinct(visitor) as `Estimated visitors` by bin(1d), `x-host-header`',
+        ],
+        view: cloudwatch.LogQueryVisualizationType.LINE,
+        width: 12,
+      }),
+      new cloudwatch.LogQueryWidget({
+        title: 'HTML page loads per day',
+        logGroupNames,
+        queryLines: [
+          ...humanHtmlFilters,
+          'stats count(*) as `Page loads` by bin(1d), `x-host-header`',
+        ],
+        view: cloudwatch.LogQueryVisualizationType.LINE,
+        width: 12,
+      }),
+      new cloudwatch.LogQueryWidget({
+        title: 'Requests per day by hostname',
+        logGroupNames,
+        queryLines: [
+          'filter `x-host-header` in ["fennec.gg", "app.fennec.gg"]',
+          'stats count(*) as Requests by bin(1d), `x-host-header`',
+        ],
+        view: cloudwatch.LogQueryVisualizationType.LINE,
+        width: 12,
+      }),
+      new cloudwatch.LogQueryWidget({
+        title: 'Estimated visitors by country and hostname',
+        logGroupNames,
+        queryLines: [
+          ...humanHtmlFilters,
+          'stats count_distinct(visitor) as `Estimated visitors` by `c-country`, `x-host-header`',
+          'sort `Estimated visitors` desc',
+          'limit 50',
+        ],
+        width: 12,
+      }),
+      new cloudwatch.LogQueryWidget({
+        title: 'Top entry paths',
+        logGroupNames,
+        queryLines: [
+          ...humanHtmlFilters,
+          'stats count(*) as Requests by `x-host-header`, `cs-uri-stem`',
+          'sort Requests desc',
+          'limit 25',
+        ],
+        width: 12,
+      }),
+      new cloudwatch.LogQueryWidget({
+        title: 'Top external referrers',
+        logGroupNames,
+        queryLines: [
+          'filter `x-host-header` in ["fennec.gg", "app.fennec.gg"]',
+          'filter `cs(Referer)` != "-" and `cs(Referer)` not like /fennec\\.gg/',
+          'stats count(*) as Requests by `cs(Referer)`, `x-host-header`',
+          'sort Requests desc',
+          'limit 25',
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'CloudFront requests and bytes downloaded',
+        left: [distribution.metricRequests()],
+        right: [distribution.metricBytesDownloaded()],
+        width: 12,
+      }),
+      new cloudwatch.LogQueryWidget({
+        title: 'CloudFront cache hit rate',
+        logGroupNames,
+        queryLines: [
+          'stats 100 * sum(strcontains(`x-edge-result-type`, "Hit")) / count(*) as `Cache hit %` by bin(1d)',
+        ],
+        view: cloudwatch.LogQueryVisualizationType.LINE,
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'CloudFront error rates',
+        left: [
+          distribution.metricTotalErrorRate(),
+          distribution.metric4xxErrorRate(),
+          distribution.metric5xxErrorRate(),
+        ],
+        width: 12,
+      }),
+    );
+
     if (zone && props.domainName) {
       const target = route53.RecordTarget.fromAlias(
         new targets.CloudFrontTarget(distribution),
@@ -221,6 +376,9 @@ function handler(event) {
       value: props.domainName
         ? `https://${props.domainName}`
         : `https://${distribution.distributionDomainName}`,
+    });
+    new cdk.CfnOutput(this, 'TrafficDashboardName', {
+      value: dashboard.dashboardName,
     });
   }
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runStages, validationStages } from '../../scripts/check.mjs';
+import {
+  runStages,
+  validationConcurrency,
+  validationStages,
+} from '../../scripts/check.mjs';
 
 describe('aggregate validation runner', () => {
   it('adds infrastructure and browser stages only to the web gate', () => {
@@ -19,6 +23,11 @@ describe('aggregate validation runner', () => {
       'infrastructure',
       'browser',
     ]);
+  });
+
+  it('uses one additional worker for the complete web gate', () => {
+    expect(validationConcurrency()).toBe(2);
+    expect(validationConcurrency({ web: true })).toBe(3);
   });
 
   it('runs at most two stages together and reports every failure', async () => {
