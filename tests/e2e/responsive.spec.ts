@@ -735,11 +735,19 @@ test('settings merge data management with an authoritative companion', async ({
         databaseBytes: 2_097_152,
         lastSyncedAt: '2026-08-10T12:00:00Z',
         updateStatus: 'current',
+        resourceUsage: {
+          cpuPercent: 0.2,
+          memoryBytes: 25 * 1024 * 1024,
+          recentPeakCpuPercent: 0.6,
+          recentPeakMemoryBytes: 28 * 1024 * 1024,
+          recentWindowSeconds: 60,
+          sampledAt: '2026-08-10T12:00:00Z',
+        },
       }),
     });
   });
 
-  await page.goto('/settings?demo=1');
+  await page.goto('/settings?demo=0');
 
   await expect(
     page.getByRole('heading', { name: 'Data and companion' }),
@@ -756,6 +764,12 @@ test('settings merge data management with an authoritative companion', async ({
   await expect(
     page.getByText('42 matches · 2.0 MB in the companion'),
   ).toBeVisible();
+  const footprint = page.getByLabel('Live companion footprint');
+  await expect(footprint).toContainText('Companion process only');
+  await expect(footprint).toContainText('0.2%');
+  await expect(footprint).toContainText('0.6% 1 min peak');
+  await expect(footprint).toContainText('25.0 MiB');
+  await expect(footprint).toContainText('28.0 MiB 1 min peak');
   await expect(page.getByText(/stay in this browser/i)).toHaveCount(0);
 });
 

@@ -1,10 +1,11 @@
-import { ExternalLink, Link2, Power, Rocket } from 'lucide-react';
+import { Activity, ExternalLink, Link2, Power, Rocket } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   companionCommand,
   companionProtocolVersion,
   type CompanionHealth,
+  type CompanionResourceUsage,
 } from '../companion/client';
 import { useCompanionStatus } from '../companion/useCompanionStatus';
 
@@ -31,6 +32,88 @@ function updateMessage(
     case 'current':
       return 'Companion updates install automatically in the background.';
   }
+}
+
+function formatCpu(value: number): string {
+  const safe = Math.max(0, value);
+  if (safe > 0 && safe < 0.1) return '<0.1%';
+  return `${safe.toFixed(1)}%`;
+}
+
+function formatMemory(bytes: number): string {
+  return `${(Math.max(0, bytes) / 1024 / 1024).toFixed(1)} MiB`;
+}
+
+/** Presents truthful process-only measurements without implying browser or game usage is included. */
+export function CompanionResourceMonitor({
+  usage,
+}: {
+  usage: CompanionResourceUsage | null | undefined;
+}) {
+  const peakLabel = usage
+    ? `${Math.round(usage.recentWindowSeconds / 60)} min peak`
+    : undefined;
+  const measurementStatus =
+    usage === undefined
+      ? 'Requires latest companion'
+      : usage === null
+        ? 'Measuring on this device'
+        : 'Live on this device';
+  return (
+    <div
+      aria-label="Live companion footprint"
+      className="surface-strong mb-4 rounded-2xl p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <strong className="flex items-center gap-2">
+          <Activity className="size-4 text-fennec-cyan" /> Live companion
+          footprint
+        </strong>
+        <span className="text-muted flex items-center gap-1.5 text-xs">
+          <span
+            aria-hidden="true"
+            className="size-2 rounded-full bg-fennec-cyan"
+          />
+          {measurementStatus}
+        </span>
+      </div>
+      <p className="text-muted mt-1 text-xs">
+        Companion process only · refreshes every 5 seconds
+      </p>
+      {usage === undefined ? (
+        <p className="text-muted mt-3 text-sm">
+          Install the latest companion to see live CPU and memory use.
+        </p>
+      ) : usage === null ? (
+        <p className="text-muted mt-3 text-sm">Measuring resource use…</p>
+      ) : (
+        <dl className="mt-3 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-white/5 p-3">
+            <dt className="text-muted text-xs font-bold uppercase tracking-wider">
+              CPU
+            </dt>
+            <dd className="mt-1 text-xl font-black tabular-nums">
+              {formatCpu(usage.cpuPercent)}
+            </dd>
+            <dd className="text-muted mt-0.5 text-xs tabular-nums">
+              {formatCpu(usage.recentPeakCpuPercent)} {peakLabel}
+            </dd>
+          </div>
+          <div className="rounded-xl border border-white/5 p-3">
+            <dt className="text-muted text-xs font-bold uppercase tracking-wider">
+              Memory
+            </dt>
+            <dd className="mt-1 text-xl font-black tabular-nums">
+              {formatMemory(usage.memoryBytes)}
+            </dd>
+            <dd className="text-muted mt-0.5 text-xs tabular-nums">
+              {formatMemory(usage.recentPeakMemoryBytes)} {peakLabel}
+            </dd>
+          </div>
+        </dl>
+      )}
+    </div>
+  );
 }
 
 /** Provides the paired companion's shared storefront, startup, and dashboard launch controls. */
@@ -195,6 +278,7 @@ export function CompanionSettings() {
         </p>
       ) : (
         <div className="mt-5">
+          <CompanionResourceMonitor usage={health.resourceUsage} />
           <CompanionLaunchControls health={health} recheck={recheck} />
         </div>
       )}

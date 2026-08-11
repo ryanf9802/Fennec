@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import {
   CompanionLaunchControls,
+  CompanionResourceMonitor,
   CompanionSettings,
 } from '../components/CompanionSettings';
 import { StatsApiSetup } from '../components/StatsApiSetup';
@@ -431,6 +432,7 @@ export function SettingsPage() {
           </div>
           {dataControls}
           <div className="mt-7 border-t border-white/10 pt-6">
+            <CompanionResourceMonitor usage={companion.health.resourceUsage} />
             <CompanionLaunchControls
               health={companion.health}
               recheck={companion.recheck}

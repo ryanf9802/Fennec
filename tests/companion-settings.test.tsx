@@ -56,6 +56,42 @@ describe('companion settings', () => {
     );
   });
 
+  it('shows current and recent companion process usage', () => {
+    renderSettings('current', {
+      resourceUsage: {
+        cpuPercent: 0.04,
+        memoryBytes: 18 * 1024 * 1024,
+        recentPeakCpuPercent: 0.7,
+        recentPeakMemoryBytes: 21.5 * 1024 * 1024,
+        recentWindowSeconds: 60,
+        sampledAt: '2026-08-10T12:00:00Z',
+      },
+    });
+
+    const monitor = screen.getByLabelText('Live companion footprint');
+    expect(monitor).toHaveTextContent('Companion process only');
+    expect(monitor).toHaveTextContent('Live on this device');
+    expect(monitor).toHaveTextContent('<0.1%');
+    expect(monitor).toHaveTextContent('0.7% 1 min peak');
+    expect(monitor).toHaveTextContent('18.0 MiB');
+    expect(monitor).toHaveTextContent('21.5 MiB 1 min peak');
+  });
+
+  it('distinguishes a new companion measuring usage from an older companion', () => {
+    const view = renderSettings('current', { resourceUsage: null });
+    expect(screen.getByText('Measuring resource use…')).toBeInTheDocument();
+    expect(screen.getByText('Measuring on this device')).toBeInTheDocument();
+
+    view.unmount();
+    renderSettings('current');
+    expect(
+      screen.getByText(
+        'Install the latest companion to see live CPU and memory use.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Requires latest companion')).toBeInTheDocument();
+  });
+
   it('presents automatic updates without requiring user action', () => {
     renderSettings('current');
     expect(

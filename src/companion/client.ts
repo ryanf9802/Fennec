@@ -34,6 +34,16 @@ export interface CompanionHealth {
   materializedFrameId?: number;
   databaseBytes?: number;
   lastSyncedAt?: string;
+  resourceUsage?: CompanionResourceUsage | null;
+}
+
+export interface CompanionResourceUsage {
+  cpuPercent: number;
+  memoryBytes: number;
+  recentPeakCpuPercent: number;
+  recentPeakMemoryBytes: number;
+  recentWindowSeconds: number;
+  sampledAt: string;
 }
 
 export interface CanonicalCompanionData {

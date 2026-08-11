@@ -32,6 +32,7 @@ vi.mock('../src/data/historyQueries', () => ({
 vi.mock('../src/components/CompanionSettings', () => ({
   CompanionSettings: () => null,
   CompanionLaunchControls: () => <div>Companion controls</div>,
+  CompanionResourceMonitor: () => <div>Live companion footprint</div>,
 }));
 
 vi.mock('../src/companion/useCompanionStatus', () => ({
@@ -263,6 +264,7 @@ describe('settings CSV export', () => {
     expect(
       screen.getByRole('button', { name: 'Delete all history' }),
     ).toBeDisabled();
+    expect(screen.getByText('Live companion footprint')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Local data' }),
     ).not.toBeInTheDocument();

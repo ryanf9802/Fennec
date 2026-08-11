@@ -258,6 +258,7 @@ pub fn run() {
                     available_update_version: None,
                     last_update_check_at: None,
                 }),
+                resource_usage: RwLock::new(None),
                 frames,
                 replicas,
             });
@@ -270,6 +271,9 @@ pub fn run() {
                 }
             });
             tauri::async_runtime::spawn(server::collect_stats(state));
+            tauri::async_runtime::spawn(server::monitor_resources(
+                app.state::<Arc<AppState>>().inner().clone(),
+            ));
             tauri::async_runtime::spawn(monitor_game_launches(
                 app.state::<Arc<AppState>>().inner().clone(),
                 installs,
