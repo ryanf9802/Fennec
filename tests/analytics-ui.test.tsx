@@ -140,7 +140,7 @@ describe('ball touch map', () => {
     vi.restoreAllMocks();
   });
 
-  it('settles the loader when the 3D scene fails', () => {
+  it('settles the loader when the 3D scene fails', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onReady = vi.fn();
     scene.fail = true;
@@ -154,7 +154,7 @@ describe('ball touch map', () => {
       />,
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
+    expect(await screen.findByRole('alert')).toHaveTextContent(
       'The 3D touch map is unavailable in this browser',
     );
     expect(onReady).toHaveBeenCalledOnce();

@@ -657,7 +657,7 @@ test('touch map stays behind the cinematic loader until its scene is ready', asy
   const moduleGate = new Promise<void>((resolve) => {
     releaseModule = resolve;
   });
-  await page.route('**/src/components/BallTouchMap.tsx*', async (route) => {
+  await page.route('**/src/components/BallTouchScene.tsx*', async (route) => {
     await moduleGate;
     await route.continue();
   });
@@ -666,10 +666,14 @@ test('touch map stays behind the cinematic loader until its scene is ready', asy
   await page.getByRole('tab', { name: 'Touch map' }).click();
 
   const loader = page.getByTestId('ball-touch-map-loading-overlay');
+  const frame = page.getByTestId('ball-touch-map-frame');
   await expect(loader).toHaveAccessibleName('Loading 3D touch map');
   await expect(page.getByTestId('ball-touch-map-content')).toHaveAttribute(
     'inert',
     '',
+  );
+  const loadingHeight = await frame.evaluate(
+    (element) => element.getBoundingClientRect().height,
   );
 
   releaseModule();
@@ -677,7 +681,15 @@ test('touch map stays behind the cinematic loader until its scene is ready', asy
     page.getByRole('img', { name: /3d ball touch map/i }),
   ).toBeVisible();
   await expect(loader).toHaveAccessibleName('Opening 3D touch map');
+  await expect
+    .poll(() =>
+      frame.evaluate((element) => element.getBoundingClientRect().height),
+    )
+    .toBeCloseTo(loadingHeight, 1);
   await expect(loader).toHaveCount(0);
+  expect(
+    await frame.evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeCloseTo(loadingHeight, 1);
   await expect(page.getByTestId('ball-touch-map-content')).not.toHaveAttribute(
     'inert',
     '',

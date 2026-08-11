@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   observedBallSpeed,
   playerTouchAnalytics,
@@ -6,10 +6,9 @@ import {
 } from '../domain/analytics';
 import { formatSpeed } from '../domain/speed';
 import type { FennecSettings, MatchState } from '../domain/types';
+import BallTouchMap from './BallTouchMap';
 import { FennecLoadingOverlay } from './FennecLoadingOverlay';
 import { PressureAnalytics } from './PressureAnalytics';
-
-const BallTouchMap = lazy(() => import('./BallTouchMap'));
 
 function LoadingBallTouchMap({
   match,
@@ -28,19 +27,15 @@ function LoadingBallTouchMap({
   return (
     <div
       className="relative overflow-hidden rounded-2xl"
-      style={{
-        minHeight: 'calc(clamp(22rem, 56vw, 38rem) + 2.75rem)',
-      }}
+      data-testid="ball-touch-map-frame"
     >
       <div data-testid="ball-touch-map-content" inert={!revealComplete}>
-        <Suspense fallback={null}>
-          <BallTouchMap
-            match={match}
-            profileId={profileId}
-            speedUnit={speedUnit}
-            onReady={markSceneReady}
-          />
-        </Suspense>
+        <BallTouchMap
+          match={match}
+          profileId={profileId}
+          speedUnit={speedUnit}
+          onReady={markSceneReady}
+        />
       </div>
       {!revealComplete && (
         <FennecLoadingOverlay
