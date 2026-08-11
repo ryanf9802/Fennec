@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { MatchPage } from '../src/pages/MatchPage';
 import { ProfilePage } from '../src/pages/ProfilePage';
@@ -349,6 +349,9 @@ describe('player profile UI', () => {
       primaryId: 'Steam|training-you|0',
       displayName: 'Training You',
     });
+    await waitFor(() =>
+      expect(screen.getByText('Profile updated.')).toBeVisible(),
+    );
   });
 
   it('uses the current training name when history has the same player', () => {
