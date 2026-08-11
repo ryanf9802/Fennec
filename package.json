@@ -14,7 +14,7 @@
     "build": "tsc -b --pretty false && vite build",
     "build:web": "vite build",
     "check": "prettier --check . --ignore-unknown && eslint . && tsc -b --pretty false && vitest run && vite build",
-    "check:web": "npm run check && npm run cdk:synth && npm run test:e2e",
+    "check:web": "pnpm run check && pnpm run cdk:synth && pnpm run test:e2e",
     "preview": "vite preview",
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",

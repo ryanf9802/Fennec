@@ -72,7 +72,7 @@ describe('companion release workflow', () => {
       'prettier --check . --ignore-unknown && eslint . && tsc -b --pretty false && vitest run && vite build',
     );
     expect(packageJson.scripts['check:web']).toBe(
-      'npm run check && npm run cdk:synth && npm run test:e2e',
+      'pnpm run check && pnpm run cdk:synth && pnpm run test:e2e',
     );
     expect(prePushHook.trim()).toBe('node scripts/pre-push.mjs');
     expect(webWorkflow).toContain('name: Web validation');
