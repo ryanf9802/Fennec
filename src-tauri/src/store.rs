@@ -277,7 +277,7 @@ fn shortcut_details(kind: StoreKind) -> (&'static str, &'static str) {
 }
 
 fn shortcut_script() -> &'static str {
-    r#"& { param($shortcutPath, $targetPath, $arguments, $workingDirectory, $iconLocation, $description); $ErrorActionPreference = 'Stop'; $shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut($shortcutPath); $shortcut.TargetPath = $targetPath; $shortcut.Arguments = $arguments; $shortcut.WorkingDirectory = $workingDirectory; $shortcut.IconLocation = $iconLocation; $shortcut.Description = $description; $shortcut.Save() }"#
+    r#"$ErrorActionPreference = 'Stop'; $shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut($env:FENNEC_SHORTCUT_PATH); $shortcut.TargetPath = $env:FENNEC_SHORTCUT_TARGET; $shortcut.Arguments = $env:FENNEC_SHORTCUT_ARGUMENTS; $shortcut.WorkingDirectory = $env:FENNEC_SHORTCUT_WORKING_DIRECTORY; $shortcut.IconLocation = $env:FENNEC_SHORTCUT_ICON; $shortcut.Description = $env:FENNEC_SHORTCUT_DESCRIPTION; $shortcut.Save()"#
 }
 
 #[cfg(windows)]
@@ -303,12 +303,12 @@ fn create_shortcut_at(kind: StoreKind, desktop: &Path) -> io::Result<PathBuf> {
             "-Command",
             shortcut_script(),
         ])
-        .arg(&path)
-        .arg(&explorer)
-        .arg(uri)
-        .arg(working_directory)
-        .arg(&icon)
-        .arg(&description)
+        .env("FENNEC_SHORTCUT_PATH", &path)
+        .env("FENNEC_SHORTCUT_TARGET", &explorer)
+        .env("FENNEC_SHORTCUT_ARGUMENTS", uri)
+        .env("FENNEC_SHORTCUT_WORKING_DIRECTORY", working_directory)
+        .env("FENNEC_SHORTCUT_ICON", &icon)
+        .env("FENNEC_SHORTCUT_DESCRIPTION", &description)
         .status()?;
     if !status.success() || !path.exists() {
         return Err(io::Error::other("Windows shortcut creation failed"));
@@ -434,9 +434,11 @@ mod tests {
     }
 
     #[test]
-    fn shortcut_script_binds_arguments_inside_an_invoked_block() {
+    fn shortcut_script_reads_values_from_the_environment() {
         let script = shortcut_script();
-        assert!(script.starts_with("& { param("));
+        assert!(!script.contains("param("));
+        assert!(script.contains("$env:FENNEC_SHORTCUT_PATH"));
+        assert!(script.contains("$env:FENNEC_SHORTCUT_ARGUMENTS"));
         assert!(script.contains("$ErrorActionPreference = 'Stop'"));
     }
 
