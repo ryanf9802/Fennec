@@ -2021,9 +2021,8 @@ export const historyRepository: HistoryRepository = {
   },
   async getMatchSessionId(matchId, profileKey) {
     await prepareProfileSessions(profileKey);
-    return (
-      await db.profileMatches.get(`${profileKey}\u0000${matchId}`)
-    )?.sessionId;
+    return (await db.profileMatches.get(`${profileKey}\u0000${matchId}`))
+      ?.sessionId;
   },
   listMatches(query = {}) {
     if (query.playerKey) return listPlayerMatches(query);

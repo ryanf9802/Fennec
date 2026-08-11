@@ -102,6 +102,8 @@ describe('Fennec site infrastructure', () => {
     const delivery = Object.values(
       template.findResources('AWS::Logs::Delivery'),
     )[0];
+    if (!delivery)
+      throw new Error('CloudFront log delivery was not synthesized');
     expect(delivery.Properties.RecordFields).not.toEqual(
       expect.arrayContaining(['cs-uri-query', 'cs(Cookie)', 'x-forwarded-for']),
     );
@@ -111,6 +113,7 @@ describe('Fennec site infrastructure', () => {
     const dashboard = Object.values(
       template.findResources('AWS::CloudWatch::Dashboard'),
     )[0];
+    if (!dashboard) throw new Error('Traffic dashboard was not synthesized');
     const dashboardFragments = dashboard.Properties.DashboardBody['Fn::Join'][1]
       .filter((fragment: unknown) => typeof fragment === 'string')
       .join('');
