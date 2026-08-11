@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
     displayName: 'You',
   } as { primaryId: string; displayName: string } | undefined,
   selectProfile: vi.fn(() => Promise.resolve()),
+  sessionPlayerCandidates: [] as Array<{
+    primaryId: string;
+    displayName: string;
+  }>,
+  emptyHistory: false,
 }));
 
 vi.mock('../src/app/FennecContext', () => ({
@@ -17,6 +22,7 @@ vi.mock('../src/app/FennecContext', () => ({
     profile: mocks.profile,
     settings: defaultSettings,
     selectProfile: mocks.selectProfile,
+    sessionPlayerCandidates: mocks.sessionPlayerCandidates,
   }),
 }));
 
@@ -122,34 +128,38 @@ vi.mock('../src/data/historyQueries', () => ({
   }),
   usePlayerHistoryAvailability: () => ({ data: ['name:boomer'] }),
   usePlayers: (_query: string, platformOnly: boolean) => ({
-    data: [
-      {
-        playerKey: 'id:Steam|you|0',
-        primaryId: 'Steam|you|0',
-        identityKind: 'platform',
-        latestName: 'You',
-        normalizedName: 'you',
-        firstSeen: botMatch.startedAt,
-        lastSeen: botMatch.startedAt,
-      },
-      {
-        playerKey: 'id:Epic|teammate|0',
-        primaryId: 'Epic|teammate|0',
-        identityKind: 'platform',
-        latestName: 'Teammate',
-        normalizedName: 'teammate',
-        firstSeen: botMatch.startedAt,
-        lastSeen: botMatch.startedAt,
-      },
-      {
-        playerKey: 'name:boomer',
-        identityKind: 'name',
-        latestName: 'Boomer',
-        normalizedName: 'boomer',
-        firstSeen: botMatch.startedAt,
-        lastSeen: botMatch.startedAt,
-      },
-    ].filter((player) => !platformOnly || player.identityKind === 'platform'),
+    data: mocks.emptyHistory
+      ? []
+      : [
+          {
+            playerKey: 'id:Steam|you|0',
+            primaryId: 'Steam|you|0',
+            identityKind: 'platform',
+            latestName: 'You',
+            normalizedName: 'you',
+            firstSeen: botMatch.startedAt,
+            lastSeen: botMatch.startedAt,
+          },
+          {
+            playerKey: 'id:Epic|teammate|0',
+            primaryId: 'Epic|teammate|0',
+            identityKind: 'platform',
+            latestName: 'Teammate',
+            normalizedName: 'teammate',
+            firstSeen: botMatch.startedAt,
+            lastSeen: botMatch.startedAt,
+          },
+          {
+            playerKey: 'name:boomer',
+            identityKind: 'name',
+            latestName: 'Boomer',
+            normalizedName: 'boomer',
+            firstSeen: botMatch.startedAt,
+            lastSeen: botMatch.startedAt,
+          },
+        ].filter(
+          (player) => !platformOnly || player.identityKind === 'platform',
+        ),
   }),
   useOverview: () => ({
     data: { matches: 1, sessions: 1, firstMatchStartedAt: botMatch.startedAt },
@@ -163,6 +173,8 @@ function LocationProbe() {
 describe('player profile UI', () => {
   beforeEach(() => {
     mocks.profile = { primaryId: 'Steam|you|0', displayName: 'You' };
+    mocks.sessionPlayerCandidates = [];
+    mocks.emptyHistory = false;
     mocks.selectProfile.mockClear();
   });
   it('opens a player profile over the match without changing location', () => {
@@ -308,5 +320,53 @@ describe('player profile UI', () => {
     expect(
       screen.getByText('Choose a player to personalize your Fennec view.'),
     ).toBeInTheDocument();
+  });
+
+  it('offers a training player for selection without saved history', async () => {
+    mocks.profile = undefined;
+    mocks.emptyHistory = true;
+    mocks.sessionPlayerCandidates = [
+      { primaryId: 'Steam|training-you|0', displayName: 'Training You' },
+    ];
+    render(
+      <MemoryRouter>
+        <ProfilePage />
+      </MemoryRouter>,
+    );
+
+    const search = screen.getByRole('combobox', { name: 'Search players' });
+    expect(search).toBeEnabled();
+    expect(search).toHaveAttribute(
+      'placeholder',
+      'Search players by display name',
+    );
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: 'Train' } });
+    fireEvent.click(screen.getByRole('option', { name: /Training You/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use player' }));
+
+    expect(mocks.selectProfile).toHaveBeenCalledWith({
+      primaryId: 'Steam|training-you|0',
+      displayName: 'Training You',
+    });
+  });
+
+  it('uses the current training name when history has the same player', () => {
+    mocks.profile = undefined;
+    mocks.sessionPlayerCandidates = [
+      { primaryId: 'Steam|you|0', displayName: 'Renamed You' },
+    ];
+    render(
+      <MemoryRouter>
+        <ProfilePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Search players' }));
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+    expect(screen.getByRole('option', { name: /Renamed You/ })).toBeVisible();
+    expect(
+      screen.queryByRole('option', { name: /^You/ }),
+    ).not.toBeInTheDocument();
   });
 });
