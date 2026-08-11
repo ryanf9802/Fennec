@@ -9,6 +9,10 @@ import {
 import { AppShell } from '../components/AppShell';
 import { AppEntrance } from '../components/AppEntrance';
 import { LocalAccessModal } from '../components/LocalAccessModal';
+import { historyRepository } from '../data/database';
+import { playerKeyForPrimaryId } from '../domain/playerIdentity';
+import { isTrainingMatch } from '../domain/playlists';
+import type { MatchState } from '../domain/types';
 import { GamesPage } from '../pages/GamesPage';
 import { MatchPage } from '../pages/MatchPage';
 import { OnboardingPage } from '../pages/OnboardingPage';
@@ -31,6 +35,55 @@ export function App() {
       <AppContent />
     </SetupStatusProvider>
   );
+}
+
+/** Keeps the completed live match visible until its history destination resolves. */
+function LiveMatchRoute({
+  activeMatch,
+  profilePrimaryId,
+}: {
+  activeMatch?: MatchState;
+  profilePrimaryId?: string;
+}) {
+  const navigate = useNavigate();
+  const displayedMatch = useRef<MatchState | undefined>(activeMatch);
+  useEffect(() => {
+    if (activeMatch) displayedMatch.current = activeMatch;
+  }, [activeMatch]);
+
+  useEffect(() => {
+    if (activeMatch) return;
+    const finishedMatch = displayedMatch.current;
+    const profileKey = playerKeyForPrimaryId(profilePrimaryId);
+    if (!finishedMatch || isTrainingMatch(finishedMatch) || !profileKey) {
+      navigate('/', { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+    void historyRepository
+      .getMatchSessionId(finishedMatch.id, profileKey)
+      .then((sessionId) => {
+        if (cancelled) return;
+        if (!sessionId) {
+          navigate('/', { replace: true });
+          return;
+        }
+        navigate(`/matches/${finishedMatch.id}`, {
+          replace: true,
+          state: { matchOrigin: `/sessions/${sessionId}` },
+        });
+      })
+      .catch(() => {
+        if (!cancelled) navigate('/', { replace: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMatch, navigate, profilePrimaryId]);
+
+  if (activeMatch) return <MatchPage match={activeMatch} />;
+  return <div className="surface rounded-3xl p-8">Opening saved match…</div>;
 }
 
 /** Holds document-entry content until local data and setup checks are ready. */
@@ -89,11 +142,10 @@ function AppContent() {
             <Route
               path="/live"
               element={
-                activeMatch ? (
-                  <MatchPage match={activeMatch} />
-                ) : (
-                  <Navigate to="/" replace />
-                )
+                <LiveMatchRoute
+                  activeMatch={activeMatch}
+                  profilePrimaryId={profile?.primaryId}
+                />
               }
             />
             <Route path="/matches/:matchId" element={<MatchPage />} />
