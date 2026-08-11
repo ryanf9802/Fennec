@@ -34,6 +34,7 @@ jobs:
       - name: Run the full web validation gate
         run: pnpm check:web
       - uses: actions/upload-artifact@v7
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         with:
           name: fennec-web-${{ github.sha }}
           path: dist

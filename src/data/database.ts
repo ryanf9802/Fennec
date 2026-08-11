@@ -2019,6 +2019,11 @@ export const historyRepository: HistoryRepository = {
       endedManually: matches.at(-1)?.sessionEndedAfter === true,
     };
   },
+  async getMatchSessionId(matchId, profileKey) {
+    await prepareProfileSessions(profileKey);
+    return (await db.profileMatches.get(`${profileKey}\u0000${matchId}`))
+      ?.sessionId;
+  },
   listMatches(query = {}) {
     if (query.playerKey) return listPlayerMatches(query);
     if (query.profileKey)

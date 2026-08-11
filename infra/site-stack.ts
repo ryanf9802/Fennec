@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -182,6 +183,29 @@ function handler(event) {
       })),
     });
 
+    const dashboard = new cloudwatch.Dashboard(this, 'TrafficDashboard', {
+      dashboardName: 'FennecTraffic',
+      start: '-P30D',
+    });
+    const daily = { period: cdk.Duration.days(1) };
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Daily CloudFront requests and bytes downloaded',
+        left: [distribution.metricRequests(daily)],
+        right: [distribution.metricBytesDownloaded(daily)],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Daily CloudFront error rates',
+        left: [
+          distribution.metricTotalErrorRate(daily),
+          distribution.metric4xxErrorRate(daily),
+          distribution.metric5xxErrorRate(daily),
+        ],
+        width: 12,
+      }),
+    );
+
     if (zone && props.domainName) {
       const target = route53.RecordTarget.fromAlias(
         new targets.CloudFrontTarget(distribution),
@@ -221,6 +245,9 @@ function handler(event) {
       value: props.domainName
         ? `https://${props.domainName}`
         : `https://${distribution.distributionDomainName}`,
+    });
+    new cdk.CfnOutput(this, 'TrafficDashboardName', {
+      value: dashboard.dashboardName,
     });
   }
 }

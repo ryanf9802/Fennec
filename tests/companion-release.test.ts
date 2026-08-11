@@ -12,6 +12,9 @@ const companionWorkflow = readFileSync(
   'utf8',
 );
 const webWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+const prebuiltTauriConfig = JSON.parse(
+  readFileSync('src-tauri/tauri.prebuilt.conf.json', 'utf8'),
+) as { build: { beforeBuildCommand: string } };
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
   scripts: Record<string, string>;
 };
@@ -57,11 +60,30 @@ describe('companion release workflow', () => {
     expectWebBuildBeforeRustTests(companionWorkflow);
   });
 
+  it('reuses the prepared frontend when packaging installers', () => {
+    expect(prebuiltTauriConfig.build.beforeBuildCommand).toBe('');
+    expect(companionWorkflow).toContain(
+      'pnpm exec tauri build --no-sign --config src-tauri/tauri.prebuilt.conf.json',
+    );
+    expect(workflow).toContain('build = @{ beforeBuildCommand = "" }');
+    expect(workflow).toContain(
+      'args: --config src-tauri/tauri.release.conf.json',
+    );
+  });
+
+  it('caches Windows Rust dependencies across eligible runs', () => {
+    for (const contents of [workflow, companionWorkflow]) {
+      expect(contents).toContain('uses: Swatinem/rust-cache@v2');
+      expect(contents).toContain('shared-key: windows-companion');
+      expect(contents).toContain('workspaces: src-tauri -> target');
+    }
+  });
+
   it('builds unsigned local and pull request installers', () => {
     expect(packageJson.scripts['companion:build']).toBe(
       'tauri build --no-sign',
     );
-    expect(companionWorkflow).toContain('run: pnpm companion:build');
+    expect(companionWorkflow).toContain('run: pnpm exec tauri build --no-sign');
     expect(workflow).toContain('TAURI_SIGNING_PRIVATE_KEY=$keyPath');
     expect(workflow).toContain('tauri-apps/tauri-action@v1');
   });
@@ -76,6 +98,9 @@ describe('companion release workflow', () => {
     expect(webWorkflow).toContain('name: Web validation');
     expect(webWorkflow).toContain('push:\n    branches:\n      - main');
     expect(webWorkflow).toContain('run: pnpm check:web');
+    expect(webWorkflow).toContain(
+      "if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')",
+    );
     expect(webWorkflow.indexOf('Install Chromium')).toBeLessThan(
       webWorkflow.indexOf('run: pnpm check:web'),
     );

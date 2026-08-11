@@ -71,6 +71,36 @@ describe('Fennec site infrastructure', () => {
     template.hasOutput('SiteUrl', { Value: 'https://app.fennec.gg' });
   }, 10_000);
 
+  it('keeps Free-plan monitoring within supported default metrics', () => {
+    const template = Template.fromStack(productionStack());
+
+    template.resourceCountIs('AWS::Logs::LogGroup', 0);
+    template.resourceCountIs('AWS::Logs::DeliverySource', 0);
+    template.resourceCountIs('AWS::Logs::DeliveryDestination', 0);
+    template.resourceCountIs('AWS::Logs::Delivery', 0);
+    template.resourceCountIs('AWS::CloudFront::MonitoringSubscription', 0);
+    template.resourceCountIs('AWS::CloudWatch::Dashboard', 1);
+    template.hasResourceProperties('AWS::CloudWatch::Dashboard', {
+      DashboardName: 'FennecTraffic',
+    });
+    const dashboard = Object.values(
+      template.findResources('AWS::CloudWatch::Dashboard'),
+    )[0];
+    if (!dashboard) throw new Error('Traffic dashboard was not synthesized');
+    const dashboardFragments = dashboard.Properties.DashboardBody['Fn::Join'][1]
+      .filter((fragment: unknown) => typeof fragment === 'string')
+      .join('');
+    expect(dashboardFragments).toContain('"start":"-P30D"');
+    expect(dashboardFragments.match(/"type":"metric"/g)).toHaveLength(2);
+    expect(dashboardFragments.match(/"type":/g)).toHaveLength(2);
+    expect(dashboardFragments).toContain('Requests');
+    expect(dashboardFragments).toContain('BytesDownloaded');
+    expect(dashboardFragments).toContain('TotalErrorRate');
+    expect(dashboardFragments).toContain('4xxErrorRate');
+    expect(dashboardFragments).toContain('5xxErrorRate');
+    template.hasOutput('TrafficDashboardName', { Value: Match.anyValue() });
+  });
+
   it('adopts the web ACL created by the flat-rate plan', () => {
     const webAclId =
       'arn:aws:wafv2:us-east-1:309418039962:global/webacl/fennec/example';

@@ -40,13 +40,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-companion
+          workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
       - name: Derive automatic release version
         shell: pwsh
         run: |
           $version = node scripts/companion-release-version.mjs $env:GITHUB_RUN_NUMBER
           "COMPANION_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          @{ version = $version } | ConvertTo-Json | Set-Content "src-tauri/tauri.release.conf.json"
+          @{
+            version = $version
+            build = @{ beforeBuildCommand = "" }
+          } | ConvertTo-Json -Depth 3 | Set-Content "src-tauri/tauri.release.conf.json"
       - name: Build web application
         run: pnpm build
       - name: Rust tests

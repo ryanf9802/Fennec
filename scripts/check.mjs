@@ -51,6 +51,10 @@ export function validationStages({ web = false } = {}) {
   return stages;
 }
 
+export function validationConcurrency({ web = false } = {}) {
+  return web ? 3 : 2;
+}
+
 function writePrefixed(stream, destination, name) {
   let pending = '';
   const flushLines = (final = false) => {
@@ -156,7 +160,10 @@ export async function main(argv = process.argv.slice(2)) {
     process.stderr.write(`Unknown option: ${invalid[0]}\n`);
     return 2;
   }
-  return runStages(validationStages({ web: argv.includes('--web') }));
+  const web = argv.includes('--web');
+  return runStages(validationStages({ web }), {
+    concurrency: validationConcurrency({ web }),
+  });
 }
 
 if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url))

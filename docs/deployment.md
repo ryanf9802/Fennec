@@ -46,8 +46,9 @@ complete observed `sub` claim when redeploying the access stack.
    assumes `FennecGitHubDeployRole`, deploys `FennecSite`, publishes `dist`,
    invalidates CloudFront, and smoke-tests the URL.
 5. In CloudFront, subscribe the distribution to the Free flat-rate plan and
-   attach the `fennec.gg` hosted zone. Do not enable paid add-ons or separately
-   billed logging.
+   attach the `fennec.gg` hosted zone. Do not enable paid add-ons or real-time
+   logging. Standard access-log ingestion into CloudWatch Logs is included in
+   the plan; storage and queries remain separately billable.
 6. Copy the plan WAF ARN into the `FENNEC_WEB_ACL_ARN` repository variable and
    dispatch the workflow again. CloudFormation then declares the plan-managed
    association so later deployments do not drift.
@@ -78,6 +79,20 @@ On a push or manual dispatch from `main`, the deployment job assumes the OIDC
 role, deploys the CDK site stack, synchronizes immutable assets and non-cached
 application entry files separately, invalidates CloudFront, and smoke-tests the
 application, apex landing page, and compatibility redirect.
+
+## Traffic monitoring
+
+The `FennecTraffic` CloudWatch dashboard uses the default metrics included for
+every CloudFront distribution: requests, downloaded bytes, and total, 4xx, and
+5xx error rates. It keeps a 30-day operational view without enabling paid
+additional metrics.
+
+Fennec's CloudFront Free plan does not support access logs. Detailed visitor,
+country, path, referrer, and cache-hit analytics therefore remain unavailable
+unless the distribution is upgraded to Pro or above. The Free plan still
+provides CloudFront's security dashboard for security events. See AWS's
+[flat-rate feature matrix](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/flat-rate-pricing-plan.html#flat-rate-pricing-plan-features)
+and [default metric reference](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/viewing-cloudfront-metrics.html).
 
 ## Companion validation and releases
 
