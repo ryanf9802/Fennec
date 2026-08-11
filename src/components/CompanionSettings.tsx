@@ -116,7 +116,7 @@ export function CompanionResourceMonitor({
   );
 }
 
-/** Provides the paired companion's shared storefront, startup, and dashboard launch controls. */
+/** Provides the connected companion's shared storefront, startup, and dashboard launch controls. */
 export function CompanionLaunchControls({
   health,
   recheck,
@@ -250,7 +250,7 @@ export function CompanionLaunchControls({
   );
 }
 
-/** Shows only operating-system controls proven available by a paired, protocol-compatible companion. */
+/** Shows only operating-system controls proven available by a connected, protocol-compatible companion. */
 export function CompanionSettings() {
   const { health, checking, recheck } = useCompanionStatus();
   const ready =
@@ -260,14 +260,16 @@ export function CompanionSettings() {
     <section className="surface rounded-3xl p-5 sm:p-7">
       <h2 className="text-xl font-extrabold">Companion service</h2>
       <p className="text-muted mt-1 text-sm">
-        Optional operating-system integrations are only available after the
-        Windows companion is installed and paired.
+        Optional operating-system integrations are available while a compatible
+        Windows companion is running.
       </p>
       {checking && !health ? (
         <p className="text-muted mt-4 text-sm">Checking the companion…</p>
       ) : !ready ? (
         <p className="surface-strong mt-4 rounded-2xl p-4 text-sm">
-          No compatible paired companion is available. Complete pairing in the{' '}
+          {health
+            ? `Companion ${health.version} is running and needs to finish updating. Keep it running, or manage it in the `
+            : 'No compatible companion is running. Start or update it in the '}
           <Link
             className="text-fennec-cyan underline"
             to="/setup?path=companion"

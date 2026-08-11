@@ -1,6 +1,7 @@
 import {
   companionCursor,
   companionPairingToken,
+  ensureCompanionAccess,
   saveCompanionCursor,
 } from '../companion/client';
 import { historyRepository, loadProfile, loadSettings } from '../data/database';
@@ -90,18 +91,34 @@ export class HybridStatsFeed implements StatsFeedAdapter {
     this.stopped = false;
     this.handlers = handlers;
     this.handlers.onSyncStatus?.({ mode: 'connecting' });
-    if (!companionPairingToken()) {
+    const hadToken = Boolean(companionPairingToken());
+    if (!hadToken) {
       this.handlers.onSyncStatus?.({ mode: 'browser-only' });
       this.startDirect();
-      return;
     }
-    void this.captureLocalHistory()
-      .catch((error) =>
-        this.handlers?.onDiagnostic?.(
-          `Could not read the browser cache before synchronization: ${error instanceof Error ? error.message : String(error)}`,
-        ),
-      )
-      .finally(() => this.connectCompanion());
+    this.connectWhenAvailable();
+  }
+
+  private connectWhenAvailable(): void {
+    void ensureCompanionAccess().then((health) => {
+      if (this.stopped) return;
+      if (!health) {
+        this.handlers?.onSyncStatus?.({ mode: 'browser-only' });
+        this.startDirect();
+        this.retryTimer = window.setTimeout(() => {
+          this.retryTimer = undefined;
+          this.connectWhenAvailable();
+        }, 5_000);
+        return;
+      }
+      void this.captureLocalHistory()
+        .catch((error) =>
+          this.handlers?.onDiagnostic?.(
+            `Could not read the browser cache before synchronization: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        )
+        .finally(() => this.connectCompanion());
+    });
   }
 
   private async captureLocalHistory(): Promise<void> {
@@ -149,7 +166,10 @@ export class HybridStatsFeed implements StatsFeedAdapter {
       if (this.stopped) return;
       this.handlers?.onSyncStatus?.({ mode: 'unavailable' });
       this.startDirect();
-      this.retryTimer = window.setTimeout(() => this.connectCompanion(), 5_000);
+      this.retryTimer = window.setTimeout(() => {
+        this.retryTimer = undefined;
+        this.connectWhenAvailable();
+      }, 5_000);
     });
     socket.addEventListener('error', () => socket.close());
   }

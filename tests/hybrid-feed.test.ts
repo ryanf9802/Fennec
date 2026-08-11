@@ -41,10 +41,16 @@ vi.mock('../src/data/database', () => ({
   loadProfile: vi.fn(async () => undefined),
 }));
 
+const directFeed = vi.hoisted(() => ({ starts: 0, stops: 0 }));
+
 vi.mock('../src/feed/WebSocketStatsFeed', () => ({
   WebSocketStatsFeed: class {
-    start() {}
-    stop() {}
+    start() {
+      directFeed.starts++;
+    }
+    stop() {
+      directFeed.stops++;
+    }
   },
 }));
 
@@ -88,6 +94,8 @@ describe('companion durable synchronization', () => {
 
   beforeEach(() => {
     FakeWebSocket.instances = [];
+    directFeed.starts = 0;
+    directFeed.stops = 0;
     vi.stubGlobal('WebSocket', FakeWebSocket);
     browserValues.clear();
     browserValues.set('fennec-companion-token', 'paired');
@@ -99,11 +107,102 @@ describe('companion durable synchronization', () => {
         removeItem: (key: string) => browserValues.delete(key),
       },
     });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const path = new URL(String(input)).pathname;
+        if (path === '/pair')
+          return {
+            ok: true,
+            json: async () => ({ token: 'automatic-token' }),
+          };
+        return {
+          ok: true,
+          json: async () => ({
+            version: '0.2.13',
+            protocolVersion: 1,
+            paired: true,
+            gameRunning: false,
+            feedConnected: false,
+            configuredStores: [],
+            launchOnStartup: false,
+          }),
+        };
+      }),
+    );
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('automatically hands browser capture to a running companion', async () => {
+    browserValues.delete('fennec-companion-token');
+    const feed = new HybridStatsFeed('ws://127.0.0.1:49124');
+    feed.start({ onState: vi.fn(), onEnvelope: vi.fn() });
+
+    expect(directFeed.starts).toBe(1);
+    await vi.waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    expect(browserValues.get('fennec-companion-token')).toBe('automatic-token');
+
+    FakeWebSocket.instances[0]!.emit('open');
+    expect(directFeed.stops).toBe(1);
+    feed.stop();
+  });
+
+  it('keeps browser capture when no companion is available', async () => {
+    browserValues.delete('fennec-companion-token');
+    const fetch = vi.fn().mockRejectedValue(new Error('offline'));
+    vi.stubGlobal('fetch', fetch);
+    const feed = new HybridStatsFeed('ws://127.0.0.1:49124');
+    feed.start({ onState: vi.fn(), onEnvelope: vi.fn() });
+
+    await vi.waitFor(() => expect(directFeed.starts).toBe(1));
+    expect(fetch).toHaveBeenCalled();
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    feed.stop();
+  });
+
+  it('hands off automatically when the companion starts later', async () => {
+    vi.useFakeTimers();
+    browserValues.delete('fennec-companion-token');
+    let available = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        if (!available) throw new Error('offline');
+        const path = new URL(String(input)).pathname;
+        return path === '/pair'
+          ? { ok: true, json: async () => ({ token: 'late-token' }) }
+          : {
+              ok: true,
+              json: async () => ({
+                version: '0.2.13',
+                protocolVersion: 1,
+                paired: true,
+                gameRunning: false,
+                feedConnected: false,
+                configuredStores: [],
+                launchOnStartup: false,
+              }),
+            };
+      }),
+    );
+    const feed = new HybridStatsFeed('ws://127.0.0.1:49124');
+    feed.start({ onState: vi.fn(), onEnvelope: vi.fn() });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(directFeed.starts).toBe(1);
+
+    available = true;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+
+    FakeWebSocket.instances[0]!.emit('open');
+    expect(directFeed.stops).toBe(1);
+    feed.stop();
   });
 
   it('restores canonical state before uploading browser-only history', async () => {

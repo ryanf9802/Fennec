@@ -26,6 +26,7 @@ export const reportDevFeedTelemetry: FeedTelemetryReporter = (
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
+    keepalive: true,
   }).catch((error) => {
     if (warnedAboutDelivery) return;
     warnedAboutDelivery = true;

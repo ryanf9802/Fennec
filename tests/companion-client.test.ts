@@ -1,92 +1,179 @@
-import {
-  companionCommand,
-  companionDeleteHistory,
-  companionDownloadUrl,
-  companionPairingLaunchUrl,
-  pairInstalledCompanion,
-  companionRestore,
-  companionSnapshot,
-} from '../src/companion/client';
+let client: typeof import('../src/companion/client');
 
-describe('companion pairing', () => {
+describe('automatic companion access', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    client = await import('../src/companion/client');
+  });
+
   afterEach(() => {
-    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  it('pairs through loopback without launching another browser page', async () => {
-    const setItem = vi.fn();
-    const assign = vi.fn();
-    vi.stubGlobal('window', {
-      localStorage: { getItem: vi.fn(), setItem },
-      setTimeout,
-    });
-    vi.stubGlobal('location', { assign });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
+  function browserStorage(value?: string) {
+    const values = new Map<string, string>();
+    if (value) values.set('fennec-companion-token', value);
+    return {
+      values,
+      storage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, next: string) => values.set(key, next),
+      },
+    };
+  }
+
+  const publicHealth = {
+    version: '0.2.13',
+    protocolVersion: 1,
+    paired: false,
+    gameRunning: false,
+    feedConnected: false,
+    configuredStores: [],
+    launchOnStartup: false,
+  };
+
+  it('automatically connects to a running companion without navigation', async () => {
+    const { values, storage } = browserStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => publicHealth })
+      .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ token: 'paired-token' }),
+        json: async () => ({ token: 'automatic-token' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...publicHealth, paired: true }),
+      });
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(client.companionHealth()).resolves.toMatchObject({
+      paired: true,
+    });
+    expect(values.get('fennec-companion-token')).toBe('automatic-token');
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      'http://127.0.0.1:49125/pair',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      'http://127.0.0.1:49125/status',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer automatic-token' },
       }),
     );
-
-    await expect(pairInstalledCompanion()).resolves.toBe(true);
-    expect(setItem).toHaveBeenCalledWith(
-      'fennec-companion-token',
-      'paired-token',
-    );
-    expect(assign).not.toHaveBeenCalled();
   });
 
-  it('activates a stopped companion and retries pairing in place', async () => {
-    vi.useFakeTimers();
-    const setItem = vi.fn();
-    const assign = vi.fn();
-    vi.stubGlobal('window', {
-      localStorage: { getItem: vi.fn(), setItem },
-      setTimeout,
+  it('uses an existing valid token without requesting another one', async () => {
+    const { storage } = browserStorage('valid-token');
+    vi.stubGlobal('window', { localStorage: storage });
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => publicHealth })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...publicHealth, paired: true }),
+      });
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(client.companionHealth()).resolves.toMatchObject({
+      paired: true,
     });
-    vi.stubGlobal('location', { assign });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenLastCalledWith(
+      'http://127.0.0.1:49125/status',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer valid-token' },
+      }),
+    );
+  });
+
+  it('refreshes a stale token automatically', async () => {
+    const { values, storage } = browserStorage('stale-token');
+    vi.stubGlobal('window', { localStorage: storage });
     vi.stubGlobal(
       'fetch',
       vi
         .fn()
-        .mockRejectedValueOnce(new Error('not running'))
-        .mockResolvedValue({
+        .mockResolvedValueOnce({ ok: true, json: async () => publicHealth })
+        .mockResolvedValueOnce({ ok: false })
+        .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ token: 'started-token' }),
+          json: async () => ({ token: 'fresh-token' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ ...publicHealth, paired: true }),
         }),
     );
 
-    const pairing = pairInstalledCompanion({
-      retryDelayMs: 100,
-      timeoutMs: 1_000,
+    await expect(client.companionHealth()).resolves.toMatchObject({
+      paired: true,
     });
-    await vi.advanceTimersByTimeAsync(100);
-
-    await expect(pairing).resolves.toBe(true);
-    expect(assign).toHaveBeenCalledWith(companionPairingLaunchUrl);
-    expect(setItem).toHaveBeenCalledWith(
-      'fennec-companion-token',
-      'started-token',
-    );
+    expect(values.get('fennec-companion-token')).toBe('fresh-token');
   });
 
-  it('reports failure after activating an unavailable companion', async () => {
+  it('retains automatic access in memory when storage is blocked', async () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: () => {
+          throw new Error('blocked');
+        },
+        setItem: () => {
+          throw new Error('blocked');
+        },
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ token: 'session-token' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ ...publicHealth, paired: true }),
+        }),
+    );
+
+    await expect(client.ensureCompanionAccess()).resolves.toMatchObject({
+      paired: true,
+    });
+    expect(client.companionPairingToken()).toBe('session-token');
+  });
+
+  it('returns public health while an older companion updates', async () => {
+    const { storage } = browserStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => publicHealth })
+        .mockResolvedValueOnce({ ok: false }),
+    );
+
+    await expect(client.companionHealth()).resolves.toEqual(publicHealth);
+  });
+
+  it('starts an installed companion without opening another web page', () => {
+    const setItem = vi.fn();
     const assign = vi.fn();
     vi.stubGlobal('window', {
-      localStorage: { getItem: vi.fn(), setItem: vi.fn() },
-      setTimeout,
+      localStorage: { getItem: vi.fn(), setItem },
     });
     vi.stubGlobal('location', { assign });
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
-    await expect(pairInstalledCompanion({ timeoutMs: 0 })).resolves.toBe(false);
-    expect(assign).toHaveBeenCalledWith('fennec://pair');
+    expect(client.startInstalledCompanion()).toBe(true);
+    expect(assign).toHaveBeenCalledWith(client.companionPairingLaunchUrl);
   });
 
   it('uses the stable latest-release Windows installer asset', () => {
-    expect(companionDownloadUrl).toBe(
+    expect(client.companionDownloadUrl).toBe(
       'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe',
     );
   });
@@ -101,9 +188,9 @@ describe('companion pairing', () => {
     const fetch = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetch);
 
-    await expect(companionCommand('enable-dashboard-auto-open')).resolves.toBe(
-      true,
-    );
+    await expect(
+      client.companionCommand('enable-dashboard-auto-open'),
+    ).resolves.toBe(true);
     expect(fetch).toHaveBeenCalledWith(
       'http://127.0.0.1:49125/commands/enable-dashboard-auto-open',
       expect.objectContaining({
@@ -131,9 +218,9 @@ describe('companion pairing', () => {
       .mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetch);
 
-    await expect(companionSnapshot()).resolves.toEqual(snapshot);
-    await companionRestore(snapshot as never);
-    await companionDeleteHistory();
+    await expect(client.companionSnapshot()).resolves.toEqual(snapshot);
+    await client.companionRestore(snapshot as never);
+    await client.companionDeleteHistory();
 
     expect(fetch).toHaveBeenNthCalledWith(
       1,
