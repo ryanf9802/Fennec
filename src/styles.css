@@ -372,6 +372,13 @@ textarea:focus-visible {
   }
 }
 
+@media (min-width: 1280px) {
+  .scoreboard-container {
+    /* Keep tall telemetry panels inside the match workspace scroll region. */
+    contain: paint;
+  }
+}
+
 @media (max-width: 767px) {
   .scoreboard-player-cell {
     position: sticky;

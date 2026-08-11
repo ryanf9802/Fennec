@@ -354,6 +354,69 @@ test('pressure is an explainable responsive telemetry view', async ({
   ).toBe(true);
 });
 
+test('desktop match telemetry tabs stay inside the viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/matches/demo-current-2?demo=1');
+
+  const expectViewportContained = async () => {
+    const layout = await page.evaluate(() => {
+      const sidebar = document.querySelector('aside')!.getBoundingClientRect();
+      return {
+        clientHeight: document.documentElement.clientHeight,
+        scrollHeight: document.documentElement.scrollHeight,
+        scrollY: window.scrollY,
+        sidebarBottom: sidebar.bottom,
+      };
+    });
+    expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight);
+    expect(layout.scrollY).toBe(0);
+    expect(layout.sidebarBottom).toBe(layout.clientHeight);
+  };
+
+  await expect(
+    page.getByRole('heading', { name: 'Ball analytics' }),
+  ).toBeVisible();
+  await expectViewportContained();
+
+  await page.getByRole('tab', { name: 'Pressure' }).click();
+  await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
+  await expectViewportContained();
+  const scoreboard = page.locator('.scoreboard-container');
+  expect(
+    await scoreboard.evaluate(
+      (element) => element.scrollHeight > element.clientHeight,
+    ),
+  ).toBe(true);
+  const pressureRows = page
+    .getByRole('table', {
+      name: 'Pressure and territory contribution by player',
+    })
+    .getByRole('row');
+  await scoreboard.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(pressureRows.last()).toBeInViewport();
+  await expectViewportContained();
+
+  await page.getByRole('tab', { name: 'Touch map' }).click();
+  await expect(
+    page.getByRole('img', { name: /3d ball touch map/i }),
+  ).toBeVisible();
+  await expectViewportContained();
+
+  await page.getByRole('tab', { name: 'Pressure' }).click();
+  await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
+  await expectViewportContained();
+
+  await page.getByRole('tab', { name: 'Ball analytics' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Ball analytics' }),
+  ).toBeVisible();
+  await expectViewportContained();
+});
+
 test('3D touch map controls and preference persist across matches', async ({
   page,
 }) => {
