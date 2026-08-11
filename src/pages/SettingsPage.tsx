@@ -344,11 +344,17 @@ export function SettingsPage() {
             </select>
           </label>
         </div>
-        <label className="mt-5 flex max-w-2xl cursor-pointer items-start gap-3">
+        <label
+          className={`mt-5 flex max-w-2xl items-start gap-3 ${profile ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+        >
           <input
             type="checkbox"
             className="mt-1 size-4 accent-cyan-400"
             checked={draft.autoOpenLiveMatch}
+            disabled={!profile}
+            aria-describedby={
+              profile ? undefined : 'auto-open-live-player-required'
+            }
             onChange={(event) =>
               patchDraft({ autoOpenLiveMatch: event.target.checked })
             }
@@ -361,6 +367,23 @@ export function SettingsPage() {
             </span>
           </span>
         </label>
+        {!profile && (
+          <p
+            id="auto-open-live-player-required"
+            role="note"
+            className="mt-3 max-w-2xl rounded-xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm"
+          >
+            <strong>Player required.</strong> Select your player before Fennec
+            can automatically open the live monitor.{' '}
+            <Link
+              className="font-bold text-fennec-cyan underline decoration-cyan-300/50 underline-offset-4"
+              to="/profile#player-selection"
+            >
+              Choose your player
+            </Link>
+            .
+          </p>
+        )}
       </section>
 
       {companionReady && companion.health ? (

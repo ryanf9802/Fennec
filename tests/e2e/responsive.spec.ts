@@ -1781,6 +1781,7 @@ test('settings save action floats above mobile navigation while dirty', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 760 });
+  await disableAutomaticLiveMatch(page);
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute(

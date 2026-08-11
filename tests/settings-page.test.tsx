@@ -183,18 +183,46 @@ describe('settings CSV export', () => {
   });
 
   it('defaults automatic live monitor opening to on', () => {
+    mocks.fennec.profile = {
+      primaryId: 'Steam|you|0',
+      displayName: 'You',
+    };
     render(
       <MemoryRouter>
         <SettingsPage />
       </MemoryRouter>,
     );
 
-    expect(
-      screen.getByRole('checkbox', {
-        name: /Automatically open the live monitor/i,
-      }),
-    ).toBeChecked();
+    const autoOpen = screen.getByRole('checkbox', {
+      name: /Automatically open the live monitor/i,
+    });
+    expect(autoOpen).toBeChecked();
+    expect(autoOpen).toBeEnabled();
     expect(screen.getByText(/on by default/i)).toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+  });
+
+  it('requires a selected player before automatic live monitor opening can be changed', () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const autoOpen = screen.getByRole('checkbox', {
+      name: /Automatically open the live monitor/i,
+    });
+    expect(autoOpen).toBeChecked();
+    expect(autoOpen).toBeDisabled();
+    expect(autoOpen).toHaveAccessibleDescription(
+      /select your player before Fennec can automatically open/i,
+    );
+    const note = screen.getByRole('note');
+    expect(note).toHaveTextContent('Player required.');
+    expect(note).toHaveTextContent(/select your player/i);
+    expect(
+      screen.getByRole('link', { name: 'Choose your player' }),
+    ).toHaveAttribute('href', '/profile#player-selection');
   });
 
   it('merges durable data and companion controls when canonical sync is available', () => {

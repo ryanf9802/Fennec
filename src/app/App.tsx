@@ -35,7 +35,7 @@ export function App() {
 
 /** Holds document-entry content until local data and setup checks are ready. */
 function AppContent() {
-  const { activeMatch, settings, ready, diagnostic } = useFennec();
+  const { activeMatch, profile, settings, ready, diagnostic } = useFennec();
   const localAccess = useLocalAccess();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -45,6 +45,7 @@ function AppContent() {
   useEffect(() => {
     if (
       setup.state === 'complete' &&
+      profile &&
       settings.autoOpenLiveMatch &&
       activeMatch &&
       opened.current !== activeMatch.id
@@ -52,7 +53,7 @@ function AppContent() {
       opened.current = activeMatch.id;
       navigate('/live');
     }
-  }, [activeMatch, navigate, settings.autoOpenLiveMatch, setup.state]);
+  }, [activeMatch, navigate, profile, settings.autoOpenLiveMatch, setup.state]);
 
   if (!ready && diagnostic)
     return (

@@ -84,7 +84,7 @@ describe('app shell entry and live auto-open', () => {
     expect(screen.queryByText('Games route')).not.toBeInTheDocument();
   });
 
-  it('auto-opens a live match when no player is selected', async () => {
+  it('does not auto-open a live match when no player is selected', async () => {
     mocks.profile = undefined;
     render(
       <MemoryRouter initialEntries={['/']}>
@@ -92,8 +92,8 @@ describe('app shell entry and live auto-open', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('Training')).toBeInTheDocument();
-    expect(screen.queryByText('Games route')).not.toBeInTheDocument();
+    expect(await screen.findByText('Games route')).toBeInTheDocument();
+    expect(screen.queryByText('Training')).not.toBeInTheDocument();
   });
 
   it('does not auto-open a live match while setup is locked', async () => {
