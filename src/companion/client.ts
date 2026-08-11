@@ -3,6 +3,7 @@ import type {
   FennecSettings,
   MatchState,
 } from '../domain/types';
+import { isLoopbackHostname } from '../platform/origin';
 
 export interface CompanionHealth {
   version: string;
@@ -47,19 +48,15 @@ export const companionDownloadUrl =
   'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe';
 
 const productionSetupUrl = 'https://app.fennec.gg/setup';
-const pairingReturnUrls = new Set([
-  productionSetupUrl,
-  'http://localhost:5173/setup',
-  'http://localhost:5174/setup',
-  'http://127.0.0.1:5173/setup',
-  'http://127.0.0.1:5174/setup',
-]);
 
 export function companionOpenUrl(): string {
-  const candidate = `${location.origin}/setup`;
-  const returnTo = pairingReturnUrls.has(candidate)
-    ? candidate
-    : productionSetupUrl;
+  const currentOrigin = new URL(location.origin);
+  const returnTo =
+    currentOrigin.origin === new URL(productionSetupUrl).origin ||
+    (currentOrigin.protocol === 'http:' &&
+      isLoopbackHostname(currentOrigin.hostname))
+      ? `${currentOrigin.origin}/setup`
+      : productionSetupUrl;
   return `fennec://open?return_to=${encodeURIComponent(returnTo)}`;
 }
 

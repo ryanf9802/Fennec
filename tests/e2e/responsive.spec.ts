@@ -15,9 +15,14 @@ test('landing page stays concise and usable across viewport sizes', async ({
         name: 'Your Rocket League games, remembered.',
       }),
     ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Open Fennec' }).first(),
-    ).toHaveAttribute('href', 'https://app.fennec.gg/');
+    const appLinks = page.locator('[data-fennec-app-link]');
+    await expect(appLinks).toHaveCount(3);
+    for (let index = 0; index < 3; index += 1) {
+      await expect(appLinks.nth(index)).toHaveAttribute(
+        'href',
+        `${new URL(page.url()).origin}/`,
+      );
+    }
     await expect(
       page.getByRole('link', { name: /GitHub/ }).first(),
     ).toBeVisible();
@@ -952,9 +957,7 @@ test('setup starts with a centered route choice and expands after selection', as
   ).toHaveAttribute(
     'href',
     `fennec://open?return_to=${encodeURIComponent(
-      ['5173', '5174'].includes(new URL(page.url()).port)
-        ? `${new URL(page.url()).origin}/setup`
-        : 'https://app.fennec.gg/setup',
+      `${new URL(page.url()).origin}/setup`,
     )}`,
   );
   await expect(

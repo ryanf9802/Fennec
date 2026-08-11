@@ -20,7 +20,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::broadcast;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -429,15 +429,12 @@ async fn serve_socket(socket: WebSocket, state: Arc<AppState>, cursor: i64, dura
 }
 
 pub async fn run(state: Arc<AppState>) -> std::io::Result<()> {
-    let allowed = [
-        HeaderValue::from_static("https://app.fennec.gg"),
-        HeaderValue::from_static("http://localhost:5173"),
-        HeaderValue::from_static("http://localhost:5174"),
-        HeaderValue::from_static("http://127.0.0.1:5173"),
-        HeaderValue::from_static("http://127.0.0.1:5174"),
-    ];
     let cors = CorsLayer::new()
-        .allow_origin(allowed)
+        .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+            origin
+                .to_str()
+                .is_ok_and(crate::is_trusted_web_origin)
+        }))
         .allow_methods([Method::GET, Method::POST])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
     let app = Router::new()

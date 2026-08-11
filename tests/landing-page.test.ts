@@ -17,6 +17,7 @@ describe('Fennec landing page', () => {
       'Your Rocket League games, remembered.',
     );
     expect(linksTo('https://app.fennec.gg/').length).toBeGreaterThanOrEqual(3);
+    expect(page.querySelectorAll('[data-fennec-app-link]')).toHaveLength(3);
     expect(links.some((link) => link.href.includes('demo'))).toBe(false);
     expect(
       linksTo('https://github.com/ryanf9802/Fennec').length,

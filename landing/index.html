@@ -24,6 +24,7 @@
       href="/assets/brand/fennec-a-mark-primary.svg"
     />
     <link rel="stylesheet" href="/src/landing.css" />
+    <script type="module" src="/src/landing.ts"></script>
     <title>Fennec: Your Rocket League games, remembered</title>
   </head>
   <body>
@@ -47,7 +48,10 @@
             rel="noreferrer"
             >GitHub <span aria-hidden="true">↗</span></a
           >
-          <a class="button button-small" href="https://app.fennec.gg/"
+          <a
+            class="button button-small"
+            href="https://app.fennec.gg/"
+            data-fennec-app-link
             >Open Fennec</a
           >
         </nav>
@@ -66,7 +70,9 @@
           service.
         </p>
         <div class="hero-actions">
-          <a class="button" href="https://app.fennec.gg/">Open Fennec</a>
+          <a class="button" href="https://app.fennec.gg/" data-fennec-app-link
+            >Open Fennec</a
+          >
           <a
             class="button button-secondary"
             href="https://github.com/ryanf9802/Fennec"
@@ -450,7 +456,9 @@
         />
         <h2 id="final-title">Ready when your next game is.</h2>
         <p>Open Fennec on the same Windows PC as Rocket League.</p>
-        <a class="button" href="https://app.fennec.gg/">Open Fennec</a>
+        <a class="button" href="https://app.fennec.gg/" data-fennec-app-link
+          >Open Fennec</a
+        >
       </section>
     </main>
 

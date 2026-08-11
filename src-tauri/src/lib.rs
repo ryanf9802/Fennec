@@ -71,17 +71,48 @@ pub(crate) fn configure_with_elevation(path: &std::path::Path) -> std::io::Resul
 
 const PRODUCTION_APP_URL: &str = "https://app.fennec.gg/";
 const PRODUCTION_SETUP_URL: &str = "https://app.fennec.gg/setup";
-const PAIRING_RETURN_URLS: [&str; 5] = [
-    PRODUCTION_SETUP_URL,
-    "http://localhost:5173/setup",
-    "http://localhost:5174/setup",
-    "http://127.0.0.1:5173/setup",
-    "http://127.0.0.1:5174/setup",
-];
+
+fn is_trusted_web_origin(candidate: &str) -> bool {
+    let Ok(value) = url::Url::parse(candidate) else {
+        return false;
+    };
+    if value.path() != "/"
+        || value.query().is_some()
+        || value.fragment().is_some()
+        || !value.username().is_empty()
+        || value.password().is_some()
+    {
+        return false;
+    }
+    if value.origin().ascii_serialization() == "https://app.fennec.gg" {
+        return true;
+    }
+    if value.scheme() != "http" {
+        return false;
+    }
+    match value.host() {
+        Some(url::Host::Domain(hostname)) => hostname.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(address)) => address == std::net::Ipv4Addr::LOCALHOST,
+        Some(url::Host::Ipv6(address)) => address == std::net::Ipv6Addr::LOCALHOST,
+        None => false,
+    }
+}
+
+fn is_trusted_pairing_return_url(candidate: &str) -> bool {
+    let Ok(value) = url::Url::parse(candidate) else {
+        return false;
+    };
+    is_trusted_web_origin(value.origin().ascii_serialization().as_str())
+        && value.path() == "/setup"
+        && value.query().is_none()
+        && value.fragment().is_none()
+        && value.username().is_empty()
+        && value.password().is_none()
+}
 
 fn pairing_url(return_to: Option<&str>, token: &str) -> String {
     let return_to = return_to
-        .filter(|candidate| PAIRING_RETURN_URLS.contains(candidate))
+        .filter(|candidate| is_trusted_pairing_return_url(candidate))
         .unwrap_or(PRODUCTION_SETUP_URL);
     format!("{return_to}#companion={token}")
 }
@@ -285,23 +316,52 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        pairing_url, should_exit_after_game, should_open_dashboard, PRODUCTION_SETUP_URL,
+        is_trusted_web_origin, pairing_url, should_exit_after_game, should_open_dashboard,
+        PRODUCTION_SETUP_URL,
     };
 
     #[test]
     fn pairing_accepts_known_local_development_urls() {
         assert_eq!(
-            pairing_url(Some("http://localhost:5173/setup"), "abc123"),
-            "http://localhost:5173/setup#companion=abc123"
+            pairing_url(Some("http://localhost:43217/setup"), "abc123"),
+            "http://localhost:43217/setup#companion=abc123"
+        );
+        assert_eq!(
+            pairing_url(Some("http://127.0.0.1:43217/setup"), "abc123"),
+            "http://127.0.0.1:43217/setup#companion=abc123"
+        );
+        assert_eq!(
+            pairing_url(Some("http://[::1]:43217/setup"), "abc123"),
+            "http://[::1]:43217/setup#companion=abc123"
         );
     }
 
     #[test]
     fn pairing_rejects_untrusted_return_urls() {
-        assert_eq!(
-            pairing_url(Some("https://attacker.example/setup"), "abc123"),
-            format!("{PRODUCTION_SETUP_URL}#companion=abc123")
-        );
+        for candidate in [
+            "https://attacker.example/setup",
+            "http://localhost.attacker.example:43217/setup",
+            "https://localhost:43217/setup",
+            "http://localhost:43217/other",
+            "http://localhost:43217/setup?next=attacker",
+        ] {
+            assert_eq!(
+                pairing_url(Some(candidate), "abc123"),
+                format!("{PRODUCTION_SETUP_URL}#companion=abc123")
+            );
+        }
+    }
+
+    #[test]
+    fn web_origins_accept_production_and_http_loopback_only() {
+        assert!(is_trusted_web_origin("https://app.fennec.gg"));
+        assert!(is_trusted_web_origin("http://localhost:43217"));
+        assert!(is_trusted_web_origin("http://127.0.0.1:43217"));
+        assert!(is_trusted_web_origin("http://[::1]:43217"));
+        assert!(!is_trusted_web_origin("https://attacker.example"));
+        assert!(!is_trusted_web_origin("http://localhost.attacker.example"));
+        assert!(!is_trusted_web_origin("https://localhost:43217"));
+        assert!(!is_trusted_web_origin("http://localhost:43217/path"));
     }
 
     #[test]
