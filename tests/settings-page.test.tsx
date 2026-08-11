@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   fennec: {} as Record<string, unknown>,
   loadMatches: vi.fn(),
   companion: {} as Record<string, unknown>,
+  storageData: undefined as
+    { persisted?: boolean; rawRetentionDays?: number } | undefined,
+  storageRefetch: vi.fn(),
 }));
 
 vi.mock('../src/app/FennecContext', () => ({
@@ -19,13 +22,17 @@ vi.mock('../src/data/database', () => ({
 }));
 
 vi.mock('../src/data/historyQueries', () => ({
-  useStorageStatistics: () => ({ data: undefined, refetch: vi.fn() }),
+  useStorageStatistics: () => ({
+    data: mocks.storageData,
+    refetch: mocks.storageRefetch,
+  }),
   useTimelineCatalog: () => ({ data: {} }),
 }));
 
 vi.mock('../src/components/CompanionSettings', () => ({
   CompanionSettings: () => null,
   CompanionLaunchControls: () => <div>Companion controls</div>,
+  CompanionResourceMonitor: () => <div>Live companion footprint</div>,
 }));
 
 vi.mock('../src/companion/useCompanionStatus', () => ({
@@ -52,6 +59,8 @@ vi.mock('../src/components/StatsApiSetup', () => ({
 describe('settings CSV export', () => {
   beforeEach(() => {
     mocks.loadMatches.mockReset();
+    mocks.storageData = undefined;
+    mocks.storageRefetch.mockReset();
     mocks.fennec = {
       profile: undefined,
       settings: defaultSettings,
@@ -100,6 +109,34 @@ describe('settings CSV export', () => {
     expect(setupLink.querySelector('svg')).toHaveClass('lucide-list-checks');
   });
 
+  it('explains recommended browser data protection without warning styling', () => {
+    mocks.storageData = { persisted: false, rawRetentionDays: 90 };
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: { persist: vi.fn().mockResolvedValue(false) },
+    });
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const protection = screen
+      .getByText('Protect app data', { selector: 'strong' })
+      .closest('[data-storage-protection-state]');
+    expect(protection).toHaveAttribute(
+      'data-storage-protection-state',
+      'recommended',
+    );
+    expect(protection).toHaveTextContent('Highly recommended');
+    expect(protection).toHaveTextContent(/not a backup/i);
+    expect(protection?.querySelector('.lucide-shield')).toBeInTheDocument();
+    expect(
+      protection?.querySelector('.lucide-triangle-alert'),
+    ).not.toBeInTheDocument();
+  });
+
   it('floats the save action only after a setting changes', () => {
     render(
       <MemoryRouter>
@@ -146,6 +183,49 @@ describe('settings CSV export', () => {
     expect(await screen.findByText('Settings saved.')).toBeInTheDocument();
   });
 
+  it('defaults automatic live monitor opening to on', () => {
+    mocks.fennec.profile = {
+      primaryId: 'Steam|you|0',
+      displayName: 'You',
+    };
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const autoOpen = screen.getByRole('checkbox', {
+      name: /Automatically open the live monitor/i,
+    });
+    expect(autoOpen).toBeChecked();
+    expect(autoOpen).toBeEnabled();
+    expect(screen.getByText(/on by default/i)).toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+  });
+
+  it('requires a selected player before automatic live monitor opening can be changed', () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const autoOpen = screen.getByRole('checkbox', {
+      name: /Automatically open the live monitor/i,
+    });
+    expect(autoOpen).toBeChecked();
+    expect(autoOpen).toBeDisabled();
+    expect(autoOpen).toHaveAccessibleDescription(
+      /select your player before Fennec can automatically open/i,
+    );
+    const note = screen.getByRole('note');
+    expect(note).toHaveTextContent('Player required.');
+    expect(note).toHaveTextContent(/select your player/i);
+    expect(
+      screen.getByRole('link', { name: 'Choose your player' }),
+    ).toHaveAttribute('href', '/profile#player-selection');
+  });
+
   it('merges durable data and companion controls when canonical sync is available', () => {
     mocks.fennec.syncStatus = {
       mode: 'restoring',
@@ -184,6 +264,7 @@ describe('settings CSV export', () => {
     expect(
       screen.getByRole('button', { name: 'Delete all history' }),
     ).toBeDisabled();
+    expect(screen.getByText('Live companion footprint')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Local data' }),
     ).not.toBeInTheDocument();

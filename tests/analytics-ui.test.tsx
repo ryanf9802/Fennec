@@ -5,10 +5,12 @@ import type { MatchState } from '../src/domain/types';
 
 const scene = vi.hoisted(() => ({
   props: undefined as BallTouchSceneProps | undefined,
+  fail: false,
 }));
 
 vi.mock('../src/components/BallTouchScene', () => ({
   BallTouchScene: (props: BallTouchSceneProps) => {
+    if (scene.fail) throw new Error('WebGL unavailable');
     scene.props = props;
     return (
       <div role="img" aria-label={`${props.profile.label} 3D ball touch map`} />
@@ -133,6 +135,31 @@ const match: MatchState = {
 };
 
 describe('ball touch map', () => {
+  afterEach(() => {
+    scene.fail = false;
+    vi.restoreAllMocks();
+  });
+
+  it('settles the loader when the 3D scene fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const onReady = vi.fn();
+    scene.fail = true;
+
+    render(
+      <BallTouchMap
+        match={match}
+        profileId="Steam|1|0"
+        speedUnit="kmh"
+        onReady={onReady}
+      />,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The 3D touch map is unavailable in this browser',
+    );
+    expect(onReady).toHaveBeenCalledOnce();
+  });
+
   it('uses extra-mode profiles and corrected goal locations', () => {
     render(
       <BallTouchMap

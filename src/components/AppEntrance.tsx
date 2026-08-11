@@ -4,11 +4,9 @@ import {
   useContext,
   useEffect,
   useState,
-  type AnimationEvent,
   type ReactNode,
 } from 'react';
-
-const COMPLETION_TIMEOUT_MS = 1_200;
+import { FennecLoadingOverlay } from './FennecLoadingOverlay';
 
 const AppEntranceContext = createContext<(() => void) | undefined>(undefined);
 
@@ -33,6 +31,7 @@ export function AppEntrance({
 }) {
   const [complete, setComplete] = useState(false);
   const revealing = ready;
+  const showContent = ready || complete;
 
   const replayCinematic = useCallback(() => {
     setComplete(false);
@@ -58,22 +57,11 @@ export function AppEntrance({
         : 'loading';
   }, [complete, revealing]);
 
-  useEffect(() => {
-    if (!revealing || complete) return;
-    const timeout = window.setTimeout(
-      () => setComplete(true),
-      COMPLETION_TIMEOUT_MS,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [complete, revealing]);
-
-  const finishReveal = (event: AnimationEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) setComplete(true);
-  };
+  const finishReveal = useCallback(() => setComplete(true), []);
 
   return (
     <AppEntranceContext.Provider value={replayCinematic}>
-      {ready && (
+      {showContent && (
         <div
           className={`app-entrance-content ${!complete && revealing ? 'app-entrance-content--cinematic' : ''}`}
           inert={!complete}
@@ -82,20 +70,14 @@ export function AppEntrance({
         </div>
       )}
       {!complete && (
-        <div
-          role="status"
-          aria-label={revealing ? 'Opening Fennec' : 'Loading Fennec'}
-          className={`app-entrance-overlay app-backdrop ${revealing ? 'app-entrance-overlay--cinematic' : ''}`}
-          data-testid="app-entrance"
-          onAnimationEnd={finishReveal}
-        >
-          <div className="app-entrance-bloom" />
-          <img
-            src="/assets/brand/fennec-a-mark-primary.svg"
-            alt=""
-            className="app-entrance-mark"
-          />
-        </div>
+        <FennecLoadingOverlay
+          loading={!revealing}
+          placement="screen"
+          loadingLabel="Loading Fennec"
+          revealingLabel="Opening Fennec"
+          onRevealComplete={finishReveal}
+          testId="app-entrance"
+        />
       )}
     </AppEntranceContext.Provider>
   );

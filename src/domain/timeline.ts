@@ -2,7 +2,6 @@ import type { FennecSettings, MatchState, TimelineEvent } from './types';
 
 export const curatedEvents = [
   'GoalScored',
-  'CrossbarHit',
   'PlayerJoined',
   'PlayerLeft',
   'MatchPaused',
@@ -87,7 +86,6 @@ export function eventDetails(
   else if (settings.timelinePreset === 'curated') {
     const curated: Record<string, string[]> = {
       GoalScored: ['Scorer.Name', 'Assister.Name', 'GoalSpeed'],
-      CrossbarHit: ['BallLastTouch.Player.Name', 'BallSpeed', 'ImpactForce'],
       StatfeedEvent: ['Type', 'MainTarget.Name', 'SecondaryTarget.Name'],
       PlayerJoined: ['PlayerName'],
       PlayerLeft: ['PlayerName'],

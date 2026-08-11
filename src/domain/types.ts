@@ -160,7 +160,7 @@ export interface FennecSettings {
 export const defaultSettings: FennecSettings = {
   webSocketPort: 49124,
   sessionGapMinutes: 30,
-  autoOpenLiveMatch: false,
+  autoOpenLiveMatch: true,
   theme: 'dark',
   speedUnit: 'kmh',
   timelinePreset: 'curated',
@@ -213,7 +213,10 @@ export function normalizeSettings(
     timelineAttributes: {},
     sidebarCollapsed: input?.sidebarCollapsed === true,
     matchAnalyticsView,
-    autoOpenLiveMatch: input?.autoOpenLiveMatch === true,
+    autoOpenLiveMatch:
+      typeof input?.autoOpenLiveMatch === 'boolean'
+        ? input.autoOpenLiveMatch
+        : defaultSettings.autoOpenLiveMatch,
     analytics: defaultSettings.analytics,
   };
 }

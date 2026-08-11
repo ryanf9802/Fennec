@@ -1,8 +1,10 @@
+import { isLoopbackHostname } from './origin';
+
 export type LocalAccessState =
   'checking' | 'prompt' | 'denied' | 'granted' | 'not-required';
 
 function isLoopbackOrigin(): boolean {
-  return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  return isLoopbackHostname(location.hostname);
 }
 
 async function loopbackPermission(): Promise<PermissionStatus | undefined> {

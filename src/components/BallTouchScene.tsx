@@ -646,6 +646,7 @@ function Scene({
   activeId,
   emphasizedIds,
   onActivate,
+  onReady,
 }: BallTouchSceneProps) {
   return (
     <>
@@ -665,8 +666,29 @@ function Scene({
         />
       ))}
       <CameraRig orientationYaw={orientationYaw} state={cameraState} />
+      <SceneReady onReady={onReady} />
     </>
   );
+}
+
+function SceneReady({ onReady }: { onReady?(): void }) {
+  const notified = useRef(false);
+  const animationFrame = useRef<number | undefined>(undefined);
+
+  useFrame(() => {
+    if (!onReady || notified.current) return;
+    notified.current = true;
+    animationFrame.current = window.requestAnimationFrame(onReady);
+  });
+
+  useEffect(
+    () => () => {
+      if (animationFrame.current !== undefined)
+        window.cancelAnimationFrame(animationFrame.current);
+    },
+    [],
+  );
+  return null;
 }
 
 export interface BallTouchSceneProps {
@@ -679,6 +701,7 @@ export interface BallTouchSceneProps {
   activeId?: string;
   emphasizedIds: string[];
   onActivate(id?: string): void;
+  onReady?(): void;
 }
 
 export function BallTouchScene(props: BallTouchSceneProps) {

@@ -171,8 +171,13 @@ describe('closed session presentation', () => {
     expect(screen.queryByText(/not saved to history/i)).not.toBeInTheDocument();
   });
 
-  it('prompts for a player instead of showing unscoped history', () => {
-    renderPage(session(), false);
+  it('prompts for a player without hiding the live match', () => {
+    renderPage(session(), false, {
+      ...match,
+      id: 'unscoped-live',
+      lifecycle: 'live',
+      playlistName: 'Private Match',
+    });
     expect(
       screen.getByRole('heading', { name: 'Choose your player' }),
     ).toBeInTheDocument();
@@ -182,6 +187,14 @@ describe('closed session presentation', () => {
     expect(
       screen.queryByRole('heading', { name: 'Current session' }),
     ).not.toBeInTheDocument();
+    expect(screen.getByText('Live now')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Private Match' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Live now/ })).toHaveAttribute(
+      'href',
+      '/live',
+    );
   });
 
   it('treats an empty timeline as ready to capture the first match', () => {

@@ -1,6 +1,15 @@
-import type { TerritorialImpactAnalytics } from '../domain/analytics';
-import { resolveTeamPresentation } from '../domain/teamPresentation';
+import type { CSSProperties } from 'react';
+import type {
+  TerritorialImpactAnalytics,
+  TerritorialPlayerAnalytics,
+} from '../domain/analytics';
+import {
+  profileTeamNumber,
+  resolveTeamPresentation,
+} from '../domain/teamPresentation';
 import type { MatchState } from '../domain/types';
+import { PlayerName } from './PlayerName';
+import { TeamSwatch } from './TeamSwatch';
 
 function percentage(value: number | undefined): string {
   return value === undefined ? '—' : `${Math.round(value * 100)}%`;
@@ -12,103 +21,269 @@ function territory(value: number | undefined): string {
   return `${rounded > 0 ? '+' : ''}${rounded}%`;
 }
 
+function ContributionBar({
+  player,
+  color,
+}: {
+  player: TerritorialPlayerAnalytics;
+  color: string;
+}) {
+  const contribution = player.pressureContribution;
+  const label = `${player.actor.name} team pressure contribution`;
+  return (
+    <div className="pressure-contribution">
+      <span className="font-bold tabular-nums">{percentage(contribution)}</span>
+      <span
+        className="pressure-contribution-track"
+        {...(contribution === undefined
+          ? { role: 'img', 'aria-label': `${label} unavailable` }
+          : {
+              role: 'meter',
+              'aria-label': label,
+              'aria-valuemin': 0,
+              'aria-valuemax': 100,
+              'aria-valuenow': Math.round(contribution * 100),
+            })}
+      >
+        {contribution !== undefined && (
+          <span
+            className="pressure-contribution-fill"
+            style={{
+              width: `${Math.max(0, Math.min(1, contribution)) * 100}%`,
+              backgroundColor: color,
+              color,
+            }}
+          />
+        )}
+      </span>
+    </div>
+  );
+}
+
 /** Presents transparent team and player territorial-impact metrics. */
 export function PressureAnalytics({
   match,
   analytics,
+  profileId,
 }: {
   match: MatchState;
   analytics: TerritorialImpactAnalytics;
+  profileId?: string;
 }) {
-  const teams = analytics.teams.map((team) => ({
-    ...team,
-    presentation: resolveTeamPresentation(match.teams, team.teamNumber),
-  }));
+  const preferredTeam = profileTeamNumber(match, profileId);
+  const teams = analytics.teams
+    .map((team) => ({
+      ...team,
+      presentation: resolveTeamPresentation(match.teams, team.teamNumber),
+    }))
+    .sort((left, right) => {
+      const leftPreferred = left.teamNumber === preferredTeam;
+      const rightPreferred = right.teamNumber === preferredTeam;
+      if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1;
+      return left.teamNumber - right.teamNumber;
+    });
+  const teamOrder = new Map(
+    teams.map((team, index) => [team.teamNumber, index]),
+  );
   const players = [...analytics.players].sort(
     (left, right) =>
-      left.actor.teamNumber - right.actor.teamNumber ||
+      (teamOrder.get(left.actor.teamNumber) ?? Number.MAX_SAFE_INTEGER) -
+        (teamOrder.get(right.actor.teamNumber) ?? Number.MAX_SAFE_INTEGER) ||
       right.pressureTouches - left.pressureTouches ||
       left.actor.name.localeCompare(right.actor.name),
   );
+  const pressureAvailable = teams.every(
+    (team) => team.fieldPressureShare !== undefined,
+  );
+
+  const playerTeam = (teamNumber: number) =>
+    teams.find((team) => team.teamNumber === teamNumber)?.presentation;
 
   return (
-    <div className="space-y-4">
-      <p className="text-muted text-xs">
-        Pressure counts unambiguous touches made in the opponent&apos;s
-        defensive third. Territory is the average signed field progress after
-        each eligible touch. Neither metric estimates possession or off-ball
-        influence.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {teams.map((team) => (
-          <article
-            key={team.teamNumber}
-            className="surface-flat rounded-xl border-l-4 p-4"
-            style={{ borderLeftColor: team.presentation.primaryColor }}
+    <div className="pressure-view space-y-4">
+      <section
+        aria-label="Team pressure comparison"
+        className="pressure-comparison"
+      >
+        <div className="pressure-team-grid">
+          {teams.map((team) => (
+            <article
+              key={team.teamNumber}
+              data-pressure-team={team.teamNumber}
+              className="pressure-team-summary"
+              style={
+                {
+                  '--pressure-team-primary': team.presentation.primaryColor,
+                } as CSSProperties
+              }
+            >
+              <h3 className="pressure-team-name">
+                <TeamSwatch team={team.presentation} className="size-3" />
+                <span className="truncate">{team.presentation.name}</span>
+              </h3>
+              <div className="pressure-touch-total">{team.pressureTouches}</div>
+              <div className="eyebrow">Pressure touches</div>
+            </article>
+          ))}
+        </div>
+
+        <div className="pressure-share-block">
+          <div className="pressure-share-labels">
+            <span className="font-black tabular-nums">
+              {percentage(teams[0]?.fieldPressureShare)}
+            </span>
+            <span className="eyebrow">Field pressure</span>
+            <span className="font-black tabular-nums">
+              {percentage(teams[1]?.fieldPressureShare)}
+            </span>
+          </div>
+          <div
+            className={`pressure-share-track ${pressureAvailable ? '' : 'pressure-share-track--empty'}`}
+            role="img"
+            aria-label={`Field pressure: ${teams.map((team) => `${team.presentation.name} ${percentage(team.fieldPressureShare)}`).join(', ')}`}
           >
-            <h3 className="font-extrabold">{team.presentation.name}</h3>
-            <dl className="mt-3 grid grid-cols-3 gap-3">
-              <div>
-                <dt className="eyebrow">Pressure touches</dt>
-                <dd className="metric-value mt-1">{team.pressureTouches}</dd>
-              </div>
-              <div>
-                <dt className="eyebrow">Field pressure</dt>
-                <dd className="metric-value mt-1">
-                  {percentage(team.fieldPressureShare)}
-                </dd>
-              </div>
-              <div>
-                <dt className="eyebrow">Avg territory</dt>
-                <dd className="metric-value mt-1">
-                  {territory(team.averageNetTerritoryPercent)}
-                </dd>
-              </div>
+            {pressureAvailable &&
+              teams.map((team) => (
+                <span
+                  key={team.teamNumber}
+                  className="pressure-share-fill"
+                  style={{
+                    width: `${(team.fieldPressureShare ?? 0) * 100}%`,
+                    backgroundColor: team.presentation.primaryColor,
+                  }}
+                />
+              ))}
+          </div>
+        </div>
+
+        <div className="pressure-territory-grid">
+          {teams.map((team) => (
+            <dl key={team.teamNumber}>
+              <dt className="eyebrow">Avg territory</dt>
+              <dd className="mt-1 text-lg font-black tabular-nums">
+                {territory(team.averageNetTerritoryPercent)}
+              </dd>
             </dl>
-          </article>
-        ))}
-      </div>
-      <div className="surface-flat overflow-x-auto rounded-xl">
-        <table className="w-full min-w-[38rem] text-left text-sm">
-          <caption className="sr-only">
-            Pressure and territory contribution by player
-          </caption>
-          <thead className="text-muted text-xs uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-3">Player</th>
-              <th className="px-4 py-3">Team</th>
-              <th className="px-4 py-3 text-right">Pressure touches</th>
-              <th className="px-4 py-3 text-right">Team contribution</th>
-              <th className="px-4 py-3 text-right">Avg territory</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((player) => {
-              const team = teams.find(
-                (value) => value.teamNumber === player.actor.teamNumber,
-              );
-              return (
-                <tr key={player.actor.key} className="border-main/10 border-t">
-                  <th className="px-4 py-3 font-bold">{player.actor.name}</th>
-                  <td className="px-4 py-3">
-                    {team?.presentation.name ??
-                      `Team ${player.actor.teamNumber}`}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {player.pressureTouches}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {percentage(player.pressureContribution)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {territory(player.averageNetTerritoryPercent)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </div>
+      </section>
+
+      <p className="pressure-explanation">
+        A pressure touch is unambiguous and made in the opponent&apos;s
+        defensive third. Territory measures signed field progress after an
+        eligible touch; neither estimates possession or off-ball influence.
+      </p>
+
+      <section aria-labelledby="pressure-player-heading">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <h3 id="pressure-player-heading" className="font-extrabold">
+            Player contribution
+          </h3>
+          <span className="text-muted text-xs">
+            Share of each team&apos;s pressure touches
+          </span>
+        </div>
+
+        <div className="pressure-player-table surface-flat hidden overflow-hidden rounded-xl md:block">
+          <table className="w-full text-left text-sm">
+            <caption className="sr-only">
+              Pressure and territory contribution by player
+            </caption>
+            <thead className="text-muted text-xs uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3">Player</th>
+                <th className="px-4 py-3 text-right">Pressure touches</th>
+                <th className="px-4 py-3">Team contribution</th>
+                <th className="px-4 py-3 text-right">Avg territory</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((player) => {
+                const team = playerTeam(player.actor.teamNumber);
+                return (
+                  <tr
+                    key={player.actor.key}
+                    data-pressure-player={player.actor.key}
+                    className="pressure-player-row"
+                    style={
+                      {
+                        '--pressure-team-primary': team?.primaryColor,
+                      } as CSSProperties
+                    }
+                  >
+                    <th className="px-4 py-3 font-medium">
+                      <PlayerName
+                        name={player.actor.name}
+                        team={team}
+                        you={player.actor.primaryId === profileId}
+                        nameWeight="medium"
+                      />
+                    </th>
+                    <td className="px-4 py-3 text-right font-bold tabular-nums">
+                      {player.pressureTouches}
+                    </td>
+                    <td className="w-[36%] px-4 py-3">
+                      <ContributionBar
+                        player={player}
+                        color={team?.primaryColor ?? '#94a3b8'}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold tabular-nums">
+                      {territory(player.averageNetTerritoryPercent)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <ul
+          aria-label="Pressure and territory contribution by player"
+          className="pressure-player-list space-y-2 md:hidden"
+        >
+          {players.map((player) => {
+            const team = playerTeam(player.actor.teamNumber);
+            return (
+              <li
+                key={player.actor.key}
+                data-pressure-player={player.actor.key}
+                className="pressure-player-card"
+                style={
+                  {
+                    '--pressure-team-primary': team?.primaryColor,
+                  } as CSSProperties
+                }
+              >
+                <PlayerName
+                  name={player.actor.name}
+                  team={team}
+                  you={player.actor.primaryId === profileId}
+                  nameWeight="medium"
+                  fill
+                />
+                <dl className="pressure-player-metrics">
+                  <div>
+                    <dt>Pressure touches</dt>
+                    <dd>{player.pressureTouches}</dd>
+                  </div>
+                  <div>
+                    <dt>Avg territory</dt>
+                    <dd>{territory(player.averageNetTerritoryPercent)}</dd>
+                  </div>
+                </dl>
+                <div>
+                  <div className="eyebrow mb-1.5">Team contribution</div>
+                  <ContributionBar
+                    player={player}
+                    color={team?.primaryColor ?? '#94a3b8'}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </div>
   );
 }

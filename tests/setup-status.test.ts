@@ -1,5 +1,6 @@
 import type { CompanionHealth } from '../src/companion/client';
 import {
+  companionHasConfiguredStore,
   setupComplete,
   storedCompanionCaptureVerification,
 } from '../src/setup/setupStatus';
@@ -73,6 +74,32 @@ describe('setup completion', () => {
         companionCaptureVerified: false,
         companionSetupVerified: false,
         health: companion,
+      }),
+    ).toBe(false);
+  });
+
+  it('accepts one configured storefront when multiple installations are detected', () => {
+    const partiallyConfigured: CompanionHealth = {
+      ...companion,
+      stores: ['steam', 'epic'],
+      configuredStores: ['steam'],
+    };
+
+    expect(companionHasConfiguredStore(partiallyConfigured)).toBe(true);
+    expect(
+      setupComplete({
+        accessSatisfied: true,
+        path: 'companion',
+        statsApiVerified: false,
+        companionCaptureVerified: true,
+        companionSetupVerified: false,
+        health: partiallyConfigured,
+      }),
+    ).toBe(true);
+    expect(
+      companionHasConfiguredStore({
+        ...partiallyConfigured,
+        configuredStores: [],
       }),
     ).toBe(false);
   });

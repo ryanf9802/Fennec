@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   observedBallSpeed,
   playerTouchAnalytics,
@@ -6,9 +6,50 @@ import {
 } from '../domain/analytics';
 import { formatSpeed } from '../domain/speed';
 import type { FennecSettings, MatchState } from '../domain/types';
+import BallTouchMap from './BallTouchMap';
+import { FennecLoadingOverlay } from './FennecLoadingOverlay';
 import { PressureAnalytics } from './PressureAnalytics';
 
-const BallTouchMap = lazy(() => import('./BallTouchMap'));
+function LoadingBallTouchMap({
+  match,
+  profileId,
+  speedUnit,
+}: {
+  match: MatchState;
+  profileId?: string;
+  speedUnit: FennecSettings['speedUnit'];
+}) {
+  const [sceneReady, setSceneReady] = useState(false);
+  const [revealComplete, setRevealComplete] = useState(false);
+  const markSceneReady = useCallback(() => setSceneReady(true), []);
+  const finishReveal = useCallback(() => setRevealComplete(true), []);
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl"
+      data-testid="ball-touch-map-frame"
+    >
+      <div data-testid="ball-touch-map-content" inert={!revealComplete}>
+        <BallTouchMap
+          match={match}
+          profileId={profileId}
+          speedUnit={speedUnit}
+          onReady={markSceneReady}
+        />
+      </div>
+      {!revealComplete && (
+        <FennecLoadingOverlay
+          loading={!sceneReady}
+          placement="contained"
+          loadingLabel="Loading 3D touch map"
+          revealingLabel="Opening 3D touch map"
+          onRevealComplete={finishReveal}
+          testId="ball-touch-map-loading-overlay"
+        />
+      )}
+    </div>
+  );
+}
 
 /**
  * Presents one persisted match-telemetry view at a time, keeping the WebGL
@@ -167,7 +208,11 @@ export function MatchAnalytics({
           role="tabpanel"
           aria-labelledby="ball-pressure-tab"
         >
-          <PressureAnalytics match={match} analytics={pressure} />
+          <PressureAnalytics
+            match={match}
+            analytics={pressure}
+            profileId={profileId}
+          />
         </div>
       ) : (
         <div
@@ -182,20 +227,12 @@ export function MatchAnalytics({
             </p>
             <span className="eyebrow">{match.arena || match.playlistName}</span>
           </div>
-          <Suspense
-            fallback={
-              <div className="surface-flat text-muted grid h-96 place-items-center rounded-2xl text-sm">
-                Loading 3D touch map…
-              </div>
-            }
-          >
-            <BallTouchMap
-              key={match.id}
-              match={match}
-              profileId={profileId}
-              speedUnit={speedUnit}
-            />
-          </Suspense>
+          <LoadingBallTouchMap
+            key={match.id}
+            match={match}
+            profileId={profileId}
+            speedUnit={speedUnit}
+          />
         </div>
       )}
     </section>

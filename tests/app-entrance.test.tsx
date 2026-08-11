@@ -62,6 +62,24 @@ describe('app entrance', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
   });
 
+  it('keeps revealed content mounted during later readiness checks', () => {
+    const view = render(
+      <AppEntrance ready>
+        <button>Continue</button>
+      </AppEntrance>,
+    );
+    fireEvent.animationEnd(screen.getByTestId('app-entrance'));
+
+    view.rerender(
+      <AppEntrance ready={false}>
+        <button>Continue</button>
+      </AppEntrance>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+    expect(screen.queryByTestId('app-entrance')).not.toBeInTheDocument();
+  });
+
   it('can replay the cinematic entrance after the app is visible', () => {
     render(
       <AppEntrance ready>

@@ -1,5 +1,7 @@
 import {
   Component,
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -23,7 +25,11 @@ import {
 } from '../domain/touchMapGeometry';
 import type { MatchState, SpeedUnit } from '../domain/types';
 import { resolveTeamPresentation } from '../domain/teamPresentation';
-import { BallTouchScene } from './BallTouchScene';
+
+const BallTouchScene = lazy(async () => {
+  const scene = await import('./BallTouchScene');
+  return { default: scene.BallTouchScene };
+});
 
 type Filter = 'all' | 'self' | 'team' | 'opponents' | `player:${string}`;
 
@@ -97,7 +103,7 @@ function matchesFilter(
 }
 
 class SceneErrorBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; onSettled?(): void },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -108,6 +114,7 @@ class SceneErrorBoundary extends Component<
 
   componentDidCatch() {
     // The inline fallback keeps the analytics tab available when WebGL fails.
+    this.props.onSettled?.();
   }
 
   render() {
@@ -133,10 +140,12 @@ export function BallTouchMap({
   match,
   profileId,
   speedUnit,
+  onReady,
 }: {
   match: MatchState;
   profileId?: string;
   speedUnit: SpeedUnit;
+  onReady?(): void;
 }) {
   const points = useMemo(
     () =>
@@ -393,18 +402,21 @@ export function BallTouchMap({
         onPointerCancel={stopDrag}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <SceneErrorBoundary>
-          <BallTouchScene
-            profile={arena}
-            teams={teams}
-            points={visible}
-            cameraState={camera}
-            goalLabels={goalLabels}
-            orientationYaw={orientationYaw}
-            activeId={active}
-            emphasizedIds={[...emphasizedIds]}
-            onActivate={setActive}
-          />
+        <SceneErrorBoundary onSettled={onReady}>
+          <Suspense fallback={null}>
+            <BallTouchScene
+              profile={arena}
+              teams={teams}
+              points={visible}
+              cameraState={camera}
+              goalLabels={goalLabels}
+              orientationYaw={orientationYaw}
+              activeId={active}
+              emphasizedIds={[...emphasizedIds]}
+              onActivate={setActive}
+              onReady={onReady}
+            />
+          </Suspense>
         </SceneErrorBoundary>
 
         <div className="surface-strong text-muted pointer-events-none absolute left-3 top-3 rounded-lg px-3 py-2 text-xs shadow-xl">

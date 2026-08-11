@@ -6,6 +6,7 @@ import { defaultSettings, type MatchState } from '../src/domain/types';
 
 const mocks = vi.hoisted(() => ({
   activeMatch: undefined as MatchState | undefined,
+  profile: undefined as { primaryId: string; displayName: string } | undefined,
   setupState: 'complete' as 'complete' | 'incomplete',
 }));
 
@@ -14,7 +15,7 @@ vi.mock('../src/app/FennecContext', () => ({
     activeMatch: mocks.activeMatch,
     connection: 'waiting',
     demoMode: false,
-    profile: { primaryId: 'Steam|you|0', displayName: 'You' },
+    profile: mocks.profile,
     settings: defaultSettings,
     updateSettings: vi.fn(),
   }),
@@ -58,22 +59,34 @@ function liveMatch(primaryId: string): MatchState {
   };
 }
 
-describe('profile-scoped live navigation', () => {
+describe('live navigation', () => {
   beforeEach(() => {
     mocks.activeMatch = undefined;
+    mocks.profile = { primaryId: 'Steam|you|0', displayName: 'You' };
     mocks.setupState = 'complete';
   });
 
-  it('hides a live match unrelated to the selected player', () => {
+  it('shows a live match unrelated to the selected player', () => {
     mocks.activeMatch = liveMatch('Epic|someone-else|0');
     render(
       <MemoryRouter>
         <AppShell>Content</AppShell>
       </MemoryRouter>,
     );
-    expect(
-      screen.queryByRole('link', { name: 'Live match' }),
-    ).not.toBeInTheDocument();
+    for (const link of screen.getAllByRole('link', { name: 'Live match' }))
+      expect(link).toHaveAttribute('href', '/live');
+  });
+
+  it('shows a live match when no player is selected', () => {
+    mocks.profile = undefined;
+    mocks.activeMatch = liveMatch('Epic|someone-else|0');
+    render(
+      <MemoryRouter>
+        <AppShell>Content</AppShell>
+      </MemoryRouter>,
+    );
+    for (const link of screen.getAllByRole('link', { name: 'Live match' }))
+      expect(link).toHaveAttribute('href', '/live');
   });
 
   it('shows a live match involving the selected player', () => {

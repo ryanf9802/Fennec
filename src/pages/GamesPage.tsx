@@ -19,7 +19,6 @@ import { formatClock, matchElapsedSeconds } from '../domain/timeline';
 import { formatTeamScore, profileTeamNumber } from '../domain/teamPresentation';
 import { playerKeyForPrimaryId } from '../domain/playerIdentity';
 import { isTrainingMatch } from '../domain/playlists';
-import { matchBelongsToProfile } from '../domain/profileScope';
 import { useSessions } from '../data/historyQueries';
 
 function sessionTitle(startedAt: string): string {
@@ -54,13 +53,7 @@ export function GamesPage() {
   const [deadlineClock, setDeadlineClock] = useState(() => Date.now());
   const profileKey = playerKeyForPrimaryId(profile?.primaryId);
   const sessionsQuery = useSessions(profileKey);
-  const visibleActiveMatch =
-    activeMatch && matchBelongsToProfile(activeMatch, profile?.primaryId)
-      ? activeMatch
-      : undefined;
-  const trainingActive = visibleActiveMatch
-    ? isTrainingMatch(visibleActiveMatch)
-    : false;
+  const trainingActive = activeMatch ? isTrainingMatch(activeMatch) : false;
   const orderedSessions =
     sessionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const current = orderedSessions[0];
@@ -69,7 +62,7 @@ export function GamesPage() {
     : undefined;
   useEffect(() => {
     if (
-      visibleActiveMatch ||
+      activeMatch ||
       !current ||
       current.endedManually ||
       idleDeadline === undefined
@@ -81,10 +74,10 @@ export function GamesPage() {
       remaining > 0 ? remaining + 25 : 0,
     );
     return () => window.clearTimeout(timer);
-  }, [visibleActiveMatch, current, idleDeadline]);
+  }, [activeMatch, current, idleDeadline]);
   const currentIsClosed = Boolean(
     current &&
-    !visibleActiveMatch &&
+    !activeMatch &&
     (current.endedManually ||
       sessionIdleGapElapsed(
         current,
@@ -106,7 +99,7 @@ export function GamesPage() {
           ? 'New session started for the live game.'
           : result === 'ended'
             ? 'Session ended. The next game will start a new session.'
-            : visibleActiveMatch
+            : activeMatch
               ? 'This live game already starts a new session.'
               : 'Session is already ended.',
       );
@@ -157,7 +150,7 @@ export function GamesPage() {
         </div>
       )}
 
-      {visibleActiveMatch && (
+      {activeMatch && (
         <Link
           to="/live"
           className="surface group relative block overflow-hidden rounded-3xl border-cyan-300/30 p-5 sm:p-6"
@@ -173,10 +166,10 @@ export function GamesPage() {
                   {trainingActive ? 'Training now' : 'Live now'}
                 </div>
                 <h2 className="mt-0.5 text-xl font-extrabold sm:text-2xl">
-                  {visibleActiveMatch.playlistName}
+                  {activeMatch.playlistName}
                 </h2>
                 <p className="text-muted mt-1 text-sm">
-                  {visibleActiveMatch.arena || 'Waiting for match state'}
+                  {activeMatch.arena || 'Waiting for match state'}
                 </p>
               </div>
             </div>
@@ -184,12 +177,12 @@ export function GamesPage() {
               <div className="text-right">
                 <div className="text-3xl font-black">
                   {formatTeamScore(
-                    visibleActiveMatch.teams,
-                    profileTeamNumber(visibleActiveMatch, profile?.primaryId),
+                    activeMatch.teams,
+                    profileTeamNumber(activeMatch, profile?.primaryId),
                   )}
                 </div>
                 <div className="text-fennec-orange text-sm font-bold">
-                  {formatClock(matchElapsedSeconds(visibleActiveMatch))}
+                  {formatClock(matchElapsedSeconds(activeMatch))}
                 </div>
               </div>
               <ArrowUpRight className="text-muted size-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -201,7 +194,7 @@ export function GamesPage() {
       {profile &&
       !sessionsQuery.isLoading &&
       !orderedSessions.length &&
-      !visibleActiveMatch ? (
+      !activeMatch ? (
         <EmptyState />
       ) : (
         profile &&

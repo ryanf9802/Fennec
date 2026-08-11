@@ -14,6 +14,13 @@ export interface ReduceResult {
   superseded?: MatchState;
 }
 
+const replayGeneratedEvents = new Set([
+  'BallHit',
+  'CrossbarHit',
+  'GoalScored',
+  'StatfeedEvent',
+]);
+
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
@@ -282,36 +289,46 @@ export function reduceStatsEnvelope(
   if (envelope.event === 'UpdateState') {
     match.lifecycle = 'live';
     delete match.endedAt;
-    match.participants = mergeParticipants(
-      match.participants,
-      recordArray(envelope.data.Players).map(participant),
-    );
     const game = envelope.data.Game;
-    if (game && typeof game === 'object' && !Array.isArray(game)) {
-      const gameRecord = game as Record<string, unknown>;
+    const gameRecord =
+      game && typeof game === 'object' && !Array.isArray(game)
+        ? (game as Record<string, unknown>)
+        : undefined;
+    const snapshotIsReplay = gameRecord
+      ? gameRecord.bReplay === true
+      : match.isReplay;
+    if (gameRecord) match.isReplay = snapshotIsReplay;
+    if (!snapshotIsReplay) {
+      match.participants = mergeParticipants(
+        match.participants,
+        recordArray(envelope.data.Players).map(participant),
+      );
+    }
+    if (gameRecord) {
       match.playlistId = numberValue(gameRecord.PlaylistId);
       const playlist = resolvePlaylist(match.playlistId);
       match.playlistName = playlist.name;
       match.playlistCategory = playlist.category;
-      const timeSeconds = optionalNumber(gameRecord.TimeSeconds);
-      if (timeSeconds !== undefined)
-        updateMatchClock(match, timeSeconds, gameRecord.bOvertime === true);
-      match.isReplay = gameRecord.bReplay === true;
       match.hasWinner = gameRecord.bHasWinner === true;
       match.winnerName = stringValue(gameRecord.Winner);
       match.arena = stringValue(gameRecord.Arena) ?? '';
-      match.teams = recordArray(gameRecord.Teams).map(team);
-      const ball = gameRecord.Ball;
-      if (ball && typeof ball === 'object' && !Array.isArray(ball)) {
-        const ballRecord = ball as Record<string, unknown>;
-        match.ball = {
-          speed: optionalNumber(ballRecord.Speed) ?? 0,
-        };
+      if (!snapshotIsReplay) {
+        const timeSeconds = optionalNumber(gameRecord.TimeSeconds);
+        if (timeSeconds !== undefined)
+          updateMatchClock(match, timeSeconds, gameRecord.bOvertime === true);
+        match.teams = recordArray(gameRecord.Teams).map(team);
+        const ball = gameRecord.Ball;
+        if (ball && typeof ball === 'object' && !Array.isArray(ball)) {
+          const ballRecord = ball as Record<string, unknown>;
+          match.ball = {
+            speed: optionalNumber(ballRecord.Speed) ?? 0,
+          };
+        }
+        match.viewTarget =
+          gameRecord.bHasTarget === true
+            ? playerReference(gameRecord.Target)
+            : undefined;
       }
-      match.viewTarget =
-        gameRecord.bHasTarget === true
-          ? playerReference(gameRecord.Target)
-          : undefined;
     }
     if (!match.roundPhaseObserved && !match.isReplay) match.roundActive = true;
     accumulateSnapshot(match);
@@ -335,6 +352,8 @@ export function reduceStatsEnvelope(
     match.roundActive = false;
     match.events = [...match.events, storeEvent(match, envelope, now)];
   } else {
+    if (match.isReplay && replayGeneratedEvents.has(envelope.event))
+      return { current: match, superseded };
     if (
       envelope.event === 'CountdownBegin' ||
       envelope.event === 'GoalScored' ||
@@ -342,7 +361,11 @@ export function reduceStatsEnvelope(
     ) {
       match.roundActive = false;
       match.roundPhaseObserved = true;
-    } else if (envelope.event === 'RoundStarted') {
+      if (envelope.event === 'GoalReplayStart') match.isReplay = true;
+      else if (envelope.event === 'CountdownBegin') match.isReplay = false;
+    } else if (envelope.event === 'GoalReplayEnd') match.isReplay = false;
+    else if (envelope.event === 'RoundStarted') {
+      match.isReplay = false;
       match.roundActive = true;
       match.roundPhaseObserved = true;
     } else if (envelope.event === 'MatchPaused') match.isPaused = true;

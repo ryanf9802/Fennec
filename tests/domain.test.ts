@@ -83,6 +83,19 @@ const match = (id: string, start: string, end: string): MatchState => ({
 });
 
 describe('settings', () => {
+  it('opens the live monitor by default while preserving an explicit opt-out', () => {
+    expect(defaultSettings.autoOpenLiveMatch).toBe(true);
+    expect(normalizeSettings().autoOpenLiveMatch).toBe(true);
+    expect(
+      normalizeSettings({ autoOpenLiveMatch: false }).autoOpenLiveMatch,
+    ).toBe(false);
+    expect(
+      normalizeSettings({
+        autoOpenLiveMatch: 'invalid' as unknown as boolean,
+      }).autoOpenLiveMatch,
+    ).toBe(true);
+  });
+
   it('preserves the pressure analytics preference', () => {
     expect(normalizeSettings({ matchAnalyticsView: 'pressure' })).toMatchObject(
       {
@@ -192,6 +205,121 @@ describe('Stats API domain', () => {
       '2026-08-08T00:00:01Z',
     ).current;
     expect(goal.events[0]?.payload.GoalSpeed).toBe(123.4);
+  });
+
+  it('excludes goal replay snapshots and gameplay events from match stats', () => {
+    const snapshot = (
+      bReplay: boolean,
+      touches: number,
+      score: number,
+      timeSeconds: number,
+    ) => ({
+      event: 'UpdateState',
+      data: {
+        MatchGuid: 'replay-stats',
+        Players: [
+          {
+            Name: 'Me',
+            PrimaryId: 'Steam|1|0',
+            Shortcut: 1,
+            TeamNum: 0,
+            Score: score * 100,
+            Goals: score,
+            Assists: score,
+            Saves: score,
+            Shots: score,
+            Touches: touches,
+            CarTouches: touches,
+            Demos: score,
+          },
+        ],
+        Game: {
+          PlaylistId: 11,
+          TimeSeconds: timeSeconds,
+          bReplay,
+          Teams: [
+            { TeamNum: 0, Score: score },
+            { TeamNum: 1, Score: 0 },
+          ],
+          Ball: { Speed: touches },
+        },
+      },
+    });
+    let value = reduceStatsEnvelope(
+      undefined,
+      snapshot(false, 10, 1, 180),
+    ).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'RoundStarted',
+      data: { MatchGuid: 'replay-stats' },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'BallHit',
+      data: {
+        MatchGuid: 'replay-stats',
+        Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+        Ball: { Location: { X: 0, Y: 0, Z: 100 } },
+      },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'GoalScored',
+      data: {
+        MatchGuid: 'replay-stats',
+        Scorer: { Name: 'Me', Shortcut: 1, TeamNum: 0 },
+      },
+    }).current;
+    value = reduceStatsEnvelope(value, {
+      event: 'GoalReplayStart',
+      data: { MatchGuid: 'replay-stats' },
+    }).current;
+
+    value = reduceStatsEnvelope(value, snapshot(true, 20, 2, 175)).current;
+    for (const eventName of [
+      'BallHit',
+      'CrossbarHit',
+      'StatfeedEvent',
+      'GoalScored',
+    ]) {
+      value = reduceStatsEnvelope(value, {
+        event: eventName,
+        data: {
+          MatchGuid: 'replay-stats',
+          Players: [{ Name: 'Me', Shortcut: 1, TeamNum: 0 }],
+          Ball: { Location: { X: 100, Y: 100, Z: 100 } },
+        },
+      }).current;
+    }
+
+    expect(value.isReplay).toBe(true);
+    expect(value.timeSeconds).toBe(180);
+    expect(value.ball?.speed).toBe(10);
+    expect(value.teams[0]?.score).toBe(1);
+    expect(value.participants[0]).toMatchObject({
+      score: 100,
+      goals: 1,
+      assists: 1,
+      saves: 1,
+      shots: 1,
+      touches: 10,
+      carTouches: 10,
+      demos: 1,
+    });
+    expect(value.events.map((event) => event.eventName)).toEqual([
+      'RoundStarted',
+      'BallHit',
+      'GoalScored',
+      'GoalReplayStart',
+    ]);
+    expect(playerTouchAnalytics(value, 'Steam|1|0').touches).toBe(1);
+
+    value = reduceStatsEnvelope(value, {
+      event: 'GoalReplayEnd',
+      data: { MatchGuid: 'replay-stats' },
+    }).current;
+    value = reduceStatsEnvelope(value, snapshot(false, 11, 1, 175)).current;
+    expect(value.isReplay).toBe(false);
+    expect(value.timeSeconds).toBe(175);
+    expect(value.participants[0]?.touches).toBe(11);
   });
 
   it('credits the prior toucher when the next valid touch is by a teammate', () => {
@@ -1839,8 +1967,13 @@ describe('Stats API domain', () => {
         MainTarget: { Name: 'Samara' },
       }),
       event(value.id, 6, 'PlayerLeft', { PlayerName: 'Saltie' }, 65),
-      event(value.id, 7, 'GoalReplayStart', {}, 65),
-      event(value.id, 8, 'GoalReplayEnd', {}, 65),
+      event(value.id, 7, 'CrossbarHit', {
+        BallLastTouch: { Player: { Name: 'Saltie', TeamNum: 1 } },
+        BallSpeed: 98.4,
+        ImpactForce: 122,
+      }),
+      event(value.id, 8, 'GoalReplayStart', {}, 65),
+      event(value.id, 9, 'GoalReplayEnd', {}, 65),
     ];
 
     const items = timelineDisplayItems(value, defaultSettings);
@@ -1853,14 +1986,19 @@ describe('Stats API domain', () => {
       'Saltie joined',
     ]);
     expect(items[0]?.parts[0]?.player?.teamNumber).toBe(1);
-    expect(
-      timelineDisplayItems(value, {
-        ...defaultSettings,
-        timelinePreset: 'everything',
-      })
-        .slice(0, 2)
-        .map((item) => item.parts[0]?.text),
-    ).toEqual(['Goal Replay End', 'Goal Replay Start']);
+    const everything = timelineDisplayItems(value, {
+      ...defaultSettings,
+      timelinePreset: 'everything',
+    });
+    expect(everything.slice(0, 2).map((item) => item.parts[0]?.text)).toEqual([
+      'Goal Replay End',
+      'Goal Replay Start',
+    ]);
+    const crossbar = everything.find((item) => item.id === 'timeline:7');
+    expect(crossbar?.parts.map((part) => part.text).join('')).toBe(
+      'Saltie hit the crossbar',
+    );
+    expect(crossbar?.technicalDetails).toContain('BallSpeed');
   });
 
   it('hides kickoff noise only from curated timelines and preserves technical details elsewhere', () => {

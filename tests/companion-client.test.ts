@@ -10,16 +10,35 @@ import {
 describe('companion pairing launch URL', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('returns to an allowlisted local development setup', () => {
-    vi.stubGlobal('location', { origin: 'http://localhost:5174' });
+  it('returns to the current loopback development setup on any port', () => {
+    vi.stubGlobal('location', { origin: 'http://localhost:43217' });
 
     expect(companionOpenUrl()).toBe(
-      'fennec://open?return_to=http%3A%2F%2Flocalhost%3A5174%2Fsetup',
+      'fennec://open?return_to=http%3A%2F%2Flocalhost%3A43217%2Fsetup',
     );
   });
 
+  it.each(['http://127.0.0.1:43217', 'http://[::1]:43217'])(
+    'returns to the loopback setup at %s',
+    (origin) => {
+      vi.stubGlobal('location', { origin });
+
+      expect(companionOpenUrl()).toBe(
+        `fennec://open?return_to=${encodeURIComponent(`${origin}/setup`)}`,
+      );
+    },
+  );
+
   it('falls back to production for an unknown browser origin', () => {
     vi.stubGlobal('location', { origin: 'https://preview.example' });
+
+    expect(companionOpenUrl()).toBe(
+      'fennec://open?return_to=https%3A%2F%2Fapp.fennec.gg%2Fsetup',
+    );
+  });
+
+  it('keeps the canonical production setup destination', () => {
+    vi.stubGlobal('location', { origin: 'https://app.fennec.gg' });
 
     expect(companionOpenUrl()).toBe(
       'fennec://open?return_to=https%3A%2F%2Fapp.fennec.gg%2Fsetup',

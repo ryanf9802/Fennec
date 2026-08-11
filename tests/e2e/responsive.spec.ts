@@ -1,4 +1,71 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+const autoOpenDisabled = new WeakSet<Page>();
+
+async function waitForAppEntrance(page: Page) {
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+}
+
+async function disableAutomaticLiveMatch(page: Page) {
+  if (autoOpenDisabled.has(page)) return;
+  if (page.url() === 'about:blank') {
+    await page.goto('/settings?demo=1');
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  }
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('fennec');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction('settings', 'readwrite');
+        const settings = transaction.objectStore('settings');
+        const request = settings.get('settings');
+        request.onsuccess = () => {
+          settings.put({
+            key: 'settings',
+            value: {
+              ...(request.result?.value ?? {}),
+              autoOpenLiveMatch: false,
+            },
+          });
+        };
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      });
+    } finally {
+      database.close();
+    }
+  });
+  autoOpenDisabled.add(page);
+}
+
+async function openDemoPage(page: Page, path: string) {
+  await disableAutomaticLiveMatch(page);
+  await page.goto(path);
+  await waitForAppEntrance(page);
+}
+
+async function openLiveDemo(page: Page, path = '/?demo=1') {
+  await page.goto(path);
+  await expect(page).toHaveURL(/\/live$/, { timeout: 5000 });
+  await waitForAppEntrance(page);
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.routeWebSocket(/^ws:\/\/127\.0\.0\.1:\d+\/?$/, (socket) =>
+    socket.close({ code: 1001, reason: 'E2E isolated' }),
+  );
+  await page.route('http://127.0.0.1:49125/**', (route) =>
+    route.fulfill({ status: 503 }),
+  );
+});
 
 test('landing page stays concise and usable across viewport sizes', async ({
   page,
@@ -15,9 +82,14 @@ test('landing page stays concise and usable across viewport sizes', async ({
         name: 'Your Rocket League games, remembered.',
       }),
     ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Open Fennec' }).first(),
-    ).toHaveAttribute('href', 'https://app.fennec.gg/');
+    const appLinks = page.locator('[data-fennec-app-link]');
+    await expect(appLinks).toHaveCount(3);
+    for (let index = 0; index < 3; index += 1) {
+      await expect(appLinks.nth(index)).toHaveAttribute(
+        'href',
+        `${new URL(page.url()).origin}/`,
+      );
+    }
     await expect(
       page.getByRole('link', { name: /GitHub/ }).first(),
     ).toBeVisible();
@@ -60,7 +132,7 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize(viewport);
-    await page.goto('/?demo=1');
+    await openDemoPage(page, '/?demo=1');
     await expect(
       page.getByRole('heading', { name: 'Game timeline' }),
     ).toBeVisible();
@@ -87,9 +159,7 @@ for (const viewport of [
 test('demo feed opens a live match and settings remain usable', async ({
   page,
 }) => {
-  await page.goto('/?demo=1');
-  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
-  await page.getByText('Live now').click();
+  await openLiveDemo(page);
   await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
   await expect(
     page.locator('main .eyebrow').filter({ hasText: /^live match$/i }),
@@ -168,16 +238,42 @@ test('demo feed opens a live match and settings remain usable', async ({
   await expect(page.getByRole('img', { name: /ball touch map/i })).toHaveCount(
     0,
   );
+  await disableAutomaticLiveMatch(page);
   await page.goto('/settings?demo=1');
+  await waitForAppEntrance(page);
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.getByLabel('WebSocket port')).toHaveValue('49124');
+});
+
+test('live match stays visible for an unrelated selected player', async ({
+  page,
+}) => {
+  await openLiveDemo(page);
+  await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
+
+  await disableAutomaticLiveMatch(page);
+  await page.evaluate(async () => {
+    const { saveProfile } = await import('../../src/data/database');
+    await saveProfile({
+      primaryId: 'Epic|archived-player|0',
+      displayName: 'Archived Player',
+    });
+  });
+
+  await page.goto('/?demo=1');
+  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
+  const liveLink = page.getByRole('link', { name: 'Live match' }).first();
+  await expect(liveLink).toBeVisible();
+  await liveLink.click();
+  await expect(page).toHaveURL(/\/live$/);
+  await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
 });
 
 test('dark is the default while system and light remain opt-in', async ({
   page,
 }) => {
   await page.emulateMedia({ colorScheme: 'light' });
-  await page.goto('/settings?demo=1');
+  await openDemoPage(page, '/settings?demo=1');
 
   const appearance = page.getByLabel('Appearance');
   await expect(appearance).toHaveValue('dark');
@@ -215,7 +311,7 @@ test('dark is the default while system and light remain opt-in', async ({
 });
 
 test('speed units default to km/h and persist as mph', async ({ page }) => {
-  await page.goto('/matches/demo-current-2?demo=1');
+  await openDemoPage(page, '/matches/demo-current-2?demo=1');
   const fastestHit = page.getByText('Fastest hit').locator('..');
   const maximumBallSpeed = page.getByText('Maximum ball speed').locator('..');
   await expect(fastestHit).toContainText('126 km/h');
@@ -239,13 +335,31 @@ test('pressure is an explainable responsive telemetry view', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/matches/demo-current-2?demo=1');
+  await openDemoPage(page, '/matches/demo-current-2?demo=1');
   await page.getByRole('tab', { name: 'Pressure' }).click();
 
   await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
+  await expect(page.getByText(/A pressure touch is unambiguous/)).toBeVisible();
   await expect(
-    page.getByText(/Pressure counts unambiguous touches/),
+    page.getByRole('region', { name: 'Team pressure comparison' }),
   ).toBeVisible();
+  const playerList = page.getByRole('list', {
+    name: 'Pressure and territory contribution by player',
+  });
+  await expect(playerList).toBeVisible();
+  await expect(playerList.getByRole('listitem')).toHaveCount(4);
+  await expect(playerList.getByText('Team contribution').first()).toBeVisible();
+  await expect(playerList.getByText('Avg territory').first()).toBeVisible();
+  const pressurePanel = page.locator('#ball-pressure-panel');
+  expect(
+    await pressurePanel.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
   const table = page.getByRole('table', {
     name: 'Pressure and territory contribution by player',
   });
@@ -257,17 +371,80 @@ test('pressure is an explainable responsive telemetry view', async ({
     table.getByRole('columnheader', { name: 'Avg territory' }),
   ).toBeVisible();
   expect(
-    await table
-      .locator('..')
-      .evaluate((element) => element.scrollWidth > element.clientWidth),
+    await pressurePanel.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
   ).toBe(true);
+});
+
+test('desktop match telemetry tabs stay inside the viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/matches/demo-current-2?demo=1');
+
+  const expectViewportContained = async () => {
+    const layout = await page.evaluate(() => {
+      const sidebar = document.querySelector('aside')!.getBoundingClientRect();
+      return {
+        clientHeight: document.documentElement.clientHeight,
+        scrollHeight: document.documentElement.scrollHeight,
+        scrollY: window.scrollY,
+        sidebarBottom: sidebar.bottom,
+      };
+    });
+    expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight);
+    expect(layout.scrollY).toBe(0);
+    expect(layout.sidebarBottom).toBe(layout.clientHeight);
+  };
+
+  await expect(
+    page.getByRole('heading', { name: 'Ball analytics' }),
+  ).toBeVisible();
+  await expectViewportContained();
+
+  await page.getByRole('tab', { name: 'Pressure' }).click();
+  await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
+  await expectViewportContained();
+  const scoreboard = page.locator('.scoreboard-container');
+  expect(
+    await scoreboard.evaluate(
+      (element) => element.scrollHeight > element.clientHeight,
+    ),
+  ).toBe(true);
+  const pressureRows = page
+    .getByRole('table', {
+      name: 'Pressure and territory contribution by player',
+    })
+    .getByRole('row');
+  await scoreboard.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(pressureRows.last()).toBeInViewport();
+  await expectViewportContained();
+
+  await page.getByRole('tab', { name: 'Touch map' }).click();
+  await expect(
+    page.getByRole('img', { name: /3d ball touch map/i }),
+  ).toBeVisible();
+  await expectViewportContained();
+
+  await page.getByRole('tab', { name: 'Pressure' }).click();
+  await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
+  await expectViewportContained();
+
+  await page.getByRole('tab', { name: 'Ball analytics' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Ball analytics' }),
+  ).toBeVisible();
+  await expectViewportContained();
 });
 
 test('3D touch map controls and preference persist across matches', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/matches/demo-current-2?demo=1');
+  await openDemoPage(page, '/matches/demo-current-2?demo=1');
   await expect(
     page.getByRole('heading', { name: 'Ball analytics' }),
   ).toBeVisible();
@@ -275,6 +452,13 @@ test('3D touch map controls and preference persist across matches', async ({
   await expect(
     page.getByRole('img', { name: /3d ball touch map/i }),
   ).toBeVisible();
+  await expect(page.getByTestId('ball-touch-map-loading-overlay')).toHaveCount(
+    0,
+  );
+  await expect(page.getByTestId('ball-touch-map-content')).not.toHaveAttribute(
+    'inert',
+    '',
+  );
   const viewport = page.getByTestId('ball-touch-map-viewport');
   await expect(
     viewport.getByText(
@@ -431,7 +615,7 @@ test('3D touch map controls and preference persist across matches', async ({
 test('custom team identity uses exact accents and theme-colored text', async ({
   page,
 }) => {
-  await page.goto('/matches/demo-history-1?demo=1');
+  await openDemoPage(page, '/matches/demo-history-1?demo=1');
   const neonHeader = page
     .locator('.scoreboard-team-header')
     .filter({ hasText: 'Neon Foxes' });
@@ -478,8 +662,54 @@ test('custom team identity uses exact accents and theme-colored text', async ({
   ).toHaveCSS('background-color', 'rgb(101, 217, 238)');
 });
 
+test('touch map stays behind the cinematic loader until its scene is ready', async ({
+  page,
+}) => {
+  let releaseModule: () => void = () => undefined;
+  const moduleGate = new Promise<void>((resolve) => {
+    releaseModule = resolve;
+  });
+  await page.route('**/src/components/BallTouchScene.tsx*', async (route) => {
+    await moduleGate;
+    await route.continue();
+  });
+
+  await openDemoPage(page, '/matches/demo-current-2?demo=1');
+  await page.getByRole('tab', { name: 'Touch map' }).click();
+
+  const loader = page.getByTestId('ball-touch-map-loading-overlay');
+  const frame = page.getByTestId('ball-touch-map-frame');
+  await expect(loader).toHaveAccessibleName('Loading 3D touch map');
+  await expect(page.getByTestId('ball-touch-map-content')).toHaveAttribute(
+    'inert',
+    '',
+  );
+  const loadingHeight = await frame.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+
+  releaseModule();
+  await expect(
+    page.getByRole('img', { name: /3d ball touch map/i }),
+  ).toBeVisible();
+  await expect(loader).toHaveAccessibleName('Opening 3D touch map');
+  await expect
+    .poll(() =>
+      frame.evaluate((element) => element.getBoundingClientRect().height),
+    )
+    .toBeCloseTo(loadingHeight, 1);
+  await expect(loader).toHaveCount(0);
+  expect(
+    await frame.evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeCloseTo(loadingHeight, 1);
+  await expect(page.getByTestId('ball-touch-map-content')).not.toHaveAttribute(
+    'inert',
+    '',
+  );
+});
+
 test('completed matches show continuous elapsed time', async ({ page }) => {
-  await page.goto('/matches/demo-current-2?demo=1');
+  await openDemoPage(page, '/matches/demo-current-2?demo=1');
   await expect(
     page.getByRole('heading', { name: 'Ranked Doubles' }),
   ).toBeVisible();
@@ -493,7 +723,7 @@ test('completed matches show continuous elapsed time', async ({ page }) => {
 });
 
 test('a historical match can be permanently deleted', async ({ page }) => {
-  await page.goto('/matches/demo-history-1?demo=1');
+  await openDemoPage(page, '/matches/demo-history-1?demo=1');
   await expect(page.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
   const matchInfo = page.locator('header p');
   await expect(matchInfo).toContainText('DFH Stadium');
@@ -516,7 +746,7 @@ test('ending a session moves the live game into a new session', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 760 });
-  await page.goto('/?demo=1');
+  await openDemoPage(page, '/?demo=1');
   await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
 
   await page.getByRole('button', { name: 'End session' }).click();
@@ -540,7 +770,7 @@ test('ending a session moves the live game into a new session', async ({
 test('settings show installation-relative Stats API instructions', async ({
   page,
 }) => {
-  await page.goto('/settings?demo=1');
+  await openDemoPage(page, '/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   const steps = page.getByRole('list', { name: 'Stats API setup steps' });
   await expect(steps).toBeVisible();
@@ -593,7 +823,7 @@ test('settings show installation-relative Stats API instructions', async ({
 test('settings keep companion after Sessions and omit timeline controls', async ({
   page,
 }) => {
-  await page.goto('/settings?demo=1');
+  await openDemoPage(page, '/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   const headings = await page
     .getByRole('heading', { level: 2 })
@@ -644,11 +874,19 @@ test('settings merge data management with an authoritative companion', async ({
         databaseBytes: 2_097_152,
         lastSyncedAt: '2026-08-10T12:00:00Z',
         updateStatus: 'current',
+        resourceUsage: {
+          cpuPercent: 0.2,
+          memoryBytes: 25 * 1024 * 1024,
+          recentPeakCpuPercent: 0.6,
+          recentPeakMemoryBytes: 28 * 1024 * 1024,
+          recentWindowSeconds: 60,
+          sampledAt: '2026-08-10T12:00:00Z',
+        },
       }),
     });
   });
 
-  await page.goto('/settings?demo=1');
+  await page.goto('/settings?demo=0');
 
   await expect(
     page.getByRole('heading', { name: 'Data and companion' }),
@@ -665,13 +903,19 @@ test('settings merge data management with an authoritative companion', async ({
   await expect(
     page.getByText('42 matches · 2.0 MB in the companion'),
   ).toBeVisible();
+  const footprint = page.getByLabel('Live companion footprint');
+  await expect(footprint).toContainText('Companion process only');
+  await expect(footprint).toContainText('0.2%');
+  await expect(footprint).toContainText('0.6% 1 min peak');
+  await expect(footprint).toContainText('25.0 MiB');
+  await expect(footprint).toContainText('28.0 MiB 1 min peak');
   await expect(page.getByText(/stay in this browser/i)).toHaveCount(0);
 });
 
 test('browser-only setup uses instructions and follows the Stats API connection', async ({
   page,
 }) => {
-  await page.goto('/onboarding?demo=1');
+  await openDemoPage(page, '/onboarding?demo=1');
   await page.getByRole('button', { name: /Browser only/ }).click();
 
   const requirement = page
@@ -739,6 +983,7 @@ test('previously verified browser setup stays complete while Rocket League is cl
     localStorage.setItem('fennec-stats-api-verified-v1', 'true');
   });
   await page.goto('/setup?demo=0');
+  await waitForAppEntrance(page);
 
   const requirement = page
     .getByRole('listitem')
@@ -778,6 +1023,7 @@ test('PWA identity uses only the Fennec name', async ({ page }) => {
 });
 
 test('document loads use the cinematic app entrance', async ({ page }) => {
+  await disableAutomaticLiveMatch(page);
   await page.goto('/?demo=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('html')).toHaveAttribute(
     'data-app-entrance',
@@ -819,6 +1065,14 @@ test('document loads use the cinematic app entrance', async ({ page }) => {
 test('setup starts with a centered route choice and expands after selection', async ({
   page,
 }) => {
+  let delayHealthCheck = true;
+  await page.route('http://127.0.0.1:49125/health', async (route) => {
+    if (delayHealthCheck) {
+      delayHealthCheck = false;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    await route.fulfill({ status: 503 });
+  });
   await page.goto('/setup?demo=0');
   const companion = page.getByRole('button', { name: /With companion/ });
   const browser = page.getByRole('button', { name: /Browser only/ });
@@ -844,6 +1098,19 @@ test('setup starts with a centered route choice and expands after selection', as
   ).toHaveCount(0);
   await expect(page.getByText('Setup instructions')).toHaveCount(0);
 
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+  await page.evaluate(() => {
+    const content = document.querySelector('.app-entrance-content');
+    if (!content) throw new Error('App entrance content was not mounted.');
+    document.documentElement.dataset.setupContentDetached = 'false';
+    new MutationObserver(() => {
+      if (!content.isConnected)
+        document.documentElement.dataset.setupContentDetached = 'true';
+    }).observe(document.body, { childList: true, subtree: true });
+  });
   await companion.click();
   await expect(
     page.getByRole('heading', { name: 'Connect Fennec' }),
@@ -869,14 +1136,16 @@ test('setup starts with a centered route choice and expands after selection', as
   await expect(
     page.getByText('Storefront detection starts after the companion responds.'),
   ).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-setup-content-detached',
+    'false',
+  );
   await expect(
     page.getByRole('link', { name: 'Open installed companion' }),
   ).toHaveAttribute(
     'href',
     `fennec://open?return_to=${encodeURIComponent(
-      ['5173', '5174'].includes(new URL(page.url()).port)
-        ? `${new URL(page.url()).origin}/setup`
-        : 'https://app.fennec.gg/setup',
+      `${new URL(page.url()).origin}/setup`,
     )}`,
   );
   await expect(
@@ -920,6 +1189,100 @@ test('incomplete first launch opens Setup and completed setup links to Game time
   await expect(page).toHaveURL(/\/$/);
   await expect(
     page.getByRole('heading', { name: 'Game timeline' }),
+  ).toBeVisible();
+});
+
+test('setup presents app data protection as optional and completes it when granted', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let protectedStorage = false;
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        estimate: async () => ({ usage: 0, quota: 1_073_741_824 }),
+        persisted: async () => protectedStorage,
+        persist: async () => {
+          protectedStorage = true;
+          return true;
+        },
+      },
+    });
+  });
+  await disableAutomaticLiveMatch(page);
+  await page.goto('/setup?demo=1');
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+  await page.getByRole('button', { name: /Browser only/ }).click();
+
+  const protection = page.locator('[data-storage-protection-state]');
+  await expect(protection).toHaveAttribute(
+    'data-storage-protection-state',
+    'recommended',
+  );
+  await expect(protection.getByText('Highly recommended')).toBeVisible();
+  await expect(protection.locator('svg.text-fennec-cyan')).toBeVisible();
+  await expect(protection.locator('.lucide-triangle-alert')).toHaveCount(0);
+  await expect(protection.getByText(/not a backup/i)).toBeVisible();
+  await expect(
+    protection.getByText(/match history, selected player, and settings/i),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toBeVisible();
+
+  await protection.getByRole('button', { name: 'Protect app data' }).click();
+  await expect(protection).toHaveAttribute(
+    'data-storage-protection-state',
+    'protected',
+  );
+  await expect(
+    protection.getByText('Browser storage protection is on.'),
+  ).toBeVisible();
+  await expect(protection.locator('svg.text-emerald-400')).toBeVisible();
+
+  await page.getByRole('button', { name: /With companion/ }).click();
+  await expect(
+    protection.getByText(/companion remains the durable copy/i),
+  ).toBeVisible();
+});
+
+test('declined app data protection stays neutral and does not block setup', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        estimate: async () => ({ usage: 0, quota: 1_073_741_824 }),
+        persisted: async () => false,
+        persist: async () => false,
+      },
+    });
+  });
+  await disableAutomaticLiveMatch(page);
+  await page.goto('/setup?demo=1');
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+  await page.getByRole('button', { name: /Browser only/ }).click();
+
+  const protection = page.locator('[data-storage-protection-state]');
+  await protection.getByRole('button', { name: 'Protect app data' }).click();
+  await expect(
+    protection.getByText(/browser did not grant protection/i),
+  ).toBeVisible();
+  await expect(protection).toHaveAttribute(
+    'data-storage-protection-state',
+    'recommended',
+  );
+  await expect(protection.locator('svg.text-fennec-cyan')).toBeVisible();
+  await expect(protection.locator('.lucide-triangle-alert')).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
   ).toBeVisible();
 });
 
@@ -975,22 +1338,30 @@ test('selected setup path reactively controls desktop and mobile navigation', as
   page,
 }) => {
   await page.addInitScript(() => {
+    localStorage.removeItem('fennec-companion-setup-complete-v1');
+    localStorage.removeItem('fennec-companion-capture-verified-v1');
+    localStorage.removeItem('fennec-companion-cursor');
     if (!localStorage.getItem('fennec-setup-path-explicit-v2'))
       localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
     localStorage.setItem('fennec-stats-api-verified-v1', 'true');
   });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/settings?demo=0');
+  await waitForAppEntrance(page);
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(
     page.locator('aside').getByRole('link', { name: 'Setup' }),
   ).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Open setup' }).click();
+  await waitForAppEntrance(page);
   await expect(
     page.locator('aside').getByRole('link', { name: 'Setup' }),
   ).toBeVisible();
   await page.getByRole('button', { name: /With companion/ }).click();
+  await expect(
+    page.getByRole('button', { name: /With companion/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
 
   await expect(page.locator('aside').getByLabel('Games')).toHaveAttribute(
     'aria-disabled',
@@ -1082,7 +1453,7 @@ test('settings companion pairing link selects the companion setup guide', async 
   await page.addInitScript(() => {
     localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
   });
-  await page.goto('/settings?demo=1');
+  await openDemoPage(page, '/settings?demo=1');
 
   const setupLink = page.getByRole('link', { name: 'Setup center' });
   await expect(setupLink).toHaveAttribute('href', '/setup?path=companion');
@@ -1176,6 +1547,80 @@ test('paired setup exposes companion launch preferences', async ({ page }) => {
   ).toBeVisible();
 });
 
+test('one configured storefront completes its companion setup step and remains reconfigurable', async ({
+  page,
+}) => {
+  let configuredStores: Array<'steam' | 'epic'> = [];
+  let steamConfigureCommands = 0;
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-companion-token', 'e2e-token');
+  });
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/permission-probe') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    if (path === '/commands/configure-steam') {
+      steamConfigureCommands += 1;
+      configuredStores = ['steam'];
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        version: '0.2.1',
+        protocolVersion: 1,
+        paired: path === '/status',
+        gameRunning: false,
+        feedConnected: false,
+        lastPacketAt: '2026-08-09T00:00:00Z',
+        stores: ['steam', 'epic'],
+        configuredStores,
+        launchOnStartup: false,
+        updateStatus: 'current',
+      }),
+    });
+  });
+
+  await page.goto('/setup?demo=0');
+  await page.getByRole('button', { name: /With companion/ }).click();
+
+  const installationStep = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Detect and configure Steam or Epic' });
+  await expect(
+    installationStep.locator('svg.text-fennec-orange'),
+  ).toBeVisible();
+  await installationStep
+    .getByRole('button', { name: 'Configure Steam' })
+    .click();
+
+  const reconfigureSteam = installationStep.getByRole('button', {
+    name: 'Reconfigure Steam',
+  });
+  await expect(installationStep.locator('svg.text-emerald-400')).toBeVisible();
+  await expect(reconfigureSteam).toHaveClass(/button-loaded/);
+  await expect(reconfigureSteam).toBeEnabled();
+  await expect(
+    installationStep.getByRole('button', { name: 'Configure Epic' }),
+  ).toBeVisible();
+  await expect(
+    installationStep.getByText(
+      'Detected Steam and Epic. Steam configuration is verified. Configure Epic too if you use it.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Companion setup is complete for Steam. Fennec can capture matches in the background.',
+    ),
+  ).toBeVisible();
+
+  await reconfigureSteam.click();
+  await expect.poll(() => steamConfigureCommands).toBe(2);
+});
+
 test('companion incompatibility is an actionable pairing error', async ({
   page,
 }) => {
@@ -1228,7 +1673,7 @@ test('companion incompatibility is an actionable pairing error', async ({
 });
 
 test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
-  await page.goto('/?demo=1');
+  await openDemoPage(page, '/?demo=1');
   await expect(page.getByText('Past sessions')).toBeVisible();
   await expect(
     page.getByText('Teammates:', { exact: true }).first(),
@@ -1243,7 +1688,7 @@ test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
 test('session summaries expose recurring teammates and full history in place', async ({
   page,
 }) => {
-  await page.goto('/?demo=1');
+  await openDemoPage(page, '/?demo=1');
   const currentSession = page.locator('section').filter({
     has: page.getByRole('heading', { name: 'Current session' }),
   });
@@ -1344,7 +1789,7 @@ test('session summaries expose recurring teammates and full history in place', a
 test('match back navigation returns to its session or the game timeline', async ({
   page,
 }) => {
-  await page.goto('/?demo=1');
+  await openDemoPage(page, '/?demo=1');
   await page
     .getByRole('link', { name: 'View current session details' })
     .click();
@@ -1363,7 +1808,7 @@ test('match back navigation returns to its session or the game timeline', async 
 test('profile player selection is searchable and explicit', async ({
   page,
 }) => {
-  await page.goto('/profile?demo=1');
+  await openDemoPage(page, '/profile?demo=1');
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
   const readProfileSessionCaches = () =>
     page.evaluate(async () => {
@@ -1440,7 +1885,7 @@ test('profile player selection is searchable and explicit', async ({
 test('session summaries show goal difference while detail adds the score totals', async ({
   page,
 }) => {
-  await page.goto('/?demo=1');
+  await openDemoPage(page, '/?demo=1');
   const history = page.locator('section').filter({
     has: page.getByRole('heading', { name: 'Past sessions' }),
   });
@@ -1461,7 +1906,7 @@ test('session summaries show goal difference while detail adds the score totals'
 
 test('primary pages use the same full content width', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/?demo=1');
+  await openDemoPage(page, '/?demo=1');
   await expect(
     page.getByRole('heading', { name: 'Game timeline' }),
   ).toBeVisible();
@@ -1499,6 +1944,7 @@ test('settings save action floats above mobile navigation while dirty', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 760 });
+  await disableAutomaticLiveMatch(page);
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute(
@@ -1548,8 +1994,8 @@ test('settings save action floats above mobile navigation while dirty', async ({
 test('primary pages reserve a stable root scrollbar gutter', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1440, height: 1100 });
-  await page.goto('/?demo=1');
+  await page.setViewportSize({ width: 1440, height: 1400 });
+  await openDemoPage(page, '/?demo=1');
   await expect(
     page.getByRole('heading', { name: 'Game timeline' }),
   ).toBeVisible();
@@ -1564,6 +2010,7 @@ test('primary pages reserve a stable root scrollbar gutter', async ({
 
   await page.goto('/settings?demo=1');
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await waitForAppEntrance(page);
   const settings = await page.evaluate(() => ({
     mainWidth: document.querySelector('main')!.getBoundingClientRect().width,
     rootScrolls:
@@ -1579,11 +2026,7 @@ test('desktop sidebar connection status fits and stays meaningful when collapsed
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 620 });
-  await page.goto('/?demo=1');
-  await expect(page.locator('html')).toHaveAttribute(
-    'data-app-entrance-state',
-    'complete',
-  );
+  await openLiveDemo(page);
   const sidebar = page.locator('aside');
   const home = sidebar.getByRole('link', { name: 'Fennec home' });
   const brandRow = home.locator('..');
@@ -1668,9 +2111,7 @@ test('scoreboard columns align and the desktop timeline scrolls independently', 
   page,
 }) => {
   await page.setViewportSize({ width: 1920, height: 780 });
-  await page.goto('/?demo=1');
-  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
-  await page.getByText('Live now').click();
+  await openLiveDemo(page);
   const scoreHeader = page
     .getByRole('columnheader', {
       name: 'Score',
@@ -1709,9 +2150,7 @@ test('wide split-layout scoreboards preserve readable player names', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 780 });
-  await page.goto('/?demo=1');
-  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
-  await page.getByText('Live now').click();
+  await openLiveDemo(page);
   const scoreboardScroller = page.locator('.scoreboard-scroller');
   const dimensions = () =>
     scoreboardScroller.evaluate((element) => ({
@@ -1767,9 +2206,7 @@ test('scrollable areas use compact theme-aware scrollbars', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1920, height: 620 });
-  await page.goto('/?demo=1');
-  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
-  await page.getByText('Live now').click();
+  await openLiveDemo(page);
   const styles = await page
     .locator('.timeline-scroller')
     .evaluate((element) => ({
@@ -1801,9 +2238,7 @@ test('scrollable areas use compact theme-aware scrollbars', async ({
 
 test('mobile scoreboard scroll stays inside the page', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 760 });
-  await page.goto('/?demo=1');
-  await expect(page.getByText('Live now')).toBeVisible({ timeout: 5000 });
-  await page.getByText('Live now').click();
+  await openLiveDemo(page);
   const scoreboardScroller = page.locator('.scoreboard-scroller');
   const dimensions = await scoreboardScroller.evaluate((element) => ({
     scroll: element.scrollWidth,
@@ -1834,12 +2269,6 @@ test('mobile scoreboard scroll stays inside the page', async ({ page }) => {
   }
 });
 
-test('auto-open remains opt-in and navigates when enabled', async ({
-  page,
-}) => {
-  await page.goto('/settings?demo=1');
-  await expect(page).toHaveURL(/settings/);
-  await page.getByLabel('Automatically open the live monitor').check();
-  await page.getByRole('button', { name: 'Save settings' }).click();
-  await expect(page).toHaveURL(/\/live/, { timeout: 5000 });
+test('auto-open navigates to the live monitor by default', async ({ page }) => {
+  await openLiveDemo(page, '/settings?demo=1');
 });

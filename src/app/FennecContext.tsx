@@ -9,8 +9,11 @@ import {
   type ReactNode,
 } from 'react';
 import { recoverActiveMatch, reduceStatsEnvelope } from '../domain/reducer';
-import { playerKeyForPrimaryId } from '../domain/playerIdentity';
-import { isHistoryEligibleMatch } from '../domain/playlists';
+import {
+  isTrackablePrimaryId,
+  playerKeyForPrimaryId,
+} from '../domain/playerIdentity';
+import { isHistoryEligibleMatch, isTrainingMatch } from '../domain/playlists';
 import {
   defaultSettings,
   normalizeSettings,
@@ -53,6 +56,7 @@ interface FennecContextValue {
   ready: boolean;
   activeMatch?: MatchState;
   profile?: FennecProfile;
+  sessionPlayerCandidates: FennecProfile[];
   settings: FennecSettings;
   connection: FeedConnectionState;
   statsApiVerified: boolean;
@@ -107,6 +111,9 @@ export function FennecProvider({
   const [ready, setReady] = useState(false);
   const [activeMatch, setActiveMatch] = useState<MatchState>();
   const [profile, setProfile] = useState<FennecProfile>();
+  const [sessionPlayerCandidates, setSessionPlayerCandidates] = useState<
+    FennecProfile[]
+  >([]);
   const [settings, setSettings] = useState<FennecSettings>(defaultSettings);
   const [connection, setConnection] = useState<FeedConnectionState>('stopped');
   const [statsApiVerified, setStatsApiVerified] = useState(
@@ -273,6 +280,31 @@ export function FennecProvider({
       onEnvelope: async (envelope) => {
         const previous = activeRef.current;
         const result = reduceStatsEnvelope(previous, envelope);
+        const trainingMatches = [result.superseded, result.current].filter(
+          (match): match is MatchState => !!match && isTrainingMatch(match),
+        );
+        if (trainingMatches.length)
+          setSessionPlayerCandidates((current) => {
+            const next = new Map(
+              current.map((candidate) => [candidate.primaryId, candidate]),
+            );
+            for (const match of trainingMatches)
+              for (const participant of match.participants)
+                if (isTrackablePrimaryId(participant.primaryId))
+                  next.set(participant.primaryId, {
+                    primaryId: participant.primaryId,
+                    displayName: participant.name,
+                  });
+            const candidates = [...next.values()];
+            return candidates.length === current.length &&
+              candidates.every(
+                (candidate, index) =>
+                  candidate.primaryId === current[index]?.primaryId &&
+                  candidate.displayName === current[index]?.displayName,
+              )
+              ? current
+              : candidates;
+          });
         if (!result.current.observedByPrimaryId && profileRef.current)
           result.current.observedByPrimaryId = profileRef.current.primaryId;
         activeRef.current = result.current;
@@ -457,6 +489,7 @@ export function FennecProvider({
       ready,
       activeMatch,
       profile,
+      sessionPlayerCandidates,
       settings,
       connection,
       statsApiVerified,
@@ -475,6 +508,7 @@ export function FennecProvider({
       ready,
       activeMatch,
       profile,
+      sessionPlayerCandidates,
       settings,
       connection,
       statsApiVerified,

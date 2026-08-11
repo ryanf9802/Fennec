@@ -12,6 +12,7 @@ import { useFennec } from '../app/FennecContext';
 import { useAppEntrance } from '../components/AppEntrance';
 import { CompanionLaunchControls } from '../components/CompanionSettings';
 import { StatsApiSetup } from '../components/StatsApiSetup';
+import { StorageProtection } from '../components/StorageProtection';
 import {
   acceptCompanionPairing,
   companionCommand,
@@ -22,7 +23,7 @@ import { isStatsApiConnected } from '../domain/connectionPresentation';
 import { useLocalAccess } from '../platform/LocalAccessContext';
 import {
   companionCompatible,
-  companionStoresConfigured,
+  companionHasConfiguredStore,
   requestedSetupPath,
   storedCompanionCaptureVerification,
   storedCompanionSetupCompletion,
@@ -182,17 +183,25 @@ export function OnboardingPage() {
   const paired = Boolean(health?.paired);
   const compatible = companionCompatible(health);
   const statsApiConnected = isStatsApiConnected(connection);
-  const storesConfigured = companionStoresConfigured(health);
+  const hasConfiguredStore = companionHasConfiguredStore(health);
   const companionCaptureVerified =
     Boolean(health?.lastPacketAt) || storedCompanionCaptureVerification();
   const companionSetupVerified = storedCompanionSetupCompletion();
   const isComplete = demoMode || setup.state === 'complete';
   const pairingComplete = health ? compatible : companionSetupVerified;
   const installationConfigured = health
-    ? storesConfigured
+    ? hasConfiguredStore
     : companionSetupVerified;
-  const configuredStores = health?.stores
+  const detectedStores = health?.stores
     ?.map((store) => (store === 'steam' ? 'Steam' : 'Epic'))
+    .join(' and ');
+  const configuredStores = health?.stores
+    ?.filter((store) => health.configuredStores?.includes(store))
+    .map((store) => (store === 'steam' ? 'Steam' : 'Epic'));
+  const configuredStoreNames = configuredStores?.join(' and ');
+  const unconfiguredStoreNames = health?.stores
+    ?.filter((store) => !health.configuredStores?.includes(store))
+    .map((store) => (store === 'steam' ? 'Steam' : 'Epic'))
     .join(' and ');
   const configureStore = async (store: 'steam' | 'epic') => {
     setConfiguring(store);
@@ -261,6 +270,10 @@ export function OnboardingPage() {
               </>
             )}
           </Requirement>
+          <StorageProtection
+            companionBacked={path === 'companion'}
+            layout="setup"
+          />
           {path === 'companion' ? (
             <>
               <Requirement
@@ -298,26 +311,46 @@ export function OnboardingPage() {
                     ? 'Installation configuration was verified previously. Start the companion to recheck it.'
                     : 'Storefront detection starts after the companion responds.'
                   : health.stores?.length
-                    ? `Detected ${health.stores.join(' and ')}. ${health.stores.every((store) => health.configuredStores?.includes(store)) ? 'Stats API configuration is verified.' : 'Configure each installation you use.'}`
+                    ? configuredStoreNames
+                      ? `Detected ${detectedStores}. ${configuredStoreNames} ${configuredStores?.length === 1 ? 'configuration is' : 'configurations are'} verified.${unconfiguredStoreNames ? ` Configure ${unconfiguredStoreNames} too if you use it.` : ''}`
+                      : `Detected ${detectedStores}. Configure at least one installation you use.`
                     : 'The companion did not find a supported Steam or Epic installation.'}
                 {health?.stores?.length ? (
                   <div className="mt-3 flex flex-wrap gap-3">
                     {health.stores?.includes('steam') && (
                       <button
-                        className="button-secondary"
+                        className={
+                          health.configuredStores?.includes('steam')
+                            ? 'button-loaded'
+                            : 'button-secondary'
+                        }
                         disabled={Boolean(configuring)}
                         onClick={() => void configureStore('steam')}
                       >
-                        Configure Steam
+                        {health.configuredStores?.includes('steam') && (
+                          <CheckCircle2 aria-hidden="true" className="size-4" />
+                        )}
+                        {health.configuredStores?.includes('steam')
+                          ? 'Reconfigure Steam'
+                          : 'Configure Steam'}
                       </button>
                     )}
                     {health.stores?.includes('epic') && (
                       <button
-                        className="button-secondary"
+                        className={
+                          health.configuredStores?.includes('epic')
+                            ? 'button-loaded'
+                            : 'button-secondary'
+                        }
                         disabled={Boolean(configuring)}
                         onClick={() => void configureStore('epic')}
                       >
-                        Configure Epic
+                        {health.configuredStores?.includes('epic') && (
+                          <CheckCircle2 aria-hidden="true" className="size-4" />
+                        )}
+                        {health.configuredStores?.includes('epic')
+                          ? 'Reconfigure Epic'
+                          : 'Configure Epic'}
                       </button>
                     )}
                   </div>
@@ -411,7 +444,7 @@ export function OnboardingPage() {
               </h2>
               <p className="text-muted mt-1 text-sm">
                 {path === 'companion'
-                  ? `Companion setup is complete${configuredStores ? ` for ${configuredStores}` : ''}. Fennec can capture matches in the background.`
+                  ? `Companion setup is complete${configuredStoreNames ? ` for ${configuredStoreNames}` : ''}. Fennec can capture matches in the background.`
                   : 'Browser-only setup is complete. Start Rocket League and keep Fennec open while you play to capture matches.'}
               </p>
               <span className="mt-3 inline-block text-sm font-bold text-emerald-300">

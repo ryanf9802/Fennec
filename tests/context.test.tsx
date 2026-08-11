@@ -125,6 +125,19 @@ function ProfileSwitchProbe() {
   );
 }
 
+function SessionPlayerCandidatesProbe() {
+  const { sessionPlayerCandidates } = useFennec();
+  return (
+    <div>
+      {sessionPlayerCandidates.map((candidate) => (
+        <span key={candidate.primaryId}>
+          {candidate.displayName}:{candidate.primaryId}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function clockUpdate(timeSeconds: number): StatsEnvelope {
   return {
     event: 'ClockUpdatedSeconds',
@@ -216,6 +229,7 @@ describe('Fennec live state', () => {
     render(
       <FennecProvider>
         <LiveStateProbe />
+        <SessionPlayerCandidatesProbe />
       </FennecProvider>,
     );
     await waitFor(() => expect(mocks.handlers).toBeDefined());
@@ -246,6 +260,31 @@ describe('Fennec live state', () => {
     ).toBeInTheDocument();
     expect(mocks.savedMatches).toEqual([]);
     expect(mocks.checkpoints).toEqual([]);
+    expect(screen.getByText('Viewer:Steam|viewer|0')).toBeInTheDocument();
+
+    await act(async () => {
+      await mocks.handlers!.onEnvelope({
+        event: 'UpdateState',
+        data: {
+          Players: [
+            {
+              Name: 'Unknown player',
+              PrimaryId: 'Unknown|0|0',
+              Shortcut: 2,
+              TeamNum: 0,
+            },
+          ],
+          Game: { PlaylistId: 9, TimeSeconds: 299 },
+        },
+      });
+      await mocks.handlers!.onEnvelope({
+        event: 'MatchDestroyed',
+        data: { MatchGuid: '' },
+      });
+    });
+
+    expect(screen.getByText('Viewer:Steam|viewer|0')).toBeInTheDocument();
+    expect(screen.queryByText(/Unknown\|0\|0/)).not.toBeInTheDocument();
   });
 
   it('restores companion-owned settings and profile into a cleared browser', async () => {

@@ -14,11 +14,13 @@ import { Link } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import {
   CompanionLaunchControls,
+  CompanionResourceMonitor,
   CompanionSettings,
 } from '../components/CompanionSettings';
 import { StatsApiSetup } from '../components/StatsApiSetup';
 import { ConnectionStatus } from '../components/ConnectionStatus';
 import { LocalNetworkAccessHelp } from '../components/LocalNetworkAccessHelp';
+import { StorageProtection } from '../components/StorageProtection';
 import {
   createBackup,
   downloadText,
@@ -171,17 +173,6 @@ export function SettingsPage() {
     );
   };
 
-  const protectStorage = async () => {
-    if (!navigator.storage?.persist) return;
-    const granted = await navigator.storage.persist();
-    await storageQuery.refetch();
-    setMessage(
-      granted
-        ? 'Persistent browser storage granted.'
-        : 'The browser kept this origin in best-effort storage.',
-    );
-  };
-
   const rebuildCache = async () => {
     try {
       await rebuildBrowserCache();
@@ -208,6 +199,7 @@ export function SettingsPage() {
 
   const dataControls = (
     <>
+      <StorageProtection companionBacked={companionReady} layout="settings" />
       {storage?.usage !== undefined && (
         <p className="text-muted mt-2 text-sm">
           Browser cache: {(storage.usage / 1_048_576).toFixed(1)} MB
@@ -221,14 +213,6 @@ export function SettingsPage() {
         </p>
       )}
       <div className="mt-5 flex flex-wrap gap-3">
-        {storage && !storage.persisted && (
-          <button
-            className="button-secondary"
-            onClick={() => void protectStorage()}
-          >
-            Protect offline cache
-          </button>
-        )}
         <button className="button-secondary" onClick={() => void exportJson()}>
           <FileJson className="size-4" />
           Export backup
@@ -361,11 +345,17 @@ export function SettingsPage() {
             </select>
           </label>
         </div>
-        <label className="mt-5 flex max-w-2xl cursor-pointer items-start gap-3">
+        <label
+          className={`mt-5 flex max-w-2xl items-start gap-3 ${profile ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+        >
           <input
             type="checkbox"
             className="mt-1 size-4 accent-cyan-400"
             checked={draft.autoOpenLiveMatch}
+            disabled={!profile}
+            aria-describedby={
+              profile ? undefined : 'auto-open-live-player-required'
+            }
             onChange={(event) =>
               patchDraft({ autoOpenLiveMatch: event.target.checked })
             }
@@ -373,11 +363,28 @@ export function SettingsPage() {
           <span>
             <strong>Automatically open the live monitor</strong>
             <span className="text-muted mt-1 block text-sm">
-              Off by default. An active game is otherwise highlighted until you
-              open it.
+              On by default. Turn this off to keep an active game highlighted
+              until you open it.
             </span>
           </span>
         </label>
+        {!profile && (
+          <p
+            id="auto-open-live-player-required"
+            role="note"
+            className="mt-3 max-w-2xl rounded-xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm"
+          >
+            <strong>Player required.</strong> Select your player before Fennec
+            can automatically open the live monitor.{' '}
+            <Link
+              className="font-bold text-fennec-cyan underline decoration-cyan-300/50 underline-offset-4"
+              to="/profile#player-selection"
+            >
+              Choose your player
+            </Link>
+            .
+          </p>
+        )}
       </section>
 
       {companionReady && companion.health ? (
@@ -425,6 +432,7 @@ export function SettingsPage() {
           </div>
           {dataControls}
           <div className="mt-7 border-t border-white/10 pt-6">
+            <CompanionResourceMonitor usage={companion.health.resourceUsage} />
             <CompanionLaunchControls
               health={companion.health}
               recheck={companion.recheck}

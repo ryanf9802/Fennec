@@ -1,15 +1,35 @@
 import { Check, Search, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { useFennec } from '../app/FennecContext';
-import { playerKeyForPrimaryId } from '../domain/playerIdentity';
+import {
+  normalizePlayerName,
+  playerKeyForPrimaryId,
+} from '../domain/playerIdentity';
+import type { FennecProfile } from '../domain/types';
 import { useOverview, usePlayers } from '../data/historyQueries';
+
+function mergePlayerOptions(
+  historical: Array<{ primaryId?: string; latestName: string }>,
+  sessionCandidates: FennecProfile[],
+): FennecProfile[] {
+  const options = new Map<string, FennecProfile>();
+  for (const player of historical)
+    if (player.primaryId)
+      options.set(player.primaryId, {
+        primaryId: player.primaryId,
+        displayName: player.latestName,
+      });
+  for (const candidate of sessionCandidates)
+    options.set(candidate.primaryId, candidate);
+  return [...options.values()];
+}
 
 /**
  * Lists trackable platform identities, shows profile-scoped statistics, and
  * persists the player whose perspective drives the rest of Fennec.
  */
 export function ProfilePage() {
-  const { profile, selectProfile } = useFennec();
+  const { profile, selectProfile, sessionPlayerCandidates = [] } = useFennec();
   const [searchDraft, setSearch] = useState<string>();
   const [selectedDraft, setSelected] = useState<string>();
   const [open, setOpen] = useState(false);
@@ -20,14 +40,21 @@ export function ProfilePage() {
   const availablePlayersQuery = usePlayers('', true);
   const playersQuery = usePlayers(search, true);
   const overviewQuery = useOverview(playerKeyForPrimaryId(profile?.primaryId));
-  const availablePlayers = availablePlayersQuery.data ?? [];
-  const players = (playersQuery.data ?? [])
-    .filter((player) => !!player.primaryId)
-    .map((player) => ({
-      primaryId: player.primaryId!,
-      displayName: player.latestName,
-    }))
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const availablePlayers = mergePlayerOptions(
+    availablePlayersQuery.data ?? [],
+    sessionPlayerCandidates,
+  );
+  const normalizedSearch = normalizePlayerName(search) ?? '';
+  const matchingSessionCandidates = sessionPlayerCandidates.filter(
+    (candidate) =>
+      (normalizePlayerName(candidate.displayName) ?? '').startsWith(
+        normalizedSearch,
+      ),
+  );
+  const players = mergePlayerOptions(
+    playersQuery.data ?? [],
+    matchingSessionCandidates,
+  ).sort((a, b) => a.displayName.localeCompare(b.displayName));
   const hasPlayers = availablePlayers.length > 0;
   const hasSelectionChange =
     selected.length > 0 && selected !== (profile?.primaryId ?? '');
@@ -41,13 +68,13 @@ export function ProfilePage() {
     setSaved(false);
   };
   const saveSelection = () => {
-    const next = [...availablePlayers, ...(playersQuery.data ?? [])].find(
+    const next = [...availablePlayers, ...players].find(
       (item) => item.primaryId === selected,
     );
-    if (next?.primaryId)
+    if (next)
       void selectProfile({
         primaryId: next.primaryId,
-        displayName: next.latestName,
+        displayName: next.displayName,
       }).then(() => setSaved(true));
   };
   const trackingSince = overviewQuery.data?.firstMatchStartedAt
@@ -100,8 +127,9 @@ export function ProfilePage() {
       >
         <h2 className="text-xl font-extrabold">Select your player</h2>
         <p className="text-muted mt-2 max-w-2xl">
-          Players appear after Fennec receives a match. Changing this selection
-          updates games, sessions, and summaries without altering local history.
+          Players appear after Fennec receives training or a match. Changing
+          this selection updates games, sessions, and summaries without altering
+          local history.
         </p>
         {!profile && (
           <p className="mt-3 max-w-2xl font-bold text-fennec-cyan">
@@ -129,7 +157,7 @@ export function ProfilePage() {
                   ? 'Loading players…'
                   : hasPlayers
                     ? 'Search players by display name'
-                    : 'Play a match to discover players'
+                    : 'Start training or play a match to discover players'
               }
               disabled={!hasPlayers && !availablePlayersQuery.isLoading}
               value={search}
@@ -204,7 +232,7 @@ export function ProfilePage() {
         </div>
         {!hasPlayers && !availablePlayersQuery.isLoading && (
           <p className="text-muted mt-3 text-sm">
-            Play a match to discover players.
+            Start training or play a match to discover players.
           </p>
         )}
         {saved && (

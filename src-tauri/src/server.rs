@@ -16,11 +16,15 @@ use axum::{
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::VecDeque,
     sync::{Arc, RwLock},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::broadcast;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
+
+const RESOURCE_SAMPLE_INTERVAL: Duration = Duration::from_secs(5);
+const RESOURCE_WINDOW: Duration = Duration::from_secs(60);
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,14 +64,110 @@ struct CompanionStatus {
     health: RuntimeHealth,
     #[serde(flatten)]
     data: DataStatus,
+    resource_usage: Option<ResourceUsage>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResourceUsage {
+    cpu_percent: f32,
+    memory_bytes: u64,
+    recent_peak_cpu_percent: f32,
+    recent_peak_memory_bytes: u64,
+    recent_window_seconds: u64,
+    sampled_at: String,
+}
+
+#[derive(Clone, Copy)]
+struct ResourceSample {
+    at: Instant,
+    cpu_percent: f32,
+    memory_bytes: u64,
+}
+
+#[derive(Default)]
+struct ResourceWindow {
+    samples: VecDeque<ResourceSample>,
+}
+
+impl ResourceWindow {
+    fn record(&mut self, sample: ResourceSample) -> ResourceUsage {
+        self.samples.push_back(sample);
+        while self
+            .samples
+            .front()
+            .is_some_and(|oldest| sample.at.duration_since(oldest.at) > RESOURCE_WINDOW)
+        {
+            self.samples.pop_front();
+        }
+        ResourceUsage {
+            cpu_percent: sample.cpu_percent,
+            memory_bytes: sample.memory_bytes,
+            recent_peak_cpu_percent: self
+                .samples
+                .iter()
+                .map(|value| value.cpu_percent)
+                .fold(0.0, f32::max),
+            recent_peak_memory_bytes: self
+                .samples
+                .iter()
+                .map(|value| value.memory_bytes)
+                .max()
+                .unwrap_or(sample.memory_bytes),
+            recent_window_seconds: RESOURCE_WINDOW.as_secs(),
+            sampled_at: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+}
+
+struct ResourceMonitor {
+    system: sysinfo::System,
+    pid: sysinfo::Pid,
+    logical_cpu_count: usize,
+    window: ResourceWindow,
+}
+
+impl ResourceMonitor {
+    fn new() -> Option<Self> {
+        let pid = sysinfo::get_current_pid().ok()?;
+        let mut system = sysinfo::System::new();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
+        Some(Self {
+            system,
+            pid,
+            logical_cpu_count: std::thread::available_parallelism()
+                .map(|count| count.get())
+                .unwrap_or(1),
+            window: ResourceWindow::default(),
+        })
+    }
+
+    fn sample(&mut self) -> Option<ResourceUsage> {
+        self.system
+            .refresh_processes(sysinfo::ProcessesToUpdate::Some(&[self.pid]), true);
+        let process = self.system.process(self.pid)?;
+        Some(self.window.record(ResourceSample {
+            at: Instant::now(),
+            cpu_percent: normalize_process_cpu(process.cpu_usage(), self.logical_cpu_count),
+            memory_bytes: process.memory(),
+        }))
+    }
 }
 
 pub struct AppState {
     pub token: String,
     pub storage: Storage,
     pub health: RwLock<RuntimeHealth>,
+    pub(crate) resource_usage: RwLock<Option<ResourceUsage>>,
     pub frames: broadcast::Sender<Arc<Frame>>,
     pub replicas: broadcast::Sender<String>,
+}
+
+fn normalize_process_cpu(cpu_percent: f32, logical_cpu_count: usize) -> f32 {
+    if !cpu_percent.is_finite() {
+        return 0.0;
+    }
+    (cpu_percent / logical_cpu_count.max(1) as f32).clamp(0.0, 100.0)
 }
 
 #[derive(Deserialize)]
@@ -136,7 +236,16 @@ async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Respo
     let mut health = state.health.read().expect("health lock").clone();
     health.paired = true;
     match state.storage.data_status() {
-        Ok(data) => Json(CompanionStatus { health, data }).into_response(),
+        Ok(data) => Json(CompanionStatus {
+            health,
+            data,
+            resource_usage: state
+                .resource_usage
+                .read()
+                .expect("resource lock")
+                .clone(),
+        })
+        .into_response(),
         Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
     }
 }
@@ -429,15 +538,12 @@ async fn serve_socket(socket: WebSocket, state: Arc<AppState>, cursor: i64, dura
 }
 
 pub async fn run(state: Arc<AppState>) -> std::io::Result<()> {
-    let allowed = [
-        HeaderValue::from_static("https://app.fennec.gg"),
-        HeaderValue::from_static("http://localhost:5173"),
-        HeaderValue::from_static("http://localhost:5174"),
-        HeaderValue::from_static("http://127.0.0.1:5173"),
-        HeaderValue::from_static("http://127.0.0.1:5174"),
-    ];
     let cors = CorsLayer::new()
-        .allow_origin(allowed)
+        .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+            origin
+                .to_str()
+                .is_ok_and(crate::is_trusted_web_origin)
+        }))
         .allow_methods([Method::GET, Method::POST])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
     let app = Router::new()
@@ -490,5 +596,57 @@ pub async fn collect_stats(state: Arc<AppState>) {
             Err(_) => {}
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+
+pub async fn monitor_resources(state: Arc<AppState>) {
+    let Some(mut monitor) = ResourceMonitor::new() else {
+        return;
+    };
+    loop {
+        tokio::time::sleep(RESOURCE_SAMPLE_INTERVAL).await;
+        *state.resource_usage.write().expect("resource lock") = monitor.sample();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize_process_cpu, ResourceSample, ResourceWindow};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn normalizes_process_cpu_to_the_whole_machine() {
+        assert_eq!(normalize_process_cpu(180.0, 8), 22.5);
+        assert_eq!(normalize_process_cpu(180.0, 0), 100.0);
+        assert_eq!(normalize_process_cpu(f32::NAN, 8), 0.0);
+    }
+
+    #[test]
+    fn keeps_current_usage_and_rolling_one_minute_peaks() {
+        let started = Instant::now();
+        let mut window = ResourceWindow::default();
+        window.record(ResourceSample {
+            at: started,
+            cpu_percent: 0.8,
+            memory_bytes: 30,
+        });
+        let peak = window.record(ResourceSample {
+            at: started + Duration::from_secs(50),
+            cpu_percent: 0.2,
+            memory_bytes: 20,
+        });
+        assert_eq!(peak.cpu_percent, 0.2);
+        assert_eq!(peak.memory_bytes, 20);
+        assert_eq!(peak.recent_peak_cpu_percent, 0.8);
+        assert_eq!(peak.recent_peak_memory_bytes, 30);
+        assert_eq!(peak.recent_window_seconds, 60);
+
+        let expired = window.record(ResourceSample {
+            at: started + Duration::from_secs(61),
+            cpu_percent: 0.1,
+            memory_bytes: 10,
+        });
+        assert_eq!(expired.recent_peak_cpu_percent, 0.2);
+        assert_eq!(expired.recent_peak_memory_bytes, 20);
     }
 }

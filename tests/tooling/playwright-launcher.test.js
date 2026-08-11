@@ -1,18 +1,20 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import playwrightConfig from '../../playwright.config';
-import { availableE2ePort, runPlaywright } from '../../scripts/playwright.mjs';
+import { runPlaywright } from '../../scripts/playwright.mjs';
+
+const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
 
 describe('Playwright launcher', () => {
   it('does not reuse a server already listening on the selected port', () => {
-    expect(playwrightConfig.webServer.reuseExistingServer).toBe(false);
-    expect(playwrightConfig.webServer.command).toContain('--strictPort');
+    expect(playwrightConfig).toContain('reuseExistingServer: false');
+    expect(playwrightConfig).toContain('--strictPort');
   });
 
-  it('asks the OS for an available loopback port', async () => {
-    const port = await availableE2ePort();
-
-    expect(port).toBeGreaterThan(0);
-    expect(port).toBeLessThanOrEqual(65_535);
+  it('bounds full-suite concurrency and fails blocked actions quickly', () => {
+    expect(playwrightConfig).toContain('fullyParallel: true');
+    expect(playwrightConfig).toContain('workers: 2');
+    expect(playwrightConfig).toContain('actionTimeout: 5_000');
+    expect(playwrightConfig).toContain('retries: process.env.CI ? 1 : 0');
   });
 
   it('allocates a fresh port for test runs', async () => {
