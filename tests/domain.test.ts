@@ -1967,8 +1967,13 @@ describe('Stats API domain', () => {
         MainTarget: { Name: 'Samara' },
       }),
       event(value.id, 6, 'PlayerLeft', { PlayerName: 'Saltie' }, 65),
-      event(value.id, 7, 'GoalReplayStart', {}, 65),
-      event(value.id, 8, 'GoalReplayEnd', {}, 65),
+      event(value.id, 7, 'CrossbarHit', {
+        BallLastTouch: { Player: { Name: 'Saltie', TeamNum: 1 } },
+        BallSpeed: 98.4,
+        ImpactForce: 122,
+      }),
+      event(value.id, 8, 'GoalReplayStart', {}, 65),
+      event(value.id, 9, 'GoalReplayEnd', {}, 65),
     ];
 
     const items = timelineDisplayItems(value, defaultSettings);
@@ -1981,14 +1986,19 @@ describe('Stats API domain', () => {
       'Saltie joined',
     ]);
     expect(items[0]?.parts[0]?.player?.teamNumber).toBe(1);
-    expect(
-      timelineDisplayItems(value, {
-        ...defaultSettings,
-        timelinePreset: 'everything',
-      })
-        .slice(0, 2)
-        .map((item) => item.parts[0]?.text),
-    ).toEqual(['Goal Replay End', 'Goal Replay Start']);
+    const everything = timelineDisplayItems(value, {
+      ...defaultSettings,
+      timelinePreset: 'everything',
+    });
+    expect(everything.slice(0, 2).map((item) => item.parts[0]?.text)).toEqual([
+      'Goal Replay End',
+      'Goal Replay Start',
+    ]);
+    const crossbar = everything.find((item) => item.id === 'timeline:7');
+    expect(crossbar?.parts.map((part) => part.text).join('')).toBe(
+      'Saltie hit the crossbar',
+    );
+    expect(crossbar?.technicalDetails).toContain('BallSpeed');
   });
 
   it('hides kickoff noise only from curated timelines and preserves technical details elsewhere', () => {
