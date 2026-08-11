@@ -872,6 +872,14 @@ test('document loads use the cinematic app entrance', async ({ page }) => {
 test('setup starts with a centered route choice and expands after selection', async ({
   page,
 }) => {
+  let delayHealthCheck = true;
+  await page.route('http://127.0.0.1:49125/health', async (route) => {
+    if (delayHealthCheck) {
+      delayHealthCheck = false;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    await route.fulfill({ status: 503 });
+  });
   await page.goto('/setup?demo=0');
   const companion = page.getByRole('button', { name: /With companion/ });
   const browser = page.getByRole('button', { name: /Browser only/ });
@@ -897,6 +905,19 @@ test('setup starts with a centered route choice and expands after selection', as
   ).toHaveCount(0);
   await expect(page.getByText('Setup instructions')).toHaveCount(0);
 
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-app-entrance-state',
+    'complete',
+  );
+  await page.evaluate(() => {
+    const content = document.querySelector('.app-entrance-content');
+    if (!content) throw new Error('App entrance content was not mounted.');
+    document.documentElement.dataset.setupContentDetached = 'false';
+    new MutationObserver(() => {
+      if (!content.isConnected)
+        document.documentElement.dataset.setupContentDetached = 'true';
+    }).observe(document.body, { childList: true, subtree: true });
+  });
   await companion.click();
   await expect(
     page.getByRole('heading', { name: 'Connect Fennec' }),
@@ -922,6 +943,10 @@ test('setup starts with a centered route choice and expands after selection', as
   await expect(
     page.getByText('Storefront detection starts after the companion responds.'),
   ).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-setup-content-detached',
+    'false',
+  );
   await expect(
     page.getByRole('link', { name: 'Open installed companion' }),
   ).toHaveAttribute(

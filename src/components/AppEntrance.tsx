@@ -33,6 +33,7 @@ export function AppEntrance({
 }) {
   const [complete, setComplete] = useState(false);
   const revealing = ready;
+  const showContent = ready || complete;
 
   const replayCinematic = useCallback(() => {
     setComplete(false);
@@ -73,7 +74,7 @@ export function AppEntrance({
 
   return (
     <AppEntranceContext.Provider value={replayCinematic}>
-      {ready && (
+      {showContent && (
         <div
           className={`app-entrance-content ${!complete && revealing ? 'app-entrance-content--cinematic' : ''}`}
           inert={!complete}
