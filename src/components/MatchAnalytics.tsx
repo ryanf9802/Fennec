@@ -213,7 +213,11 @@ export function MatchAnalytics({
           role="tabpanel"
           aria-labelledby="ball-pressure-tab"
         >
-          <PressureAnalytics match={match} analytics={pressure} />
+          <PressureAnalytics
+            match={match}
+            analytics={pressure}
+            profileId={profileId}
+          />
         </div>
       ) : (
         <div

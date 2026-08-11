@@ -180,7 +180,7 @@ describe('match analytics view switch', () => {
             {
               name: 'You',
               primaryId: 'Steam|1|0',
-              teamNumber: 0,
+              teamNumber: 1,
               score: 0,
               goals: 0,
               assists: 0,
@@ -189,6 +189,20 @@ describe('match analytics view switch', () => {
               saves: 0,
               shots: 0,
               touches: 1,
+              demos: 0,
+            },
+            {
+              name: 'Opponent',
+              primaryId: 'Steam|2|0',
+              teamNumber: 0,
+              score: 0,
+              goals: 0,
+              assists: 0,
+              passes: 0,
+              fifties: 0,
+              saves: 0,
+              shots: 0,
+              touches: 0,
               demos: 0,
             },
           ],
@@ -200,8 +214,8 @@ describe('match analytics view switch', () => {
               eventName: 'BallHit',
               receivedAt: '2026-08-08T00:01:00Z',
               payload: {
-                Players: [{ Name: 'You', TeamNum: 0 }],
-                Ball: { Location: { X: 0, Y: 4000, Z: 100 } },
+                Players: [{ Name: 'You', TeamNum: 1 }],
+                Ball: { Location: { X: 0, Y: -4000, Z: 100 } },
               },
             },
           ],
@@ -213,14 +227,37 @@ describe('match analytics view switch', () => {
     expect(
       await screen.findByRole('heading', { name: 'Pressure' }),
     ).toBeInTheDocument();
+    const comparison = screen.getByRole('region', {
+      name: 'Team pressure comparison',
+    });
+    expect(comparison).toHaveTextContent('Orange1Pressure touches');
+    expect(comparison).toHaveTextContent('Field pressure');
+    expect(comparison).toHaveAccessibleName('Team pressure comparison');
     expect(
-      screen.getByRole('heading', { name: 'Blue' }).parentElement,
-    ).toHaveTextContent('Pressure touches1');
+      [...comparison.querySelectorAll('[data-pressure-team]')].map((team) =>
+        team.getAttribute('data-pressure-team'),
+      ),
+    ).toEqual(['1', '0']);
     expect(
       screen.getByRole('table', {
         name: 'Pressure and territory contribution by player',
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('list', {
+        name: 'Pressure and territory contribution by player',
+      }),
+    ).toHaveTextContent('You');
+    expect(
+      screen.getAllByRole('meter', {
+        name: 'You team pressure contribution',
+      }),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByLabelText(
+        'Opponent team pressure contribution unavailable',
+      ),
+    ).toHaveLength(2);
   });
 
   it('keeps the previous view when persistence fails', async () => {

@@ -334,9 +334,27 @@ test('pressure is an explainable responsive telemetry view', async ({
   await page.getByRole('tab', { name: 'Pressure' }).click();
 
   await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
+  await expect(page.getByText(/A pressure touch is unambiguous/)).toBeVisible();
   await expect(
-    page.getByText(/Pressure counts unambiguous touches/),
+    page.getByRole('region', { name: 'Team pressure comparison' }),
   ).toBeVisible();
+  const playerList = page.getByRole('list', {
+    name: 'Pressure and territory contribution by player',
+  });
+  await expect(playerList).toBeVisible();
+  await expect(playerList.getByRole('listitem')).toHaveCount(4);
+  await expect(playerList.getByText('Team contribution').first()).toBeVisible();
+  await expect(playerList.getByText('Avg territory').first()).toBeVisible();
+  const pressurePanel = page.locator('#ball-pressure-panel');
+  expect(
+    await pressurePanel.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Pressure' })).toBeVisible();
   const table = page.getByRole('table', {
     name: 'Pressure and territory contribution by player',
   });
@@ -348,9 +366,9 @@ test('pressure is an explainable responsive telemetry view', async ({
     table.getByRole('columnheader', { name: 'Avg territory' }),
   ).toBeVisible();
   expect(
-    await table
-      .locator('..')
-      .evaluate((element) => element.scrollWidth > element.clientWidth),
+    await pressurePanel.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
   ).toBe(true);
 });
 

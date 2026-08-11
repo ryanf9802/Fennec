@@ -305,6 +305,184 @@ textarea:focus-visible {
   font-weight: 800;
   letter-spacing: -0.025em;
 }
+.pressure-comparison {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    radial-gradient(
+      circle at 50% -30%,
+      rgba(54, 215, 255, 0.1),
+      transparent 48%
+    ),
+    var(--background-elevated);
+}
+.pressure-team-grid,
+.pressure-territory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pressure-team-summary {
+  min-width: 0;
+  padding: 1rem;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--pressure-team-primary) 10%, transparent),
+    transparent 65%
+  );
+}
+.pressure-team-summary + .pressure-team-summary {
+  border-left: 1px solid var(--border);
+  text-align: right;
+}
+.pressure-team-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pressure-team-summary + .pressure-team-summary .pressure-team-name {
+  flex-direction: row-reverse;
+}
+.pressure-touch-total {
+  margin-top: 0.75rem;
+  color: color-mix(in srgb, var(--pressure-team-primary) 78%, var(--text));
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 24px
+    color-mix(in srgb, var(--pressure-team-primary) 24%, transparent);
+}
+.pressure-share-block {
+  padding: 0.9rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: rgba(2, 10, 20, 0.22);
+}
+.pressure-share-labels {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.pressure-share-labels > :last-child {
+  text-align: right;
+}
+.pressure-share-track {
+  display: flex;
+  height: 0.55rem;
+  margin-top: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
+}
+.pressure-share-track--empty::after {
+  width: 100%;
+  content: '';
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 5px,
+    color-mix(in srgb, var(--muted) 8%, transparent) 5px,
+    color-mix(in srgb, var(--muted) 8%, transparent) 10px
+  );
+}
+.pressure-share-fill {
+  min-width: 0;
+}
+.pressure-share-fill + .pressure-share-fill {
+  border-left: 2px solid var(--background-elevated);
+}
+.pressure-territory-grid > dl {
+  padding: 0.85rem 1rem 1rem;
+}
+.pressure-territory-grid > dl + dl {
+  border-left: 1px solid var(--border);
+  text-align: right;
+}
+.pressure-explanation {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 0.75rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--background-elevated) 62%, transparent);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.pressure-player-table thead {
+  background: color-mix(in srgb, var(--muted) 5%, transparent);
+}
+.pressure-player-row {
+  border-top: 1px solid var(--border);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--pressure-team-primary) 5%, transparent),
+    transparent 30%
+  );
+}
+.pressure-contribution {
+  display: grid;
+  grid-template-columns: 2.8rem minmax(4rem, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+}
+.pressure-contribution-track {
+  display: block;
+  height: 0.4rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+}
+.pressure-contribution-fill {
+  display: block;
+  height: 100%;
+  min-width: 0.2rem;
+  border-radius: inherit;
+  box-shadow: 0 0 10px currentColor;
+}
+.pressure-player-card {
+  overflow: hidden;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pressure-team-primary);
+  border-radius: 0.85rem;
+  background:
+    linear-gradient(
+      105deg,
+      color-mix(in srgb, var(--pressure-team-primary) 7%, transparent),
+      transparent 45%
+    ),
+    var(--background-elevated);
+}
+.pressure-player-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.8rem 0;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.pressure-player-metrics dt {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.pressure-player-metrics dd {
+  margin-top: 0.2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pressure-player-metrics > div + div {
+  text-align: right;
+}
 .live-pulse {
   box-shadow: 0 0 0 0 rgba(54, 215, 255, 0.5);
   animation: live-pulse 2s infinite;
