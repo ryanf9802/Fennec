@@ -60,7 +60,7 @@ describe('Fennec CI access infrastructure', () => {
         ]),
       },
     });
-  });
+  }, 10_000);
 
   it('rejects wildcard or non-main subjects', () => {
     const app = new cdk.App();

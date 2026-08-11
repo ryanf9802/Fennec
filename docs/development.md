@@ -72,8 +72,9 @@ pnpm check
 ```
 
 It checks formatting, lint, TypeScript, unit tests, and the production web
-bundle. The Husky pre-push hook runs this fast gate for ordinary branch and tag
-pushes.
+bundle. Independent stages run at most two at a time, continue after failures,
+and finish with one complete result summary. The Husky pre-push hook runs this
+fast gate for ordinary branch and tag pushes.
 
 When any pushed ref targets `main`, the hook instead runs the full web gate:
 
@@ -82,9 +83,17 @@ pnpm check:web
 ```
 
 That command adds account-neutral CDK synthesis and the complete responsive
-Playwright suite. Install the matching Chromium build once before pushing to
-`main`; GitHub Web validation runs the same full gate after installing Chromium
-on its hosted runner.
+Playwright suite. Local runs report each Playwright failure once; GitHub Actions
+retries a failed browser test once to expose flakes. Install the matching
+Chromium build before pushing to `main`; GitHub Web validation runs the same
+full gate after installing Chromium on its hosted runner.
+
+An administrator intentionally pushing a web-only fast-forward directly from
+a clean, checked-out `main` branch uses this full local gate before Git proceeds.
+The hook refuses direct pushes whose outgoing commits touch companion or release
+paths because Linux cannot prove the required Windows installer gate; use a pull
+request for those changes. The hook also refuses to validate dirty or divergent
+state so the checked tree cannot differ from the commit being published.
 
 Behavior changes should add or update focused automated tests. Bug fixes should
 include a regression test that demonstrates the failure when practical. Run

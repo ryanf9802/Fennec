@@ -68,11 +68,9 @@ describe('companion release workflow', () => {
 
   it('shares the full web gate between main pushes and web CI', () => {
     expect(packageJson.scripts.prepare).toBe('husky');
-    expect(packageJson.scripts.check).toBe(
-      'prettier --check . --ignore-unknown && eslint . && tsc -b --pretty false && vitest run && vite build',
-    );
+    expect(packageJson.scripts.check).toBe('node scripts/check.mjs');
     expect(packageJson.scripts['check:web']).toBe(
-      'pnpm run check && pnpm run cdk:synth && pnpm run test:e2e',
+      'node scripts/check.mjs --web',
     );
     expect(prePushHook.trim()).toBe('node scripts/pre-push.mjs');
     expect(webWorkflow).toContain('name: Web validation');

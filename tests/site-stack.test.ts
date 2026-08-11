@@ -69,7 +69,7 @@ describe('Fennec site infrastructure', () => {
     );
     template.resourceCountIs('AWS::Route53::RecordSet', 4);
     template.hasOutput('SiteUrl', { Value: 'https://app.fennec.gg' });
-  });
+  }, 10_000);
 
   it('adopts the web ACL created by the flat-rate plan', () => {
     const webAclId =

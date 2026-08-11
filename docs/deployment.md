@@ -62,12 +62,17 @@ instead of creating a duplicate.
 lint, typechecking, unit tests, a web build, CDK synthesis, and responsive
 Playwright tests. It retains the web build as a workflow artifact.
 
-The `main` branch accepts changes only through pull requests. Every pull request
-must have current successful `Web validation` and `Windows companion gate`
-checks. Contributor pull requests also require approval from the repository
-code owner; authors cannot approve their own changes. Repository administrators
-may bypass only the review requirement from within a pull request, so solo
-maintainer changes still use a green PR and direct pushes remain blocked.
+The normal path to `main` is a pull request with current successful
+`Web validation` and `Windows companion gate` checks. Contributor pull requests
+also require approval from the repository code owner; authors cannot approve
+their own changes.
+
+Repository administrators who currently have ruleset bypass authority may use
+a direct push only for a clean, web-only fast-forward from checked-out `main`.
+The local pre-push hook runs the complete web gate and refuses companion or
+release-sensitive paths, which must use a pull request so Windows validation is
+authoritative. A bypassed push is not pre-validated by GitHub: it starts hosted
+validation and deployment workflows only after `main` changes.
 
 On a push or manual dispatch from `main`, the deployment job assumes the OIDC
 role, deploys the CDK site stack, synchronizes immutable assets and non-cached
