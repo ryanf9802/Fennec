@@ -15,6 +15,13 @@ const webWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 const prebuiltTauriConfig = JSON.parse(
   readFileSync('src-tauri/tauri.prebuilt.conf.json', 'utf8'),
 ) as { build: { beforeBuildCommand: string } };
+const tauriConfig = JSON.parse(
+  readFileSync('src-tauri/tauri.conf.json', 'utf8'),
+) as { bundle: { useLocalToolsDir?: boolean } };
+const installerBuildScript = readFileSync(
+  'scripts/build-companion-installer.ps1',
+  'utf8',
+);
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
   scripts: Record<string, string>;
 };
@@ -25,6 +32,7 @@ const releasePaths = [
   'src/companion/**',
   'src/components/CompanionSettings.tsx',
   'src/pages/OnboardingPage.tsx',
+  'scripts/build-companion-installer.ps1',
   'scripts/companion-release-version.mjs',
   'package.json',
   'pnpm-lock.yaml',
@@ -63,7 +71,7 @@ describe('companion release workflow', () => {
   it('reuses the prepared frontend when packaging installers', () => {
     expect(prebuiltTauriConfig.build.beforeBuildCommand).toBe('');
     expect(companionWorkflow).toContain(
-      'pnpm exec tauri build --no-sign --config src-tauri/tauri.prebuilt.conf.json',
+      './scripts/build-companion-installer.ps1 -Config src-tauri/tauri.prebuilt.conf.json',
     );
     expect(workflow).toContain('build = @{ beforeBuildCommand = "" }');
     expect(workflow).toContain(
@@ -79,11 +87,40 @@ describe('companion release workflow', () => {
     }
   });
 
+  it('caches and retries transient Tauri bundler tool downloads', () => {
+    expect(tauriConfig.bundle.useLocalToolsDir).toBe(true);
+    expect(installerBuildScript).toContain('[int]$MaxAttempts = 3');
+    expect(installerBuildScript).toContain(
+      "'failed to bundle project:.*http status:\\s*(408|425|429|5\\d\\d)'",
+    );
+    expect(installerBuildScript).toContain('-not $isTransientFailure');
+
+    for (const contents of [workflow, companionWorkflow]) {
+      expect(contents).toContain('uses: actions/cache@v5');
+      expect(contents).toContain('path: src-tauri/target/.tauri');
+      expect(contents).toContain(
+        "key: tauri-bundler-tools-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}",
+      );
+      expect(contents).toContain(
+        './scripts/build-companion-installer.ps1 -Config',
+      );
+    }
+
+    expect(workflow.indexOf('Prime companion installer tools')).toBeLessThan(
+      workflow.indexOf('aws-actions/configure-aws-credentials@v5'),
+    );
+    expect(workflow.indexOf('Prime companion installer tools')).toBeLessThan(
+      workflow.indexOf('tauri-apps/tauri-action@v1'),
+    );
+  });
+
   it('builds unsigned local and pull request installers', () => {
     expect(packageJson.scripts['companion:build']).toBe(
       'tauri build --no-sign',
     );
-    expect(companionWorkflow).toContain('run: pnpm exec tauri build --no-sign');
+    expect(installerBuildScript).toContain(
+      '& pnpm exec tauri build --no-sign --config $Config',
+    );
     expect(workflow).toContain('TAURI_SIGNING_PRIVATE_KEY=$keyPath');
     expect(workflow).toContain('tauri-apps/tauri-action@v1');
   });
