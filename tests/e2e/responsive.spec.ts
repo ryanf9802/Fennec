@@ -312,6 +312,7 @@ test('dark is the default while system and light remain opt-in', async ({
 
 test('speed units default to km/h and persist as mph', async ({ page }) => {
   await openDemoPage(page, '/matches/demo-current-2?demo=1');
+  await page.getByRole('tab', { name: 'Ball analytics' }).click();
   const fastestHit = page.getByText('Fastest hit').locator('..');
   const maximumBallSpeed = page.getByText('Maximum ball speed').locator('..');
   await expect(fastestHit).toContainText('126 km/h');
