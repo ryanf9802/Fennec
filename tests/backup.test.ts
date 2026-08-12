@@ -215,7 +215,7 @@ describe('portable data', () => {
       parsed.settings.webSocketPort,
       parsed.settings.sessionGapMinutes,
       parsed.settings.matchAnalyticsView,
-    ]).toEqual([49124, 30, 'analytics']);
+    ]).toEqual([49124, 30, 'touch-map']);
   });
   it('defaults settings added after older backups were created', () => {
     const backup = createBackup([value], defaultSettings);
@@ -227,7 +227,7 @@ describe('portable data', () => {
     const parsed = parseBackup(
       JSON.stringify({ ...backup, version: 2, settings: legacySettings }),
     );
-    expect(parsed.settings.matchAnalyticsView).toBe('analytics');
+    expect(parsed.settings.matchAnalyticsView).toBe('touch-map');
     expect(parsed.settings.speedUnit).toBe('kmh');
   });
   it('exports profile match summaries as CSV', () => {

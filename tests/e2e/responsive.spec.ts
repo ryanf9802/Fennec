@@ -232,12 +232,12 @@ test('demo feed opens a live match and settings remain usable', async ({
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(matchUrl);
   await expect(
-    page.getByRole('heading', { name: 'Ball analytics' }),
+    page.getByRole('heading', { name: 'Ball touch map' }),
   ).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Touch map' })).toBeVisible();
-  await expect(page.getByRole('img', { name: /ball touch map/i })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByRole('img', { name: /3d ball touch map/i }),
+  ).toBeVisible();
   await disableAutomaticLiveMatch(page);
   await page.goto('/settings?demo=1');
   await waitForAppEntrance(page);
@@ -312,6 +312,7 @@ test('dark is the default while system and light remain opt-in', async ({
 
 test('speed units default to km/h and persist as mph', async ({ page }) => {
   await openDemoPage(page, '/matches/demo-current-2?demo=1');
+  await page.getByRole('tab', { name: 'Ball analytics' }).click();
   const fastestHit = page.getByText('Fastest hit').locator('..');
   const maximumBallSpeed = page.getByText('Maximum ball speed').locator('..');
   await expect(fastestHit).toContainText('126 km/h');
@@ -399,8 +400,13 @@ test('desktop match telemetry tabs stay inside the viewport', async ({
   };
 
   await expect(
-    page.getByRole('heading', { name: 'Ball analytics' }),
+    page.getByRole('heading', { name: 'Ball touch map' }),
   ).toBeVisible();
+  await expect(page.getByRole('tab')).toHaveText([
+    'Touch map',
+    'Pressure',
+    'Ball analytics',
+  ]);
   await expectViewportContained();
 
   await page.getByRole('tab', { name: 'Pressure' }).click();
@@ -446,8 +452,9 @@ test('3D touch map controls and preference persist across matches', async ({
   await page.setViewportSize({ width: 1440, height: 900 });
   await openDemoPage(page, '/matches/demo-current-2?demo=1');
   await expect(
-    page.getByRole('heading', { name: 'Ball analytics' }),
+    page.getByRole('heading', { name: 'Ball touch map' }),
   ).toBeVisible();
+  await page.getByRole('tab', { name: 'Ball analytics' }).click();
   await page.getByRole('tab', { name: 'Touch map' }).click();
   await expect(
     page.getByRole('img', { name: /3d ball touch map/i }),
@@ -864,7 +871,7 @@ test('settings merge data management with an authoritative companion', async ({
         protocolVersion: 1,
         dataSyncVersion: 1,
         paired: path === '/status',
-        gameRunning: false,
+        gameRunning: true,
         feedConnected: false,
         stores: ['steam'],
         configuredStores: ['steam'],
@@ -897,9 +904,19 @@ test('settings merge data management with an authoritative companion', async ({
   await expect(
     page.getByRole('button', { name: 'Rebuild browser cache' }),
   ).toBeVisible();
+  const restore = page.getByRole('button', { name: 'Restore backup' });
+  await expect(restore).toBeDisabled();
+  await expect(restore).toHaveAccessibleDescription(
+    /^Close Rocket League.*before restoring a backup.*deleting history\.$/,
+  );
+  await expect(
+    page.getByText(
+      /^Close Rocket League.*before restoring a backup.*deleting history\.$/,
+    ),
+  ).toHaveAttribute('role', 'status');
   await expect(
     page.getByRole('button', { name: 'Delete all history' }),
-  ).toBeVisible();
+  ).toBeDisabled();
   await expect(
     page.getByText('42 matches · 2.0 MB in the companion'),
   ).toBeVisible();

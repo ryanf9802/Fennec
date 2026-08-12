@@ -41,6 +41,7 @@ import {
 import {
   defaultSettings,
   normalizeSettings,
+  type FennecSettings,
   type MatchState,
   type ParticipantState,
   type TimelineEvent,
@@ -102,6 +103,20 @@ describe('settings', () => {
         matchAnalyticsView: 'pressure',
       },
     );
+  });
+
+  it('defaults the match telemetry view to the touch map', () => {
+    expect(defaultSettings.matchAnalyticsView).toBe('touch-map');
+    expect(normalizeSettings().matchAnalyticsView).toBe('touch-map');
+    expect(
+      normalizeSettings({
+        matchAnalyticsView:
+          'invalid' as unknown as FennecSettings['matchAnalyticsView'],
+      }).matchAnalyticsView,
+    ).toBe('touch-map');
+    expect(
+      normalizeSettings({ matchAnalyticsView: 'analytics' }),
+    ).toMatchObject({ matchAnalyticsView: 'analytics' });
   });
 });
 const event = (

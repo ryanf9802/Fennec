@@ -94,6 +94,24 @@ describe('settings CSV export', () => {
     expect(mocks.loadMatches).not.toHaveBeenCalled();
   });
 
+  it('keeps browser-only data actions available without companion guidance', () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.queryByText(/before restoring a backup/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Restore backup' }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete history' }),
+    ).toBeEnabled();
+  });
+
   it('puts Setup first and keeps its route available', () => {
     render(
       <MemoryRouter>
@@ -271,6 +289,11 @@ describe('settings CSV export', () => {
       screen.getByText(/companion keeps the durable copy/i),
     ).toBeInTheDocument();
     expect(screen.getByText('Restoring 12 of 30 matches…')).toBeInTheDocument();
+    const restore = screen.getByRole('button', { name: 'Restore backup' });
+    expect(restore).toBeDisabled();
+    expect(restore).toHaveAccessibleDescription(
+      'Wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.',
+    );
     expect(
       screen.getByRole('button', { name: 'Rebuild browser cache' }),
     ).toBeDisabled();
@@ -281,5 +304,113 @@ describe('settings CSV export', () => {
     expect(
       screen.queryByRole('heading', { name: 'Local data' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('explains which data actions require Rocket League to close', () => {
+    mocks.fennec.syncStatus = { mode: 'synchronized' };
+    mocks.companion = {
+      checking: false,
+      recheck: vi.fn(),
+      health: {
+        paired: true,
+        dataSyncVersion: 1,
+        canonicalMatches: 30,
+        databaseBytes: 2_097_152,
+        pendingFrames: 0,
+        gameRunning: true,
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const message =
+      'Close Rocket League before restoring a backup or deleting history.';
+    expect(screen.getByText(message)).toHaveAttribute('role', 'status');
+    expect(
+      screen.getByRole('button', { name: 'Restore backup' }),
+    ).toHaveAccessibleDescription(message);
+    expect(
+      screen.getByRole('button', { name: 'Restore backup' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Rebuild browser cache' }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete all history' }),
+    ).toBeDisabled();
+  });
+
+  it('combines the data-action guidance when capture and sync are busy', () => {
+    mocks.fennec.syncStatus = { mode: 'reconciling', pendingFrames: 3 };
+    mocks.companion = {
+      checking: false,
+      recheck: vi.fn(),
+      health: {
+        paired: true,
+        dataSyncVersion: 1,
+        canonicalMatches: 30,
+        databaseBytes: 2_097_152,
+        pendingFrames: 3,
+        gameRunning: true,
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const message =
+      'Close Rocket League and wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.';
+    expect(screen.getByText(message)).toHaveAttribute('role', 'status');
+    for (const name of [
+      'Restore backup',
+      'Rebuild browser cache',
+      'Delete all history',
+    ]) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription(message);
+    }
+  });
+
+  it('does not show data-action guidance when companion actions are available', () => {
+    mocks.fennec.syncStatus = { mode: 'synchronized' };
+    mocks.companion = {
+      checking: false,
+      recheck: vi.fn(),
+      health: {
+        paired: true,
+        dataSyncVersion: 1,
+        canonicalMatches: 30,
+        databaseBytes: 2_097_152,
+        pendingFrames: 0,
+        gameRunning: false,
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.queryByText(/before restoring a backup/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Restore backup' }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Rebuild browser cache' }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete all history' }),
+    ).toBeEnabled();
   });
 });

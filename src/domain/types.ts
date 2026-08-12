@@ -167,7 +167,7 @@ export const defaultSettings: FennecSettings = {
   enabledTimelineEvents: [],
   timelineAttributes: {},
   sidebarCollapsed: false,
-  matchAnalyticsView: 'analytics',
+  matchAnalyticsView: 'touch-map',
   analytics: { playlistMode: 'ranked', groupByPlaylist: true },
 };
 
@@ -188,9 +188,10 @@ export function normalizeSettings(
     input?.speedUnit === 'mph' ? 'mph' : defaultSettings.speedUnit;
   const matchAnalyticsView =
     input?.matchAnalyticsView === 'touch-map' ||
-    input?.matchAnalyticsView === 'pressure'
+    input?.matchAnalyticsView === 'pressure' ||
+    input?.matchAnalyticsView === 'analytics'
       ? input.matchAnalyticsView
-      : 'analytics';
+      : defaultSettings.matchAnalyticsView;
   return {
     ...defaultSettings,
     ...input,
