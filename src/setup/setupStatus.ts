@@ -7,7 +7,9 @@ export type SetupPath = 'companion' | 'browser';
 
 const setupPathKey = 'fennec-setup-path-explicit-v2';
 const companionSetupCompleteKey = 'fennec-companion-setup-complete-v1';
-const companionCaptureVerifiedKey = 'fennec-companion-capture-verified-v1';
+const companionStatsApiVerifiedKey = 'fennec-companion-stats-api-verified-v2';
+const legacyCompanionCaptureVerifiedKey =
+  'fennec-companion-capture-verified-v1';
 const companionCursorKey = 'fennec-companion-cursor';
 let sessionSetupPath: SetupPath | undefined;
 
@@ -51,15 +53,16 @@ export function rememberSetupPath(path: SetupPath): void {
   storeValue(setupPathKey, path);
 }
 
-export function storedCompanionCaptureVerification(): boolean {
-  if (storedValue(companionCaptureVerifiedKey) === 'true') return true;
+export function storedCompanionStatsApiVerification(): boolean {
+  if (storedValue(companionStatsApiVerifiedKey) === 'true') return true;
+  if (storedValue(legacyCompanionCaptureVerifiedKey) === 'true') return true;
   // A saved cursor proves an older Fennec version already accepted a companion frame.
   const cursor = Number(storedValue(companionCursorKey));
   return Number.isInteger(cursor) && cursor > 0;
 }
 
-export function rememberCompanionCaptureVerification(): void {
-  storeValue(companionCaptureVerifiedKey, 'true');
+export function rememberCompanionStatsApiVerification(): void {
+  storeValue(companionStatsApiVerifiedKey, 'true');
 }
 
 export function storedCompanionSetupCompletion(): boolean {
@@ -89,14 +92,14 @@ export function setupComplete({
   accessSatisfied,
   path,
   statsApiVerified,
-  companionCaptureVerified,
+  companionStatsApiVerified,
   companionSetupVerified,
   health,
 }: {
   accessSatisfied: boolean;
   path?: SetupPath;
   statsApiVerified: boolean;
-  companionCaptureVerified: boolean;
+  companionStatsApiVerified: boolean;
   companionSetupVerified: boolean;
   health?: CompanionHealth;
 }): boolean {
@@ -106,6 +109,6 @@ export function setupComplete({
   return (
     companionCompatible(health) &&
     companionHasConfiguredStore(health) &&
-    companionCaptureVerified
+    companionStatsApiVerified
   );
 }

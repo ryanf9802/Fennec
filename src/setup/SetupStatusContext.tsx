@@ -12,11 +12,11 @@ import type { CompanionHealth } from '../companion/client';
 import { useCompanionStatus } from '../companion/useCompanionStatus';
 import { useLocalAccess } from '../platform/LocalAccessContext';
 import {
-  rememberCompanionCaptureVerification,
+  rememberCompanionStatsApiVerification,
   rememberCompanionSetupCompletion,
   rememberSetupPath,
   setupComplete,
-  storedCompanionCaptureVerification,
+  storedCompanionStatsApiVerification,
   storedCompanionSetupCompletion,
   storedSetupPath,
   type SetupPath,
@@ -58,19 +58,27 @@ export function SetupStatusProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (companion.health?.lastPacketAt && !demoMode)
-      rememberCompanionCaptureVerification();
-  }, [companion.health?.lastPacketAt, demoMode]);
+    if (
+      (companion.health?.feedConnected || companion.health?.lastPacketAt) &&
+      !demoMode
+    )
+      rememberCompanionStatsApiVerification();
+  }, [
+    companion.health?.feedConnected,
+    companion.health?.lastPacketAt,
+    demoMode,
+  ]);
 
-  const companionCaptureVerified =
-    Boolean(companion.health?.lastPacketAt) ||
-    storedCompanionCaptureVerification();
+  const companionStatsApiVerified =
+    Boolean(
+      companion.health?.feedConnected || companion.health?.lastPacketAt,
+    ) || storedCompanionStatsApiVerification();
   const companionSetupVerified = storedCompanionSetupCompletion();
   const currentlyComplete = setupComplete({
     accessSatisfied: access.satisfied,
     path: selectedPath,
     statsApiVerified,
-    companionCaptureVerified,
+    companionStatsApiVerified,
     companionSetupVerified: false,
     health: companion.health,
   });
@@ -91,7 +99,7 @@ export function SetupStatusProvider({ children }: { children: ReactNode }) {
               accessSatisfied: access.satisfied,
               path: selectedPath,
               statsApiVerified,
-              companionCaptureVerified,
+              companionStatsApiVerified,
               companionSetupVerified,
               health: companion.health,
             })

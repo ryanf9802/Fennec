@@ -74,7 +74,9 @@ vi.mock('../src/pages/MatchPage', () => ({
     );
   },
 }));
-vi.mock('../src/pages/OnboardingPage', () => ({ OnboardingPage: () => null }));
+vi.mock('../src/pages/OnboardingPage', () => ({
+  OnboardingPage: () => <div>Setup route</div>,
+}));
 vi.mock('../src/pages/ProfilePage', () => ({ ProfilePage: () => null }));
 vi.mock('../src/pages/SessionPage', () => ({ SessionPage: () => null }));
 vi.mock('../src/pages/SettingsPage', () => ({
@@ -128,6 +130,17 @@ describe('app shell entry and live auto-open', () => {
     );
 
     expect(await screen.findByText('Games route')).toBeInTheDocument();
+    expect(screen.queryByText('Training')).not.toBeInTheDocument();
+  });
+
+  it('does not leave setup when a live match completes setup', async () => {
+    render(
+      <MemoryRouter initialEntries={['/setup']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Setup route')).toBeInTheDocument();
     expect(screen.queryByText('Training')).not.toBeInTheDocument();
   });
 

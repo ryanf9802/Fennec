@@ -1234,6 +1234,106 @@ test('setup automatically connects a running companion in the current page', asy
     .toBe('in-place-token');
 });
 
+test('setup detects a companion that starts after the page is already open', async ({
+  page,
+}) => {
+  let available = false;
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (!available) {
+      await route.fulfill({ status: 503 });
+      return;
+    }
+    if (pathname === '/pair' && request.method() === 'POST') {
+      await route.fulfill({ json: { token: 'started-later-token' } });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        version: '0.2.13',
+        protocolVersion: 1,
+        paired: pathname === '/status',
+        gameRunning: false,
+        feedConnected: false,
+        stores: [],
+        configuredStores: [],
+        launchOnStartup: false,
+      },
+    });
+  });
+  await page.goto('/setup?demo=0');
+  await page.getByRole('button', { name: /With companion/ }).click();
+  const setupUrl = page.url();
+  const pageCount = page.context().pages().length;
+  await expect(
+    page.getByRole('button', { name: 'Open installed companion' }),
+  ).toBeVisible();
+
+  available = true;
+
+  await expect(
+    page.getByText('Companion 0.2.13 is running and connected.'),
+  ).toBeVisible({ timeout: 3_000 });
+  expect(page.url()).toBe(setupUrl);
+  expect(page.context().pages()).toHaveLength(pageCount);
+});
+
+test('setup stops showing a previously completed companion as currently ready', async ({
+  page,
+}) => {
+  let available = true;
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-companion-token', 'installed-token');
+  });
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname === '/permission-probe') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    if (!available) {
+      await route.fulfill({ status: 503 });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        version: '0.2.13',
+        protocolVersion: 1,
+        paired: pathname === '/status',
+        gameRunning: false,
+        feedConnected: true,
+        stores: ['steam'],
+        configuredStores: ['steam'],
+        launchOnStartup: true,
+      },
+    });
+  });
+  await page.goto('/setup?demo=0');
+  await page.getByRole('button', { name: /With companion/ }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toBeVisible();
+
+  available = false;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+
+  const companionStep = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Install and run the companion' });
+  await expect(companionStep.locator('svg.text-fennec-orange')).toBeVisible({
+    timeout: 3_000,
+  });
+  await expect(
+    companionStep.getByText(
+      'The companion is not running or cannot be reached from this browser.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toHaveCount(0);
+});
+
 test('setup treats a pre-automatic-access companion as an update state', async ({
   page,
 }) => {
@@ -1609,8 +1709,7 @@ test('connected setup exposes companion launch preferences', async ({
         protocolVersion: 1,
         paired: path === '/status',
         gameRunning: false,
-        feedConnected: false,
-        lastPacketAt: '2026-08-09T00:00:00Z',
+        feedConnected: true,
         stores: ['steam', 'epic'],
         configuredStores: ['steam', 'epic'],
         launchOnStartup: false,
@@ -1682,8 +1781,7 @@ test('one configured storefront completes its companion setup step and remains r
         protocolVersion: 1,
         paired: path === '/status',
         gameRunning: false,
-        feedConnected: false,
-        lastPacketAt: '2026-08-09T00:00:00Z',
+        feedConnected: true,
         stores: ['steam', 'epic'],
         configuredStores,
         launchOnStartup: false,
@@ -2379,4 +2477,21 @@ test('mobile scoreboard scroll stays inside the page', async ({ page }) => {
 
 test('auto-open navigates to the live monitor by default', async ({ page }) => {
   await openLiveDemo(page, '/settings?demo=1');
+});
+
+test('auto-open does not take an active match away from setup', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-setup-path-explicit-v2', 'browser');
+  });
+  await page.goto('/setup?demo=1');
+
+  await expect(
+    page.getByRole('heading', { name: 'Connect Fennec' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: /Live (match|training)/ }),
+  ).toBeVisible({ timeout: 5_000 });
+  await expect(page).toHaveURL(/\/setup\?demo=1$/);
 });
