@@ -150,9 +150,9 @@ export function MatchAnalytics({
         >
           {(
             [
-              ['analytics', 'Ball analytics'],
-              ...(pressure ? ([['pressure', 'Pressure']] as const) : []),
               ['touch-map', 'Touch map'],
+              ...(pressure ? ([['pressure', 'Pressure']] as const) : []),
+              ['analytics', 'Ball analytics'],
             ] as const
           ).map(([value, label]) => (
             <button

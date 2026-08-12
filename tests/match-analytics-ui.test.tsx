@@ -223,6 +223,11 @@ describe('match analytics view switch', () => {
       />,
     );
 
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Touch map',
+      'Pressure',
+      'Ball analytics',
+    ]);
     fireEvent.click(screen.getByRole('tab', { name: 'Pressure' }));
     expect(
       await screen.findByRole('heading', { name: 'Pressure' }),
