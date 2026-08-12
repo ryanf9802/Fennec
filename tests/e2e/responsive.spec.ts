@@ -1262,6 +1262,61 @@ test('setup detects a companion that starts after the page is already open', asy
   expect(page.context().pages()).toHaveLength(pageCount);
 });
 
+test('setup stops showing a previously completed companion as currently ready', async ({
+  page,
+}) => {
+  let available = true;
+  await page.addInitScript(() => {
+    localStorage.setItem('fennec-companion-token', 'installed-token');
+  });
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname === '/permission-probe') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    if (!available) {
+      await route.fulfill({ status: 503 });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        version: '0.2.13',
+        protocolVersion: 1,
+        paired: pathname === '/status',
+        gameRunning: false,
+        feedConnected: true,
+        stores: ['steam'],
+        configuredStores: ['steam'],
+        launchOnStartup: true,
+      },
+    });
+  });
+  await page.goto('/setup?demo=0');
+  await page.getByRole('button', { name: /With companion/ }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toBeVisible();
+
+  available = false;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+
+  const companionStep = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Install and run the companion' });
+  await expect(companionStep.locator('svg.text-fennec-orange')).toBeVisible({
+    timeout: 3_000,
+  });
+  await expect(
+    companionStep.getByText(
+      'The companion is not running or cannot be reached from this browser.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
+  ).toHaveCount(0);
+});
+
 test('setup treats a pre-automatic-access companion as an update state', async ({
   page,
 }) => {

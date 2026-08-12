@@ -191,8 +191,11 @@ export function OnboardingPage() {
     Boolean(health?.feedConnected || health?.lastPacketAt) ||
     storedCompanionStatsApiVerification();
   const companionSetupVerified = storedCompanionSetupCompletion();
-  const isComplete = demoMode || setup.state === 'complete';
-  const companionReady = health ? compatible : companionSetupVerified;
+  const isComplete =
+    demoMode ||
+    (setup.state === 'complete' &&
+      (path !== 'companion' || Boolean(health && compatible)));
+  const companionReady = Boolean(health && compatible);
   const installationConfigured = health
     ? hasConfiguredStore
     : companionSetupVerified;

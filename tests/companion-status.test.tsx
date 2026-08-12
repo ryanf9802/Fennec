@@ -41,6 +41,20 @@ describe('companion status polling', () => {
     expect(mocks.companionHealth).toHaveBeenCalledTimes(2);
   });
 
+  it('clears stale health when a running companion disappears', async () => {
+    mocks.companionHealth
+      .mockResolvedValueOnce(connectedHealth)
+      .mockResolvedValueOnce(undefined);
+    const { result } = renderHook(() => useCompanionStatus());
+
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(result.current.health).toEqual(connectedHealth);
+
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(result.current.health).toBeUndefined();
+    expect(mocks.companionHealth).toHaveBeenCalledTimes(2);
+  });
+
   it('rechecks immediately when the browser regains focus', async () => {
     mocks.companionHealth.mockResolvedValue(undefined);
     renderHook(() => useCompanionStatus());
