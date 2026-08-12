@@ -69,6 +69,19 @@ export function SettingsPage() {
   const syncBusy = ['connecting', 'restoring', 'reconciling'].includes(
     syncStatus.mode,
   );
+  const gameRunning = Boolean(companionReady && companion.health?.gameRunning);
+  const dataActionMessage = !companionReady
+    ? undefined
+    : syncBusy && gameRunning
+      ? 'Close Rocket League and wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.'
+      : syncBusy
+        ? 'Wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.'
+        : gameRunning
+          ? 'Close Rocket League before restoring a backup or deleting history.'
+          : undefined;
+  const dataActionStatusId = dataActionMessage
+    ? 'data-action-availability'
+    : undefined;
   const patchDraft = (patch: Partial<FennecSettings>) =>
     setDraft((current) => ({ ...current, ...patch }));
 
@@ -222,10 +235,9 @@ export function SettingsPage() {
           Export CSV
         </button>
         <button
+          aria-describedby={dataActionStatusId}
           className="button-secondary"
-          disabled={
-            companionReady && (syncBusy || companion.health?.gameRunning)
-          }
+          disabled={companionReady && (syncBusy || gameRunning)}
           onClick={() => fileInput.current?.click()}
         >
           <Upload className="size-4" />
@@ -240,6 +252,7 @@ export function SettingsPage() {
         />
         {companionReady && (
           <button
+            aria-describedby={syncBusy ? dataActionStatusId : undefined}
             className="button-secondary"
             disabled={syncBusy}
             onClick={() => void rebuildCache()}
@@ -249,10 +262,9 @@ export function SettingsPage() {
           </button>
         )}
         <button
+          aria-describedby={dataActionStatusId}
           className="button-danger"
-          disabled={
-            companionReady && (syncBusy || companion.health?.gameRunning)
-          }
+          disabled={companionReady && (syncBusy || gameRunning)}
           onClick={() => {
             const count = companionReady
               ? (companion.health?.canonicalMatches ?? storage?.matches ?? 0)
@@ -271,6 +283,15 @@ export function SettingsPage() {
           {companionReady ? 'Delete all history' : 'Delete history'}
         </button>
       </div>
+      {dataActionMessage && (
+        <p
+          id="data-action-availability"
+          className="text-muted mt-3 text-sm"
+          role="status"
+        >
+          {dataActionMessage}
+        </p>
+      )}
     </>
   );
 
