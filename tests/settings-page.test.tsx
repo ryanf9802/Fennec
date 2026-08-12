@@ -226,6 +226,19 @@ describe('settings CSV export', () => {
     ).toHaveAttribute('href', '/profile#player-selection');
   });
 
+  it('describes browser-only storage without pairing language', () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText(/When a compatible companion is not running/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/paired companion/i)).not.toBeInTheDocument();
+  });
+
   it('merges durable data and companion controls when canonical sync is available', () => {
     mocks.fennec.syncStatus = {
       mode: 'restoring',

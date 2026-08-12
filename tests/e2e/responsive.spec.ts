@@ -1141,13 +1141,8 @@ test('setup starts with a centered route choice and expands after selection', as
     'false',
   );
   await expect(
-    page.getByRole('link', { name: 'Open installed companion' }),
-  ).toHaveAttribute(
-    'href',
-    `fennec://open?return_to=${encodeURIComponent(
-      `${new URL(page.url()).origin}/setup`,
-    )}`,
-  );
+    page.getByRole('button', { name: 'Open installed companion' }),
+  ).toBeEnabled();
   await expect(
     page.getByRole('link', { name: 'Download latest companion' }),
   ).toHaveAttribute(
@@ -1162,6 +1157,100 @@ test('setup starts with a centered route choice and expands after selection', as
   await expect(
     page.getByRole('button', { name: /With companion/ }),
   ).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('setup automatically connects a running companion in the current page', async ({
+  page,
+}) => {
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === '/pair' && request.method() === 'POST') {
+      await route.fulfill({ json: { token: 'in-place-token' } });
+      return;
+    }
+    if (pathname === '/status') {
+      await route.fulfill({
+        json: {
+          version: '0.2.0',
+          protocolVersion: 1,
+          paired: true,
+          gameRunning: false,
+          feedConnected: false,
+          stores: [],
+          configuredStores: [],
+          launchOnStartup: false,
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        version: '0.2.0',
+        protocolVersion: 1,
+        paired: false,
+        gameRunning: false,
+        feedConnected: false,
+        stores: [],
+        configuredStores: [],
+        launchOnStartup: false,
+      },
+    });
+  });
+  await page.goto('/setup?demo=0');
+  await page.getByRole('button', { name: /With companion/ }).click();
+  const setupUrl = page.url();
+  const pageCount = page.context().pages().length;
+
+  await expect(
+    page.getByText('Companion 0.2.0 is running and connected.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Open installed companion' }),
+  ).toHaveCount(0);
+  expect(page.url()).toBe(setupUrl);
+  expect(page.context().pages()).toHaveLength(pageCount);
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem('fennec-companion-token')),
+    )
+    .toBe('in-place-token');
+});
+
+test('setup treats a pre-automatic-access companion as an update state', async ({
+  page,
+}) => {
+  await page.route('http://127.0.0.1:49125/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname === '/pair') {
+      await route.fulfill({ status: 404 });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        version: '0.2.12',
+        protocolVersion: 1,
+        paired: false,
+        gameRunning: false,
+        feedConnected: false,
+        stores: [],
+        configuredStores: [],
+        launchOnStartup: false,
+      },
+    });
+  });
+  await page.goto('/setup?demo=0');
+  await page.getByRole('button', { name: /With companion/ }).click();
+
+  await expect(
+    page.getByText(
+      'Companion 0.2.12 is running and needs to finish updating before Fennec can connect. Keep it running; updates install automatically when Rocket League is closed.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Open installed companion' }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/not paired/i)).toHaveCount(0);
 });
 
 test('incomplete first launch opens Setup and completed setup links to Game timeline', async ({
@@ -1447,7 +1536,7 @@ test('ready panel navigates through a cinematic entrance replay', async ({
   ).toBeVisible();
 });
 
-test('settings companion pairing link selects the companion setup guide', async ({
+test('settings companion link selects the companion setup guide', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -1466,7 +1555,7 @@ test('settings companion pairing link selects the companion setup guide', async 
   await expect(
     page.getByRole('heading', { name: 'Setup instructions' }),
   ).toBeVisible();
-  await expect(page.getByText('Install and pair the companion')).toBeVisible();
+  await expect(page.getByText('Install and run the companion')).toBeVisible();
 
   await page.getByRole('button', { name: /Browser only/ }).click();
   await expect(page).toHaveURL(/\/setup$/);
@@ -1478,7 +1567,9 @@ test('settings companion pairing link selects the companion setup guide', async 
   ).toBeVisible();
 });
 
-test('paired setup exposes companion launch preferences', async ({ page }) => {
+test('connected setup exposes companion launch preferences', async ({
+  page,
+}) => {
   let dashboardCommandSeen = false;
   await page.addInitScript(() => {
     localStorage.setItem('fennec-companion-token', 'e2e-token');
@@ -1621,7 +1712,7 @@ test('one configured storefront completes its companion setup step and remains r
   await expect.poll(() => steamConfigureCommands).toBe(2);
 });
 
-test('companion incompatibility is an actionable pairing error', async ({
+test('companion incompatibility is an actionable update state', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -1652,13 +1743,13 @@ test('companion incompatibility is an actionable pairing error', async ({
   await page.goto('/setup?demo=0');
   await page.getByRole('button', { name: /With companion/ }).click();
 
-  const pairing = page
+  const companion = page
     .getByRole('listitem')
-    .filter({ hasText: 'Install and pair the companion' });
-  await expect(pairing.locator('svg.text-fennec-orange')).toBeVisible();
+    .filter({ hasText: 'Install and run the companion' });
+  await expect(companion.locator('svg.text-fennec-orange')).toBeVisible();
   await expect(
-    pairing.getByText(
-      'Fennec needs to finish updating before setup can continue. Keep the companion running while it updates automatically, then reload Fennec.',
+    companion.getByText(
+      'Fennec needs to finish updating before setup can continue. Keep the companion running while it updates automatically.',
     ),
   ).toBeVisible();
   await expect(

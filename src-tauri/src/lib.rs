@@ -179,21 +179,44 @@ fn should_exit_after_game(launch_on_startup: bool) -> bool {
     !launch_on_startup
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum DeepLinkAction {
+    Launch,
+    Open(Option<String>),
+    PairInPlace,
+    Ignore,
+}
+
+fn deep_link_action(value: &url::Url) -> DeepLinkAction {
+    if value.scheme() != "fennec" {
+        return DeepLinkAction::Ignore;
+    }
+    match value.host_str() {
+        Some("launch") => DeepLinkAction::Launch,
+        Some("open") => DeepLinkAction::Open(
+            value
+                .query_pairs()
+                .find_map(|(key, value)| (key == "return_to").then(|| value.into_owned())),
+        ),
+        Some("pair") => DeepLinkAction::PairInPlace,
+        _ => DeepLinkAction::Ignore,
+    }
+}
+
 fn handle_urls(
     app: tauri::AppHandle,
     urls: impl IntoIterator<Item = url::Url>,
     token: Option<&str>,
 ) {
     for value in urls {
-        if value.scheme() == "fennec" && value.host_str() == Some("launch") {
-            launch_from_url(app.clone(), &value);
-        } else if value.scheme() == "fennec" && value.host_str() == Some("open") {
-            let return_to = value
-                .query_pairs()
-                .find_map(|(key, value)| (key == "return_to").then(|| value.into_owned()));
-            if let Some(token) = token {
-                open_fennec(token, return_to.as_deref());
+        match deep_link_action(&value) {
+            DeepLinkAction::Launch => launch_from_url(app.clone(), &value),
+            DeepLinkAction::Open(return_to) => {
+                if let Some(token) = token {
+                    open_fennec(token, return_to.as_deref());
+                }
             }
+            DeepLinkAction::PairInPlace | DeepLinkAction::Ignore => {}
         }
     }
 }
@@ -320,8 +343,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_trusted_web_origin, pairing_url, should_exit_after_game, should_open_dashboard,
-        PRODUCTION_SETUP_URL,
+        deep_link_action, is_trusted_web_origin, pairing_url, should_exit_after_game,
+        should_open_dashboard, DeepLinkAction, PRODUCTION_SETUP_URL,
     };
 
     #[test]
@@ -380,5 +403,11 @@ mod tests {
         assert!(!should_open_dashboard(true, true, true));
         assert!(!should_open_dashboard(false, false, true));
         assert!(!should_open_dashboard(false, true, false));
+    }
+
+    #[test]
+    fn pairing_deep_link_activates_without_opening_a_browser() {
+        let value = url::Url::parse("fennec://pair").expect("valid pairing URL");
+        assert_eq!(deep_link_action(&value), DeepLinkAction::PairInPlace);
     }
 }

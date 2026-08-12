@@ -46,6 +46,17 @@ function renderSettings(
 describe('companion settings', () => {
   afterEach(() => vi.clearAllMocks());
 
+  it('describes connection without exposing pairing as a user task', () => {
+    renderSettings('current', { paired: false });
+
+    expect(
+      screen.getByText(
+        /Companion 0.2.1 is running and needs to finish updating/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/pair/i)).not.toBeInTheDocument();
+  });
+
   it('explains the lightweight persistent Windows startup behavior', () => {
     renderSettings('current');
 

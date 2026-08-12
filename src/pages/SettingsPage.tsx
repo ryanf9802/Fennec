@@ -445,9 +445,9 @@ export function SettingsPage() {
           <section className="surface-flat rounded-3xl p-5 sm:p-7">
             <h2 className="text-xl font-extrabold">Local data</h2>
             <p className="text-muted mt-2">
-              Without a compatible paired companion, match history and compact
-              analytics stay in this browser. Full technical payloads are
-              retained for {storage?.rawRetentionDays ?? 90} days.
+              When a compatible companion is not running, match history and
+              compact analytics stay in this browser. Full technical payloads
+              are retained for {storage?.rawRetentionDays ?? 90} days.
             </p>
             {dataControls}
           </section>

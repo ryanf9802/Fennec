@@ -17,7 +17,7 @@ import {
   acceptCompanionPairing,
   companionCommand,
   companionDownloadUrl,
-  companionOpenUrl,
+  startInstalledCompanion,
 } from '../companion/client';
 import { isStatsApiConnected } from '../domain/connectionPresentation';
 import { useLocalAccess } from '../platform/LocalAccessContext';
@@ -156,6 +156,7 @@ export function OnboardingPage() {
   const { replayCinematic } = useAppEntrance();
   const [configuring, setConfiguring] = useState<'steam' | 'epic'>();
   const [companionMessage, setCompanionMessage] = useState<string>();
+  const [startMessage, setStartMessage] = useState<string>();
   const selectSetupPath = useCallback(
     (nextPath: SetupPath) => {
       selectPath(nextPath);
@@ -180,7 +181,7 @@ export function OnboardingPage() {
       void recheck();
     }
   }, [recheck, selectPath]);
-  const paired = Boolean(health?.paired);
+  const connected = Boolean(health?.paired);
   const compatible = companionCompatible(health);
   const statsApiConnected = isStatsApiConnected(connection);
   const hasConfiguredStore = companionHasConfiguredStore(health);
@@ -188,7 +189,7 @@ export function OnboardingPage() {
     Boolean(health?.lastPacketAt) || storedCompanionCaptureVerification();
   const companionSetupVerified = storedCompanionSetupCompletion();
   const isComplete = demoMode || setup.state === 'complete';
-  const pairingComplete = health ? compatible : companionSetupVerified;
+  const companionReady = health ? compatible : companionSetupVerified;
   const installationConfigured = health
     ? hasConfiguredStore
     : companionSetupVerified;
@@ -213,6 +214,16 @@ export function OnboardingPage() {
     );
     await recheck();
     setConfiguring(undefined);
+  };
+  const startCompanion = () => {
+    setStartMessage(undefined);
+    if (!startInstalledCompanion()) {
+      setStartMessage(
+        'Could not open the installed companion. Start it from Windows or install the latest version, then try again.',
+      );
+      return;
+    }
+    window.setTimeout(() => void recheck(), 1_000);
   };
   if (!path)
     return (
@@ -277,21 +288,21 @@ export function OnboardingPage() {
           {path === 'companion' ? (
             <>
               <Requirement
-                complete={pairingComplete}
-                title="Install and pair the companion"
+                complete={companionReady}
+                title="Install and run the companion"
               >
-                {paired
+                {connected
                   ? compatible
-                    ? `Companion ${health?.version} is paired and responding.`
-                    : 'Fennec needs to finish updating before setup can continue. Keep the companion running while it updates automatically, then reload Fennec.'
+                    ? `Companion ${health?.version} is running and connected.`
+                    : 'Fennec needs to finish updating before setup can continue. Keep the companion running while it updates automatically.'
                   : health
-                    ? `Companion ${health.version} is responding but is not paired with this browser.`
+                    ? `Companion ${health.version} is running and needs to finish updating before Fennec can connect. Keep it running; updates install automatically when Rocket League is closed.`
                     : 'The companion is not running or cannot be reached from this browser.'}
-                {!paired && (
+                {!health && (
                   <div className="mt-3 flex flex-wrap gap-3">
-                    <a className="button-primary" href={companionOpenUrl()}>
+                    <button className="button-primary" onClick={startCompanion}>
                       Open installed companion
-                    </a>
+                    </button>
                     <a
                       className="button-secondary"
                       href={companionDownloadUrl}
@@ -300,6 +311,9 @@ export function OnboardingPage() {
                       <Download className="size-4" /> Download latest companion
                     </a>
                   </div>
+                )}
+                {!health && startMessage && (
+                  <p className="mt-2">{startMessage}</p>
                 )}
               </Requirement>
               <Requirement

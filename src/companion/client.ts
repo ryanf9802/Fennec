@@ -3,7 +3,6 @@ import type {
   FennecSettings,
   MatchState,
 } from '../domain/types';
-import { isLoopbackHostname } from '../platform/origin';
 
 export interface CompanionHealth {
   version: string;
@@ -56,19 +55,9 @@ export const companionProtocolVersion = 1;
 export const companionDataSyncVersion = 1;
 export const companionDownloadUrl =
   'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe';
-
-const productionSetupUrl = 'https://app.fennec.gg/setup';
-
-export function companionOpenUrl(): string {
-  const currentOrigin = new URL(location.origin);
-  const returnTo =
-    currentOrigin.origin === new URL(productionSetupUrl).origin ||
-    (currentOrigin.protocol === 'http:' &&
-      isLoopbackHostname(currentOrigin.hostname))
-      ? `${currentOrigin.origin}/setup`
-      : productionSetupUrl;
-  return `fennec://open?return_to=${encodeURIComponent(returnTo)}`;
-}
+export const companionPairingLaunchUrl = 'fennec://pair';
+let sessionPairingToken: string | undefined;
+let accessRequest: Promise<CompanionHealth | undefined> | undefined;
 
 function browserStorage(): Storage | undefined {
   try {
@@ -82,7 +71,22 @@ function browserStorage(): Storage | undefined {
 }
 
 export function companionPairingToken(): string | undefined {
-  return browserStorage()?.getItem('fennec-companion-token') ?? undefined;
+  try {
+    return (
+      browserStorage()?.getItem('fennec-companion-token') ?? sessionPairingToken
+    );
+  } catch {
+    return sessionPairingToken;
+  }
+}
+
+function saveCompanionPairingToken(token: string): void {
+  sessionPairingToken = token;
+  try {
+    browserStorage()?.setItem('fennec-companion-token', token);
+  } catch {
+    // Session memory still allows automatic access when persistence is blocked.
+  }
 }
 
 export function companionCursor(): string {
@@ -96,11 +100,65 @@ export function saveCompanionCursor(cursor: number): void {
 export function acceptCompanionPairing(): boolean {
   const value = new URLSearchParams(location.hash.slice(1)).get('companion');
   if (!value) return false;
-  const storage = browserStorage();
-  if (!storage) return false;
-  storage.setItem('fennec-companion-token', value);
+  saveCompanionPairingToken(value);
   history.replaceState(null, '', `${location.pathname}${location.search}`);
   return true;
+}
+
+async function authenticatedCompanionStatus(
+  token: string,
+): Promise<CompanionHealth | undefined> {
+  try {
+    const response = await fetch('http://127.0.0.1:49125/status', {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(1_500),
+    });
+    return response.ok
+      ? ((await response.json()) as CompanionHealth)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function requestAutomaticAccess(): Promise<CompanionHealth | undefined> {
+  const existingToken = companionPairingToken();
+  if (existingToken) {
+    const status = await authenticatedCompanionStatus(existingToken);
+    if (status) return status;
+  }
+  try {
+    const response = await fetch('http://127.0.0.1:49125/pair', {
+      method: 'POST',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(1_500),
+    });
+    if (!response.ok) return undefined;
+    const value = (await response.json()) as { token?: unknown };
+    if (typeof value.token !== 'string' || !value.token) return undefined;
+    saveCompanionPairingToken(value.token);
+    return authenticatedCompanionStatus(value.token);
+  } catch {
+    return undefined;
+  }
+}
+
+export function ensureCompanionAccess(): Promise<CompanionHealth | undefined> {
+  if (accessRequest) return accessRequest;
+  accessRequest = requestAutomaticAccess().finally(() => {
+    accessRequest = undefined;
+  });
+  return accessRequest;
+}
+
+export function startInstalledCompanion(): boolean {
+  try {
+    location.assign(companionPairingLaunchUrl);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function companionHealth(): Promise<CompanionHealth | undefined> {
@@ -111,14 +169,7 @@ export async function companionHealth(): Promise<CompanionHealth | undefined> {
     });
     if (!response.ok) return undefined;
     const health = (await response.json()) as CompanionHealth;
-    const pairingToken = companionPairingToken();
-    if (!pairingToken) return health;
-    const status = await fetch('http://127.0.0.1:49125/status', {
-      headers: { Authorization: `Bearer ${pairingToken}` },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(1_500),
-    });
-    return status.ok ? ((await status.json()) as CompanionHealth) : health;
+    return (await ensureCompanionAccess()) ?? health;
   } catch {
     return undefined;
   }

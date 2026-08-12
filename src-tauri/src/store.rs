@@ -276,12 +276,13 @@ fn shortcut_details(kind: StoreKind) -> (&'static str, &'static str) {
     }
 }
 
+fn shortcut_script() -> &'static str {
+    r#"$ErrorActionPreference = 'Stop'; $shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut($env:FENNEC_SHORTCUT_PATH); $shortcut.TargetPath = $env:FENNEC_SHORTCUT_TARGET; $shortcut.Arguments = $env:FENNEC_SHORTCUT_ARGUMENTS; $shortcut.WorkingDirectory = $env:FENNEC_SHORTCUT_WORKING_DIRECTORY; $shortcut.IconLocation = $env:FENNEC_SHORTCUT_ICON; $shortcut.Description = $env:FENNEC_SHORTCUT_DESCRIPTION; $shortcut.Save()"#
+}
+
 #[cfg(windows)]
-pub fn create_shortcut(kind: StoreKind) -> io::Result<PathBuf> {
-    let profile = std::env::var_os("USERPROFILE")
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Windows user profile not found"))?;
+fn create_shortcut_at(kind: StoreKind, desktop: &Path) -> io::Result<PathBuf> {
     let (label, uri) = shortcut_details(kind);
-    let desktop = PathBuf::from(profile).join("Desktop");
     let path = desktop.join(format!("Rocket League ({label}) with Fennec.lnk"));
     let legacy = desktop.join(format!("Rocket League ({label}) with Fennec.url"));
     let executable = std::env::current_exe()?;
@@ -295,21 +296,32 @@ pub fn create_shortcut(kind: StoreKind) -> io::Result<PathBuf> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "companion directory not found"))?;
     let icon = format!("{},0", executable.to_string_lossy());
     let description = format!("Launch Rocket League ({label}) with Fennec");
-    let script = r#"$shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut($args[0]); $shortcut.TargetPath = $args[1]; $shortcut.Arguments = $args[2]; $shortcut.WorkingDirectory = $args[3]; $shortcut.IconLocation = $args[4]; $shortcut.Description = $args[5]; $shortcut.Save()"#;
     let status = crate::hidden_windows_command("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", script])
-        .arg(&path)
-        .arg(&explorer)
-        .arg(uri)
-        .arg(working_directory)
-        .arg(&icon)
-        .arg(&description)
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            shortcut_script(),
+        ])
+        .env("FENNEC_SHORTCUT_PATH", &path)
+        .env("FENNEC_SHORTCUT_TARGET", &explorer)
+        .env("FENNEC_SHORTCUT_ARGUMENTS", uri)
+        .env("FENNEC_SHORTCUT_WORKING_DIRECTORY", working_directory)
+        .env("FENNEC_SHORTCUT_ICON", &icon)
+        .env("FENNEC_SHORTCUT_DESCRIPTION", &description)
         .status()?;
     if !status.success() || !path.exists() {
         return Err(io::Error::other("Windows shortcut creation failed"));
     }
     let _ = fs::remove_file(legacy);
     Ok(path)
+}
+
+#[cfg(windows)]
+pub fn create_shortcut(kind: StoreKind) -> io::Result<PathBuf> {
+    let profile = std::env::var_os("USERPROFILE")
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Windows user profile not found"))?;
+    create_shortcut_at(kind, &PathBuf::from(profile).join("Desktop"))
 }
 
 #[cfg(not(windows))]
@@ -419,6 +431,43 @@ mod tests {
             shortcut_details(StoreKind::Epic),
             ("Epic", "fennec://launch/epic")
         );
+    }
+
+    #[test]
+    fn shortcut_script_reads_values_from_the_environment() {
+        let script = shortcut_script();
+        assert!(!script.contains("param("));
+        assert!(script.contains("$env:FENNEC_SHORTCUT_PATH"));
+        assert!(script.contains("$env:FENNEC_SHORTCUT_ARGUMENTS"));
+        assert!(script.contains("$ErrorActionPreference = 'Stop'"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn creates_steam_and_epic_shortcuts() {
+        let desktop = std::env::temp_dir().join(format!(
+            "fennec-shortcut-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir_all(&desktop).expect("create shortcut test directory");
+
+        let steam = create_shortcut_at(StoreKind::Steam, &desktop)
+            .expect("create Steam shortcut with Windows PowerShell");
+        let epic = create_shortcut_at(StoreKind::Epic, &desktop)
+            .expect("create Epic shortcut with Windows PowerShell");
+
+        assert_eq!(
+            steam.file_name().and_then(|name| name.to_str()),
+            Some("Rocket League (Steam) with Fennec.lnk")
+        );
+        assert_eq!(
+            epic.file_name().and_then(|name| name.to_str()),
+            Some("Rocket League (Epic) with Fennec.lnk")
+        );
+        assert!(steam.exists());
+        assert!(epic.exists());
+
+        fs::remove_dir_all(desktop).expect("remove shortcut test directory");
     }
 
     #[cfg(not(windows))]
