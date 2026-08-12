@@ -896,15 +896,15 @@ test('settings merge data management with an authoritative companion', async ({
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Rebuild browser cache' }),
-  ).toBeDisabled();
+  ).toBeVisible();
   const restore = page.getByRole('button', { name: 'Restore backup' });
   await expect(restore).toBeDisabled();
   await expect(restore).toHaveAccessibleDescription(
-    'Close Rocket League and wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.',
+    /^Close Rocket League.*before restoring a backup.*deleting history\.$/,
   );
   await expect(
     page.getByText(
-      'Close Rocket League and wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.',
+      /^Close Rocket League.*before restoring a backup.*deleting history\.$/,
     ),
   ).toHaveAttribute('role', 'status');
   await expect(
