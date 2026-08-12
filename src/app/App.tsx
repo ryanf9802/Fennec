@@ -98,6 +98,7 @@ function AppContent() {
   useEffect(() => {
     if (
       setup.state === 'complete' &&
+      pathname !== '/setup' &&
       profile &&
       settings.autoOpenLiveMatch &&
       activeMatch &&
@@ -106,7 +107,14 @@ function AppContent() {
       opened.current = activeMatch.id;
       navigate('/live');
     }
-  }, [activeMatch, navigate, profile, settings.autoOpenLiveMatch, setup.state]);
+  }, [
+    activeMatch,
+    navigate,
+    pathname,
+    profile,
+    settings.autoOpenLiveMatch,
+    setup.state,
+  ]);
 
   if (!ready && diagnostic)
     return (

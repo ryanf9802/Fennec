@@ -2,7 +2,7 @@ import type { CompanionHealth } from '../src/companion/client';
 import {
   companionHasConfiguredStore,
   setupComplete,
-  storedCompanionCaptureVerification,
+  storedCompanionStatsApiVerification,
 } from '../src/setup/setupStatus';
 
 const companion: CompanionHealth = {
@@ -40,7 +40,7 @@ describe('setup completion', () => {
         accessSatisfied: true,
         path: 'browser',
         statsApiVerified: false,
-        companionCaptureVerified: false,
+        companionStatsApiVerified: false,
         companionSetupVerified: false,
       }),
     ).toBe(false);
@@ -49,7 +49,7 @@ describe('setup completion', () => {
         accessSatisfied: true,
         path: 'browser',
         statsApiVerified: true,
-        companionCaptureVerified: false,
+        companionStatsApiVerified: false,
         companionSetupVerified: false,
       }),
     ).toBe(true);
@@ -61,7 +61,7 @@ describe('setup completion', () => {
         accessSatisfied: true,
         path: 'companion',
         statsApiVerified: false,
-        companionCaptureVerified: true,
+        companionStatsApiVerified: true,
         companionSetupVerified: false,
         health: companion,
       }),
@@ -71,7 +71,7 @@ describe('setup completion', () => {
         accessSatisfied: true,
         path: 'companion',
         statsApiVerified: false,
-        companionCaptureVerified: false,
+        companionStatsApiVerified: false,
         companionSetupVerified: false,
         health: companion,
       }),
@@ -91,7 +91,7 @@ describe('setup completion', () => {
         accessSatisfied: true,
         path: 'companion',
         statsApiVerified: false,
-        companionCaptureVerified: true,
+        companionStatsApiVerified: true,
         companionSetupVerified: false,
         health: partiallyConfigured,
       }),
@@ -110,7 +110,7 @@ describe('setup completion', () => {
         accessSatisfied: true,
         path: 'companion',
         statsApiVerified: false,
-        companionCaptureVerified: true,
+        companionStatsApiVerified: true,
         companionSetupVerified: true,
       }),
     ).toBe(true);
@@ -122,7 +122,7 @@ describe('setup completion', () => {
         accessSatisfied: true,
         path: 'companion',
         statsApiVerified: false,
-        companionCaptureVerified: true,
+        companionStatsApiVerified: true,
         companionSetupVerified: true,
         health: { ...companion, protocolVersion: 0 },
       }),
@@ -132,6 +132,12 @@ describe('setup completion', () => {
   it('recognizes an existing synchronized companion cursor as prior verification', () => {
     window.localStorage.setItem('fennec-companion-cursor', '12');
 
-    expect(storedCompanionCaptureVerification()).toBe(true);
+    expect(storedCompanionStatsApiVerification()).toBe(true);
+  });
+
+  it('accepts legacy first-packet verification for existing installs', () => {
+    window.localStorage.setItem('fennec-companion-capture-verified-v1', 'true');
+
+    expect(storedCompanionStatsApiVerification()).toBe(true);
   });
 });

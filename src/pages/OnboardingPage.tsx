@@ -25,7 +25,7 @@ import {
   companionCompatible,
   companionHasConfiguredStore,
   requestedSetupPath,
-  storedCompanionCaptureVerification,
+  storedCompanionStatsApiVerification,
   storedCompanionSetupCompletion,
   type SetupPath,
 } from '../setup/setupStatus';
@@ -50,7 +50,9 @@ function Requirement({
         )}
         <div>
           <strong>{title}</strong>
-          <div className="text-muted mt-1 text-sm">{children}</div>
+          <div aria-live="polite" className="text-muted mt-1 text-sm">
+            {children}
+          </div>
         </div>
       </div>
     </li>
@@ -185,8 +187,9 @@ export function OnboardingPage() {
   const compatible = companionCompatible(health);
   const statsApiConnected = isStatsApiConnected(connection);
   const hasConfiguredStore = companionHasConfiguredStore(health);
-  const companionCaptureVerified =
-    Boolean(health?.lastPacketAt) || storedCompanionCaptureVerification();
+  const companionStatsApiVerified =
+    Boolean(health?.feedConnected || health?.lastPacketAt) ||
+    storedCompanionStatsApiVerification();
   const companionSetupVerified = storedCompanionSetupCompletion();
   const isComplete = demoMode || setup.state === 'complete';
   const companionReady = health ? compatible : companionSetupVerified;
@@ -223,7 +226,10 @@ export function OnboardingPage() {
       );
       return;
     }
-    window.setTimeout(() => void recheck(), 1_000);
+    setStartMessage(
+      'Waiting for the companion to start. This step will update automatically.',
+    );
+    void recheck();
   };
   if (!path)
     return (
@@ -372,16 +378,14 @@ export function OnboardingPage() {
                 {companionMessage && <p className="mt-2">{companionMessage}</p>}
               </Requirement>
               <Requirement
-                complete={companionCaptureVerified}
-                title="Verify live capture"
+                complete={companionStatsApiVerified}
+                title="Enable the Rocket League Stats API"
               >
-                {health?.lastPacketAt
-                  ? `Feed connected${health.lastPacketAt ? `; last packet ${new Date(health.lastPacketAt).toLocaleTimeString()}` : ''}.`
-                  : companionCaptureVerified
-                    ? 'Live capture was verified previously. Start Rocket League to reconnect.'
-                    : health?.feedConnected
-                      ? 'Connected to Rocket League; waiting for the first Stats API packet.'
-                      : 'Start Rocket League after configuration and wait for the first Stats API packet.'}
+                {health?.feedConnected
+                  ? "Fennec is connected to Rocket League's Stats API."
+                  : companionStatsApiVerified
+                    ? 'Fennec previously connected successfully. Start Rocket League to reconnect.'
+                    : 'Start Rocket League after configuration. This step will complete automatically when the companion connects to the Stats API.'}
               </Requirement>
             </>
           ) : (
