@@ -870,7 +870,7 @@ test('settings merge data management with an authoritative companion', async ({
         protocolVersion: 1,
         dataSyncVersion: 1,
         paired: path === '/status',
-        gameRunning: false,
+        gameRunning: true,
         feedConnected: false,
         stores: ['steam'],
         configuredStores: ['steam'],
@@ -903,9 +903,19 @@ test('settings merge data management with an authoritative companion', async ({
   await expect(
     page.getByRole('button', { name: 'Rebuild browser cache' }),
   ).toBeVisible();
+  const restore = page.getByRole('button', { name: 'Restore backup' });
+  await expect(restore).toBeDisabled();
+  await expect(restore).toHaveAccessibleDescription(
+    /^Close Rocket League.*before restoring a backup.*deleting history\.$/,
+  );
+  await expect(
+    page.getByText(
+      /^Close Rocket League.*before restoring a backup.*deleting history\.$/,
+    ),
+  ).toHaveAttribute('role', 'status');
   await expect(
     page.getByRole('button', { name: 'Delete all history' }),
-  ).toBeVisible();
+  ).toBeDisabled();
   await expect(
     page.getByText('42 matches · 2.0 MB in the companion'),
   ).toBeVisible();
