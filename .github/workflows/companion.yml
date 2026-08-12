@@ -34,6 +34,7 @@ jobs:
               'src/companion/',
               'src/components/CompanionSettings.tsx',
               'src/pages/OnboardingPage.tsx',
+              'scripts/build-companion-installer.ps1',
               'scripts/companion-release-version.mjs',
               'package.json',
               'pnpm-lock.yaml',
@@ -76,6 +77,13 @@ jobs:
         with:
           shared-key: windows-companion
           workspaces: src-tauri -> target
+      - name: Cache Tauri bundler tools
+        uses: actions/cache@v5
+        with:
+          path: src-tauri/target/.tauri
+          key: tauri-bundler-tools-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            tauri-bundler-tools-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - name: Build web application
         run: pnpm build
@@ -83,7 +91,8 @@ jobs:
         working-directory: src-tauri
         run: cargo test --locked
       - name: Build companion installer
-        run: pnpm exec tauri build --no-sign --config src-tauri/tauri.prebuilt.conf.json
+        shell: pwsh
+        run: ./scripts/build-companion-installer.ps1 -Config src-tauri/tauri.prebuilt.conf.json
       - uses: actions/upload-artifact@v7
         with:
           name: fennec-companion-windows
