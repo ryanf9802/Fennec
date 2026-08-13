@@ -10,7 +10,6 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useFennec } from '../app/FennecContext';
 import { useAppEntrance } from '../components/AppEntrance';
-import { CompanionLaunchControls } from '../components/CompanionSettings';
 import { StatsApiSetup } from '../components/StatsApiSetup';
 import { StorageProtection } from '../components/StorageProtection';
 import {
@@ -411,21 +410,6 @@ export function OnboardingPage() {
             </>
           )}
         </ol>
-        {path === 'companion' && compatible && health && (
-          <div className="mt-6 border-t border-white/10 pt-6">
-            <h3 className="text-lg font-extrabold">
-              Launch Fennec with Rocket League
-            </h3>
-            <p className="text-muted mt-1 text-sm">
-              Windows startup is the recommended hands-off option. Store
-              shortcuts are available when you prefer to run the companion only
-              for a game session, and dashboard opening remains optional.
-            </p>
-            <div className="mt-4">
-              <CompanionLaunchControls health={health} recheck={recheck} />
-            </div>
-          </div>
-        )}
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
           <a
             className="button-secondary"
