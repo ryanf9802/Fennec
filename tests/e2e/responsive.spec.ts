@@ -1684,7 +1684,7 @@ test('settings companion link selects the companion setup guide', async ({
   ).toBeVisible();
 });
 
-test('connected setup exposes companion launch preferences', async ({
+test('companion launch preferences are managed only in settings', async ({
   page,
 }) => {
   let dashboardCommandSeen = false;
@@ -1723,7 +1723,25 @@ test('connected setup exposes companion launch preferences', async ({
   await page.getByRole('button', { name: /With companion/ }).click();
   await expect(
     page.getByRole('heading', { name: 'Launch Fennec with Rocket League' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Enable Windows startup (recommended)' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Add Steam shortcut' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Add Epic shortcut' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText('Use a compatible companion protocol'),
+  ).toHaveCount(0);
+  await expect(page.getByText(/protocol versions match/i)).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
   ).toBeVisible();
+
+  await page.goto('/settings?demo=0');
   await expect(
     page.getByRole('button', { name: 'Enable Windows startup (recommended)' }),
   ).toBeVisible();
@@ -1733,24 +1751,12 @@ test('connected setup exposes companion launch preferences', async ({
   await expect(
     page.getByRole('button', { name: 'Add Epic shortcut' }),
   ).toBeVisible();
-  await expect(
-    page.getByText('Use a compatible companion protocol'),
-  ).toHaveCount(0);
-  await expect(page.getByText(/protocol versions match/i)).toHaveCount(0);
   await page
     .getByRole('button', { name: 'Open dashboard with Rocket League' })
     .click();
   await expect.poll(() => dashboardCommandSeen).toBe(true);
   await expect(
     page.getByText('The dashboard will open when Rocket League starts.'),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'Fennec is set up and ready to go' }),
-  ).toBeVisible();
-  await expect(
-    page.getByText(
-      'Companion setup is complete for Steam and Epic. Fennec can capture matches in the background.',
-    ),
   ).toBeVisible();
 });
 
@@ -1881,6 +1887,14 @@ test('companion incompatibility is an actionable update state', async ({
 test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
   await openDemoPage(page, '/?demo=1');
   await expect(page.getByText('Past sessions')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Select your player' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', {
+      name: "Fennec couldn't identify your player",
+    }),
+  ).toHaveCount(0);
   await expect(
     page.getByText('Teammates:', { exact: true }).first(),
   ).toBeVisible();

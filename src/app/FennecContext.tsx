@@ -13,6 +13,7 @@ import {
   isTrackablePrimaryId,
   playerKeyForPrimaryId,
 } from '../domain/playerIdentity';
+import { inferInitialProfile } from '../domain/profileInference';
 import { isHistoryEligibleMatch, isTrainingMatch } from '../domain/playlists';
 import {
   defaultSettings,
@@ -275,7 +276,7 @@ export function FennecProvider({
       },
       /**
        * Reduces each feed envelope into live state, checkpoints durable match
-       * history, and keeps the selected or demo profile synchronized.
+       * history, and keeps the selected or inferred profile synchronized.
        */
       onEnvelope: async (envelope) => {
         const previous = activeRef.current;
@@ -305,8 +306,18 @@ export function FennecProvider({
               ? current
               : candidates;
           });
-        if (!result.current.observedByPrimaryId && profileRef.current)
-          result.current.observedByPrimaryId = profileRef.current.primaryId;
+        const inference = profileRef.current
+          ? undefined
+          : inferInitialProfile(result.current);
+        const inferredProfile =
+          inference?.status === 'resolved' ? inference.profile : undefined;
+        if (inferredProfile) {
+          profileRef.current = inferredProfile;
+          setProfile(inferredProfile);
+        }
+        const selected = profileRef.current;
+        if (!result.current.observedByPrimaryId && selected)
+          result.current.observedByPrimaryId = selected.primaryId;
         activeRef.current = result.current;
         setActiveMatch(
           result.current.lifecycle === 'live' ? result.current : undefined,
@@ -327,13 +338,19 @@ export function FennecProvider({
           result.current,
           addedEvent || result.current.lifecycle !== 'live',
         );
-        const selected = profileRef.current;
         const selectedPlayer =
           selected &&
           result.current.participants.find(
             (player) => player.primaryId === selected.primaryId,
           );
-        if (
+        if (inferredProfile) {
+          await saveProfile(inferredProfile);
+          feed.preferences?.(settingsRef.current, inferredProfile);
+          await historyRepository.prepareProfileSessions(
+            playerKeyForPrimaryId(inferredProfile.primaryId)!,
+          );
+          await queryClient.invalidateQueries({ queryKey: historyKeys.all });
+        } else if (
           selected &&
           selectedPlayer &&
           selected.displayName !== selectedPlayer.name
@@ -346,19 +363,6 @@ export function FennecProvider({
           setProfile(next);
           await saveProfile(next);
           feed.preferences?.(settingsRef.current, next);
-        } else if (demoMode && !selected) {
-          const demoPlayer = result.current.participants.find(
-            (player) => player.primaryId === 'Steam|demo-you|0',
-          );
-          if (demoPlayer?.primaryId) {
-            const next = {
-              primaryId: demoPlayer.primaryId,
-              displayName: demoPlayer.name,
-            };
-            profileRef.current = next;
-            setProfile(next);
-            await saveProfile(next);
-          }
         }
       },
     });
