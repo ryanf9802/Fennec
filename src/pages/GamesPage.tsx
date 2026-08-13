@@ -18,6 +18,7 @@ import { sessionIdleGapElapsed } from '../domain/sessions';
 import { formatClock, matchElapsedSeconds } from '../domain/timeline';
 import { formatTeamScore, profileTeamNumber } from '../domain/teamPresentation';
 import { playerKeyForPrimaryId } from '../domain/playerIdentity';
+import { inferInitialProfile } from '../domain/profileInference';
 import { isTrainingMatch } from '../domain/playlists';
 import { useSessions } from '../data/historyQueries';
 
@@ -54,6 +55,8 @@ export function GamesPage() {
   const profileKey = playerKeyForPrimaryId(profile?.primaryId);
   const sessionsQuery = useSessions(profileKey);
   const trainingActive = activeMatch ? isTrainingMatch(activeMatch) : false;
+  const profileInference =
+    activeMatch && !profile ? inferInitialProfile(activeMatch) : undefined;
   const orderedSessions =
     sessionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const current = orderedSessions[0];
@@ -128,15 +131,17 @@ export function GamesPage() {
         />
       </header>
 
-      {!profile && (
+      {!profile && profileInference?.status === 'failed' && (
         <section className="surface rounded-3xl border-cyan-300/30 px-6 py-12 text-center ring-2 ring-cyan-400/40">
           <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-cyan-400/15 text-fennec-cyan">
             <UserRound className="size-7" />
           </div>
-          <h2 className="mt-5 text-xl font-extrabold">Choose your player</h2>
+          <h2 className="mt-5 text-xl font-extrabold">
+            Fennec couldn't identify your player
+          </h2>
           <p className="text-muted mx-auto mt-2 max-w-md">
-            Select the player whose games and spectated matches you want Fennec
-            to show.
+            Select your player so Fennec can personalize this game and future
+            sessions.
           </p>
           <Link className="button-primary mt-6" to="/profile#player-selection">
             Select your player
@@ -191,10 +196,7 @@ export function GamesPage() {
         </Link>
       )}
 
-      {profile &&
-      !sessionsQuery.isLoading &&
-      !orderedSessions.length &&
-      !activeMatch ? (
+      {!sessionsQuery.isLoading && !orderedSessions.length && !activeMatch ? (
         <EmptyState />
       ) : (
         profile &&

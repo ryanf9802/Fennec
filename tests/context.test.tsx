@@ -8,12 +8,16 @@ const mocks = vi.hoisted(() => ({
   pendingSaves: [] as Array<() => void>,
   savedMatches: [] as MatchState[],
   checkpoints: [] as MatchState[],
+  preferences: [] as Array<
+    { primaryId: string; displayName: string } | undefined
+  >,
   latestMatch: undefined as MatchState | undefined,
   profile: undefined as { primaryId: string; displayName: string } | undefined,
   endCurrentSession: vi.fn(async () => 'ended' as const),
   saveProfile: vi.fn(),
   saveSettings: vi.fn(),
   clearProfile: vi.fn(),
+  prepareProfileSessions: vi.fn(async () => undefined),
 }));
 const storedBrowserValues = new Map<string, string>();
 
@@ -27,6 +31,12 @@ vi.mock('../src/feed/HybridStatsFeed', () => ({
       mocks.checkpoints.push(match);
     }
     tombstone() {}
+    preferences(
+      _settings: unknown,
+      profile?: { primaryId: string; displayName: string },
+    ) {
+      mocks.preferences.push(profile);
+    }
   },
 }));
 
@@ -38,7 +48,7 @@ vi.mock('../src/data/database', () => ({
   historyRepository: {
     initialize: vi.fn(async () => undefined),
     countMatches: vi.fn(async () => 0),
-    prepareProfileSessions: vi.fn(async () => undefined),
+    prepareProfileSessions: mocks.prepareProfileSessions,
     loadLatestMatch: vi.fn(async () => mocks.latestMatch),
     loadLiveMatches: vi.fn(async () => []),
   },
@@ -101,6 +111,15 @@ function LiveStateProbe() {
         {statsApiVerified ? 'Stats API verified' : 'Stats API unverified'}
       </div>
     </>
+  );
+}
+
+function ProfileProbe() {
+  const { profile } = useFennec();
+  return (
+    <div>
+      {profile ? `${profile.displayName}:${profile.primaryId}` : 'no profile'}
+    </div>
   );
 }
 
@@ -185,6 +204,7 @@ describe('Fennec live state', () => {
     for (const resolve of mocks.pendingSaves.splice(0)) resolve();
     mocks.savedMatches.length = 0;
     mocks.checkpoints.length = 0;
+    mocks.preferences.length = 0;
     mocks.latestMatch = undefined;
     mocks.profile = undefined;
     mocks.handlers = undefined;
@@ -192,6 +212,7 @@ describe('Fennec live state', () => {
     mocks.saveProfile.mockClear();
     mocks.saveSettings.mockClear();
     mocks.clearProfile.mockClear();
+    mocks.prepareProfileSessions.mockClear();
     window.localStorage.removeItem('fennec-stats-api-verified-v1');
   });
 
@@ -321,6 +342,100 @@ describe('Fennec live state', () => {
       primaryId: 'Steam|restored|0',
       displayName: 'Restored',
     });
+  });
+
+  it('infers and synchronizes the first profile before attributing a match', async () => {
+    render(
+      <FennecProvider>
+        <ProfileProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    await act(async () => {
+      await mocks.handlers!.onEnvelope({
+        event: 'UpdateState',
+        data: {
+          MatchGuid: 'first-match',
+          Players: [
+            {
+              Name: 'Viewer',
+              PrimaryId: 'Steam|viewer|0',
+              Shortcut: 1,
+              TeamNum: 0,
+            },
+            {
+              Name: 'Teammate',
+              PrimaryId: 'Epic|teammate|0',
+              Shortcut: 2,
+              TeamNum: 0,
+            },
+          ],
+          Game: {
+            PlaylistId: 11,
+            TimeSeconds: 300,
+            bHasTarget: true,
+            Target: { Name: 'Viewer', Shortcut: 1, TeamNum: 0 },
+          },
+        },
+      });
+    });
+
+    expect(screen.getByText('Viewer:Steam|viewer|0')).toBeInTheDocument();
+    expect(mocks.saveProfile).toHaveBeenCalledOnce();
+    expect(mocks.saveProfile).toHaveBeenCalledWith({
+      primaryId: 'Steam|viewer|0',
+      displayName: 'Viewer',
+    });
+    expect(mocks.preferences).toEqual([
+      { primaryId: 'Steam|viewer|0', displayName: 'Viewer' },
+    ]);
+    expect(mocks.prepareProfileSessions).toHaveBeenCalledWith(
+      'id:Steam|viewer|0',
+    );
+    expect(mocks.savedMatches[0]?.observedByPrimaryId).toBe('Steam|viewer|0');
+  });
+
+  it('never replaces an existing profile with the current view target', async () => {
+    mocks.profile = { primaryId: 'Steam|viewer|0', displayName: 'Viewer' };
+    render(
+      <FennecProvider>
+        <ProfileProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    await act(async () => {
+      await mocks.handlers!.onEnvelope({
+        event: 'UpdateState',
+        data: {
+          Players: [
+            {
+              Name: 'Viewer',
+              PrimaryId: 'Steam|viewer|0',
+              Shortcut: 1,
+              TeamNum: 0,
+            },
+            {
+              Name: 'Teammate',
+              PrimaryId: 'Epic|teammate|0',
+              Shortcut: 2,
+              TeamNum: 0,
+            },
+          ],
+          Game: {
+            PlaylistId: 11,
+            TimeSeconds: 300,
+            bHasTarget: true,
+            Target: { Name: 'Teammate', Shortcut: 2, TeamNum: 0 },
+          },
+        },
+      });
+    });
+
+    expect(screen.getByText('Viewer:Steam|viewer|0')).toBeInTheDocument();
+    expect(mocks.saveProfile).not.toHaveBeenCalled();
+    expect(mocks.preferences).toEqual([]);
   });
 
   it('starts persistence after training rolls over into a game', async () => {

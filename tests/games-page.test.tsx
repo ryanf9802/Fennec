@@ -171,15 +171,18 @@ describe('closed session presentation', () => {
     expect(screen.queryByText(/not saved to history/i)).not.toBeInTheDocument();
   });
 
-  it('prompts for a player without hiding the live match', () => {
+  it('only prompts after live player inference fails', () => {
     renderPage(session(), false, {
       ...match,
       id: 'unscoped-live',
       lifecycle: 'live',
       playlistName: 'Private Match',
+      participants: [participant('Someone', 'Steam|someone|0', 0)],
     });
     expect(
-      screen.getByRole('heading', { name: 'Choose your player' }),
+      screen.getByRole('heading', {
+        name: "Fennec couldn't identify your player",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Select your player' }),
@@ -195,6 +198,51 @@ describe('closed session presentation', () => {
       'href',
       '/live',
     );
+  });
+
+  it('does not prompt while live player data is pending or inferable', () => {
+    const { rerender } = renderPage(session(), false, {
+      ...match,
+      id: 'pending-live',
+      lifecycle: 'live',
+      playlistName: 'Private Match',
+    });
+    expect(
+      screen.queryByRole('link', { name: 'Select your player' }),
+    ).not.toBeInTheDocument();
+
+    mocks.fennec = {
+      ...mocks.fennec,
+      activeMatch: {
+        ...match,
+        id: 'inferable-live',
+        lifecycle: 'live',
+        participants: [
+          participant('You', 'Steam|you|0', 0),
+          participant('Teammate', 'Epic|mate|0', 0),
+        ],
+        viewTarget: { name: 'You', teamNumber: 0 },
+      },
+    };
+    rerender(
+      <MemoryRouter>
+        <GamesPage />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Select your player' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the kickoff state without requiring an initial profile', () => {
+    renderPage(null, false, undefined, 'unavailable');
+
+    expect(
+      screen.queryByRole('link', { name: 'Select your player' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Ready for kickoff' }),
+    ).toBeInTheDocument();
   });
 
   it('treats an empty timeline as ready to capture the first match', () => {

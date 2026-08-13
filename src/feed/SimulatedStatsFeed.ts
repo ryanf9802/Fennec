@@ -98,6 +98,8 @@ export class SimulatedStatsFeed implements StatsFeedAdapter {
           TimeSeconds: timeSeconds,
           bOvertime: false,
           bReplay: false,
+          bHasTarget: true,
+          Target: { Name: 'You', Shortcut: 1, TeamNum: 0 },
           Arena: 'DFH Stadium',
           Ball: { Speed: 9.1 + blue * 0.7, TeamNum: blue > orange ? 0 : 1 },
         },

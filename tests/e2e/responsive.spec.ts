@@ -1888,6 +1888,14 @@ test('dashboard emphasizes teammate and opponent rosters', async ({ page }) => {
   await openDemoPage(page, '/?demo=1');
   await expect(page.getByText('Past sessions')).toBeVisible();
   await expect(
+    page.getByRole('link', { name: 'Select your player' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', {
+      name: "Fennec couldn't identify your player",
+    }),
+  ).toHaveCount(0);
+  await expect(
     page.getByText('Teammates:', { exact: true }).first(),
   ).toBeVisible();
   await expect(
