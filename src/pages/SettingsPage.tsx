@@ -70,15 +70,15 @@ export function SettingsPage() {
     syncStatus.mode,
   );
   const gameRunning = Boolean(companionReady && companion.health?.gameRunning);
+  const liveDataActions = companion.health?.liveDataActions === true;
+  const gameDataActionsBlocked = gameRunning && !liveDataActions;
   const dataActionMessage = !companionReady
     ? undefined
-    : syncBusy && gameRunning
-      ? 'Close Rocket League and wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.'
-      : syncBusy
-        ? 'Wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.'
-        : gameRunning
-          ? 'Close Rocket League before restoring a backup or deleting history.'
-          : undefined;
+    : syncBusy
+      ? 'Wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.'
+      : gameDataActionsBlocked
+        ? 'Update the companion or close Rocket League before restoring a backup or deleting history.'
+        : undefined;
   const dataActionStatusId = dataActionMessage
     ? 'data-action-availability'
     : undefined;
@@ -92,7 +92,9 @@ export function SettingsPage() {
       if (
         !confirm(
           companionReady
-            ? `Replace the companion's durable Fennec data and this browser cache with ${backup.matches.length} matches from this backup?`
+            ? gameRunning && liveDataActions
+              ? `Replace the companion's saved history and this browser cache with ${backup.matches.length} matches from this backup? The current live match will be kept.`
+              : `Replace the companion's durable Fennec data and this browser cache with ${backup.matches.length} matches from this backup?`
             : `Replace local Fennec data with ${backup.matches.length} matches from this backup?`,
         )
       )
@@ -202,7 +204,9 @@ export function SettingsPage() {
       await storageQuery.refetch();
       setMessage(
         companionReady
-          ? 'History deleted from the companion and browser cache.'
+          ? gameRunning && liveDataActions
+            ? 'Saved history deleted. The current live match was kept.'
+            : 'History deleted from the companion and browser cache.'
           : 'Match history deleted.',
       );
     } catch (error) {
@@ -237,7 +241,7 @@ export function SettingsPage() {
         <button
           aria-describedby={dataActionStatusId}
           className="button-secondary"
-          disabled={companionReady && (syncBusy || gameRunning)}
+          disabled={companionReady && (syncBusy || gameDataActionsBlocked)}
           onClick={() => fileInput.current?.click()}
         >
           <Upload className="size-4" />
@@ -264,7 +268,7 @@ export function SettingsPage() {
         <button
           aria-describedby={dataActionStatusId}
           className="button-danger"
-          disabled={companionReady && (syncBusy || gameRunning)}
+          disabled={companionReady && (syncBusy || gameDataActionsBlocked)}
           onClick={() => {
             const count = companionReady
               ? (companion.health?.canonicalMatches ?? storage?.matches ?? 0)
@@ -272,7 +276,9 @@ export function SettingsPage() {
             if (
               confirm(
                 companionReady
-                  ? `Permanently delete ${count} matches from the companion and synchronized browsers? This cannot be undone.`
+                  ? gameRunning && liveDataActions
+                    ? 'Permanently delete all saved history from the companion and synchronized browsers? The current live match will be kept. This cannot be undone.'
+                    : `Permanently delete ${count} matches from the companion and synchronized browsers? This cannot be undone.`
                   : `Delete ${count} locally stored matches? This cannot be undone.`,
               )
             )
@@ -280,7 +286,11 @@ export function SettingsPage() {
           }}
         >
           <Trash2 className="size-4" />
-          {companionReady ? 'Delete all history' : 'Delete history'}
+          {companionReady
+            ? gameRunning && liveDataActions
+              ? 'Delete saved history'
+              : 'Delete all history'
+            : 'Delete history'}
         </button>
       </div>
       {dataActionMessage && (

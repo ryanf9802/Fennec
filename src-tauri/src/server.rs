@@ -55,6 +55,7 @@ pub struct RuntimeHealth {
     pub update_status: UpdateStatus,
     pub available_update_version: Option<String>,
     pub last_update_check_at: Option<String>,
+    pub live_data_actions: bool,
 }
 
 #[derive(Serialize)]
@@ -296,14 +297,13 @@ async fn restore_data(
     if !authorized(&headers, &state) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
-    if state.health.read().expect("health lock").game_running {
-        return (
-            StatusCode::CONFLICT,
-            "Close Rocket League before restoring Fennec data.",
-        )
-            .into_response();
-    }
-    match state.storage.replace_canonical(&value) {
+    let game_running = state.health.read().expect("health lock").game_running;
+    let result = if game_running {
+        state.storage.replace_canonical_preserving_live(&value)
+    } else {
+        state.storage.replace_canonical(&value)
+    };
+    match result {
         Ok(()) => {
             let _ = state
                 .replicas
@@ -318,14 +318,13 @@ async fn delete_history(State(state): State<Arc<AppState>>, headers: HeaderMap) 
     if !authorized(&headers, &state) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
-    if state.health.read().expect("health lock").game_running {
-        return (
-            StatusCode::CONFLICT,
-            "Close Rocket League before deleting Fennec history.",
-        )
-            .into_response();
-    }
-    match state.storage.delete_history() {
+    let game_running = state.health.read().expect("health lock").game_running;
+    let result = if game_running {
+        state.storage.delete_history_preserving_live()
+    } else {
+        state.storage.delete_history()
+    };
+    match result {
         Ok(()) => {
             let _ = state
                 .replicas
