@@ -56,8 +56,43 @@ export const companionDataSyncVersion = 1;
 export const companionDownloadUrl =
   'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe';
 export const companionPairingLaunchUrl = 'fennec://pair';
+const companionStatusRequestTimeoutMs = 1_500;
 let sessionPairingToken: string | undefined;
 let accessRequest: Promise<CompanionHealth | undefined> | undefined;
+
+async function companionStatusRequest<T>(
+  path: '/health' | '/pair' | '/status',
+  init?: RequestInit,
+): Promise<T | undefined> {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<undefined>((resolve) => {
+    timeout = setTimeout(() => {
+      // Abort normally releases fetch; resolving also protects polling when a
+      // browser leaves the loopback request or response body pending.
+      controller.abort();
+      resolve(undefined);
+    }, companionStatusRequestTimeoutMs);
+  });
+  const request = (async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:49125${path}`, {
+        cache: 'no-store',
+        ...init,
+        signal: controller.signal,
+      });
+      return response.ok ? ((await response.json()) as T) : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+  try {
+    return await Promise.race([request, deadline]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+    controller.abort();
+  }
+}
 
 function browserStorage(): Storage | undefined {
   try {
@@ -108,18 +143,9 @@ export function acceptCompanionPairing(): boolean {
 async function authenticatedCompanionStatus(
   token: string,
 ): Promise<CompanionHealth | undefined> {
-  try {
-    const response = await fetch('http://127.0.0.1:49125/status', {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(1_500),
-    });
-    return response.ok
-      ? ((await response.json()) as CompanionHealth)
-      : undefined;
-  } catch {
-    return undefined;
-  }
+  return companionStatusRequest<CompanionHealth>('/status', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }
 
 async function requestAutomaticAccess(): Promise<CompanionHealth | undefined> {
@@ -128,20 +154,12 @@ async function requestAutomaticAccess(): Promise<CompanionHealth | undefined> {
     const status = await authenticatedCompanionStatus(existingToken);
     if (status) return status;
   }
-  try {
-    const response = await fetch('http://127.0.0.1:49125/pair', {
-      method: 'POST',
-      cache: 'no-store',
-      signal: AbortSignal.timeout(1_500),
-    });
-    if (!response.ok) return undefined;
-    const value = (await response.json()) as { token?: unknown };
-    if (typeof value.token !== 'string' || !value.token) return undefined;
-    saveCompanionPairingToken(value.token);
-    return authenticatedCompanionStatus(value.token);
-  } catch {
-    return undefined;
-  }
+  const value = await companionStatusRequest<{ token?: unknown }>('/pair', {
+    method: 'POST',
+  });
+  if (typeof value?.token !== 'string' || !value.token) return undefined;
+  saveCompanionPairingToken(value.token);
+  return authenticatedCompanionStatus(value.token);
 }
 
 export function ensureCompanionAccess(): Promise<CompanionHealth | undefined> {
@@ -162,17 +180,9 @@ export function startInstalledCompanion(): boolean {
 }
 
 export async function companionHealth(): Promise<CompanionHealth | undefined> {
-  try {
-    const response = await fetch('http://127.0.0.1:49125/health', {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(1_500),
-    });
-    if (!response.ok) return undefined;
-    const health = (await response.json()) as CompanionHealth;
-    return (await ensureCompanionAccess()) ?? health;
-  } catch {
-    return undefined;
-  }
+  const health = await companionStatusRequest<CompanionHealth>('/health');
+  if (!health) return undefined;
+  return (await ensureCompanionAccess()) ?? health;
 }
 
 export async function companionCommand(

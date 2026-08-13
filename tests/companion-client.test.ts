@@ -7,6 +7,7 @@ describe('automatic companion access', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -158,6 +159,71 @@ describe('automatic companion access', () => {
     );
 
     await expect(client.companionHealth()).resolves.toEqual(publicHealth);
+  });
+
+  it('retries after a health fetch never settles', async () => {
+    vi.useFakeTimers();
+    const { storage } = browserStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    let stalledSignal: AbortSignal | undefined;
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce((_url: string, init: RequestInit) => {
+        stalledSignal = init.signal as AbortSignal;
+        return new Promise(() => undefined);
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => publicHealth })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: 'recovered-token' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...publicHealth, paired: true }),
+      });
+    vi.stubGlobal('fetch', fetch);
+
+    const stalledCheck = client.companionHealth();
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    await expect(stalledCheck).resolves.toBeUndefined();
+    expect(stalledSignal?.aborted).toBe(true);
+    await expect(client.companionHealth()).resolves.toMatchObject({
+      paired: true,
+    });
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it('releases automatic access when a response body never settles', async () => {
+    vi.useFakeTimers();
+    const { storage } = browserStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => publicHealth })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => new Promise(() => undefined),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => publicHealth })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: 'recovered-token' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...publicHealth, paired: true }),
+      });
+    vi.stubGlobal('fetch', fetch);
+
+    const stalledCheck = client.companionHealth();
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    await expect(stalledCheck).resolves.toEqual(publicHealth);
+    await expect(client.companionHealth()).resolves.toMatchObject({
+      paired: true,
+    });
+    expect(fetch).toHaveBeenCalledTimes(5);
   });
 
   it('starts an installed companion without opening another web page', () => {
