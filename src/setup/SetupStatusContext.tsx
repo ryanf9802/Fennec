@@ -52,10 +52,15 @@ export function SetupStatusProvider({ children }: { children: ReactNode }) {
   const companion = useCompanionStatus(
     !demoMode && selectedPath === 'companion',
   );
-  const selectPath = useCallback((path: SetupPath) => {
-    rememberSetupPath(path);
-    setSelectedPath(path);
-  }, []);
+  const recheckCompanion = companion.recheck;
+  const selectPath = useCallback(
+    (path: SetupPath) => {
+      if (path === 'companion' && !demoMode) void recheckCompanion();
+      rememberSetupPath(path);
+      setSelectedPath(path);
+    },
+    [demoMode, recheckCompanion],
+  );
 
   useEffect(() => {
     if (

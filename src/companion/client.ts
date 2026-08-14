@@ -33,6 +33,7 @@ export interface CompanionHealth {
   materializedFrameId?: number;
   databaseBytes?: number;
   lastSyncedAt?: string;
+  liveDataActions?: boolean;
   resourceUsage?: CompanionResourceUsage | null;
 }
 

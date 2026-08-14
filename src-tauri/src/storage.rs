@@ -369,31 +369,99 @@ impl Storage {
     }
 
     pub fn replace_canonical(&self, state: &CanonicalState) -> io::Result<()> {
+        self.replace_canonical_with_live_capture(state, false)
+    }
+
+    pub fn replace_canonical_preserving_live(
+        &self,
+        state: &CanonicalState,
+    ) -> io::Result<()> {
+        self.replace_canonical_with_live_capture(state, true)
+    }
+
+    fn replace_canonical_with_live_capture(
+        &self,
+        state: &CanonicalState,
+        preserve_live_capture: bool,
+    ) -> io::Result<()> {
         let mut connection = self
             .connection
             .lock()
             .map_err(|_| io::Error::other("storage lock poisoned"))?;
         let transaction = connection.transaction().map_err(io::Error::other)?;
+        let preserved = if preserve_live_capture {
+            let mut statement = transaction
+                .prepare(
+                    "SELECT match_id, revision, payload, updated_at
+                     FROM checkpoints ORDER BY updated_at DESC",
+                )
+                .map_err(io::Error::other)?;
+            let mut rows = statement.query([]).map_err(io::Error::other)?;
+            let mut preserved = None;
+            while let Some(row) = rows.next().map_err(io::Error::other)? {
+                let payload: String = row.get(2).map_err(io::Error::other)?;
+                let is_live = serde_json::from_str::<Value>(&payload)
+                    .ok()
+                    .and_then(|value| value.get("lifecycle").and_then(Value::as_str).map(str::to_owned))
+                    .is_some_and(|lifecycle| lifecycle == "live");
+                if is_live {
+                    preserved = Some((
+                        row.get::<_, String>(0).map_err(io::Error::other)?,
+                        row.get::<_, i64>(1).map_err(io::Error::other)?,
+                        payload,
+                        row.get::<_, String>(3).map_err(io::Error::other)?,
+                    ));
+                    break;
+                }
+            }
+            preserved
+        } else {
+            None
+        };
         transaction
             .execute("DELETE FROM checkpoints", [])
             .map_err(io::Error::other)?;
         transaction
             .execute("DELETE FROM tombstones", [])
             .map_err(io::Error::other)?;
-        transaction
-            .execute("DELETE FROM frames", [])
-            .map_err(io::Error::other)?;
+        if !preserve_live_capture {
+            transaction
+                .execute("DELETE FROM frames", [])
+                .map_err(io::Error::other)?;
+        }
         for (revision, value) in state.matches.iter().enumerate() {
-            let Some(match_id) = value.get("id").and_then(Value::as_str) else {
+            let mut value = value.clone();
+            let Some(match_id) = value.get("id").and_then(Value::as_str).map(str::to_owned) else {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "match is missing id",
                 ));
             };
+            if preserved.as_ref().is_some_and(|(id, ..)| id == &match_id) {
+                continue;
+            }
+            if preserve_live_capture
+                && value.get("lifecycle").and_then(Value::as_str) == Some("live")
+            {
+                if let Some(object) = value.as_object_mut() {
+                    object.insert("lifecycle".to_string(), Value::String("incomplete".to_string()));
+                    if let Some(last_event_at) = object.get("lastEventAt").cloned() {
+                        object.insert("endedAt".to_string(), last_event_at);
+                    }
+                }
+            }
             transaction.execute(
                 "INSERT INTO checkpoints(match_id, revision, payload, updated_at) VALUES (?1, ?2, ?3, ?4)",
                 params![match_id, revision as i64 + 1, value.to_string(), chrono::Utc::now().to_rfc3339()],
             ).map_err(io::Error::other)?;
+        }
+        if let Some((match_id, revision, payload, updated_at)) = preserved {
+            transaction
+                .execute(
+                    "INSERT INTO checkpoints(match_id, revision, payload, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                    params![match_id, revision, payload, updated_at],
+                )
+                .map_err(io::Error::other)?;
         }
         match &state.settings {
             Some(settings) => put_metadata(&transaction, "settings", &settings.to_string()),
@@ -416,7 +484,10 @@ impl Storage {
             + 1;
         put_metadata(&transaction, "dataset_generation", &generation.to_string())
             .map_err(io::Error::other)?;
-        put_metadata(&transaction, "materialized_frame_id", "0").map_err(io::Error::other)?;
+        if !preserve_live_capture {
+            put_metadata(&transaction, "materialized_frame_id", "0")
+                .map_err(io::Error::other)?;
+        }
         put_metadata(
             &transaction,
             "last_synced_at",
@@ -429,6 +500,15 @@ impl Storage {
     pub fn delete_history(&self) -> io::Result<()> {
         let state = self.canonical_state()?;
         self.replace_canonical(&CanonicalState {
+            matches: Vec::new(),
+            settings: state.settings,
+            profile: state.profile,
+        })
+    }
+
+    pub fn delete_history_preserving_live(&self) -> io::Result<()> {
+        let state = self.canonical_state()?;
+        self.replace_canonical_preserving_live(&CanonicalState {
             matches: Vec::new(),
             settings: state.settings,
             profile: state.profile,
@@ -535,5 +615,103 @@ mod tests {
             storage.data_status().expect("status").dataset_generation,
             generation + 1
         );
+    }
+
+    #[test]
+    fn live_restore_preserves_capture_and_archives_imported_live_matches() {
+        let storage = Storage::open(Path::new(":memory:")).expect("in-memory storage");
+        let materialized = storage.store_frame("materialized").expect("first frame");
+        storage
+            .save_checkpoint(
+                "current",
+                10,
+                r#"{"id":"current","lifecycle":"live","lastEventAt":"2026-08-13T12:00:00Z"}"#,
+                Some(materialized.id),
+            )
+            .expect("live checkpoint");
+        storage
+            .save_checkpoint(
+                "old",
+                1,
+                r#"{"id":"old","lifecycle":"completed"}"#,
+                None,
+            )
+            .expect("old checkpoint");
+        storage.store_frame("pending").expect("pending frame");
+        let generation = storage.data_status().expect("status").dataset_generation;
+
+        storage
+            .replace_canonical_preserving_live(&CanonicalState {
+                matches: vec![
+                    serde_json::json!({"id": "restored", "lifecycle": "completed"}),
+                    serde_json::json!({
+                        "id": "backup-live",
+                        "lifecycle": "live",
+                        "lastEventAt": "2026-08-12T12:00:00Z"
+                    }),
+                ],
+                settings: None,
+                profile: None,
+            })
+            .expect("live restore");
+
+        let state = storage.canonical_state().expect("canonical state");
+        let current = state
+            .matches
+            .iter()
+            .find(|value| value["id"] == "current")
+            .expect("current match");
+        let imported_live = state
+            .matches
+            .iter()
+            .find(|value| value["id"] == "backup-live")
+            .expect("imported live match");
+        assert_eq!(current["lifecycle"], "live");
+        assert_eq!(imported_live["lifecycle"], "incomplete");
+        assert_eq!(imported_live["endedAt"], "2026-08-12T12:00:00Z");
+        assert!(state.matches.iter().all(|value| value["id"] != "old"));
+        let status = storage.data_status().expect("status");
+        assert_eq!(status.pending_frames, 1);
+        assert_eq!(status.materialized_frame_id, materialized.id);
+        assert_eq!(status.dataset_generation, generation + 1);
+    }
+
+    #[test]
+    fn live_delete_removes_every_match_except_the_current_capture() {
+        let storage = Storage::open(Path::new(":memory:")).expect("in-memory storage");
+        storage
+            .save_checkpoint(
+                "current",
+                10,
+                r#"{"id":"current","lifecycle":"live"}"#,
+                None,
+            )
+            .expect("live checkpoint");
+        storage
+            .save_checkpoint(
+                "incomplete",
+                1,
+                r#"{"id":"incomplete","lifecycle":"incomplete"}"#,
+                None,
+            )
+            .expect("incomplete checkpoint");
+        storage
+            .save_checkpoint(
+                "completed",
+                1,
+                r#"{"id":"completed","lifecycle":"completed"}"#,
+                None,
+            )
+            .expect("completed checkpoint");
+        storage.store_frame("pending").expect("pending frame");
+
+        storage
+            .delete_history_preserving_live()
+            .expect("live delete");
+
+        let state = storage.canonical_state().expect("canonical state");
+        assert_eq!(state.matches.len(), 1);
+        assert_eq!(state.matches[0]["id"], "current");
+        assert_eq!(storage.data_status().expect("status").pending_frames, 1);
     }
 }

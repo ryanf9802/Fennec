@@ -1,5 +1,12 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { ConnectionStatus } from '../src/components/ConnectionStatus';
+import { defaultSettings } from '../src/domain/types';
 import type { MatchState, StatsEnvelope } from '../src/domain/types';
 import type { StatsFeedHandlers } from '../src/feed/StatsFeedAdapter';
 
@@ -18,6 +25,10 @@ const mocks = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   clearProfile: vi.fn(),
   prepareProfileSessions: vi.fn(async () => undefined),
+  replaceAll: vi.fn(async () => undefined),
+  companionDeleteHistory: vi.fn(async () => undefined),
+  companionRestore: vi.fn(async () => undefined),
+  companionSnapshot: vi.fn(),
 }));
 const storedBrowserValues = new Map<string, string>();
 
@@ -64,7 +75,7 @@ vi.mock('../src/data/database', () => ({
     sidebarCollapsed: false,
     analytics: { playlistMode: 'ranked', groupByPlaylist: true },
   })),
-  replaceAll: vi.fn(),
+  replaceAll: mocks.replaceAll,
   saveMatch: vi.fn(
     (match: MatchState) =>
       new Promise<void>((resolve) => {
@@ -74,6 +85,12 @@ vi.mock('../src/data/database', () => ({
   ),
   saveProfile: mocks.saveProfile,
   saveSettings: mocks.saveSettings,
+}));
+
+vi.mock('../src/companion/client', () => ({
+  companionDeleteHistory: mocks.companionDeleteHistory,
+  companionRestore: mocks.companionRestore,
+  companionSnapshot: mocks.companionSnapshot,
 }));
 
 vi.mock('../src/feed/WebSocketStatsFeed', () => ({
@@ -157,6 +174,32 @@ function SessionPlayerCandidatesProbe() {
   );
 }
 
+function DataActionsProbe() {
+  const { activeMatch, deleteHistory, restoreBackup } = useFennec();
+  return (
+    <>
+      <div>{activeMatch?.id ?? 'no active match'}</div>
+      <button onClick={() => void deleteHistory(true)}>Delete canonical</button>
+      <button
+        onClick={() =>
+          void restoreBackup(
+            {
+              format: 'fennec-backup',
+              version: 5,
+              exportedAt: '2026-08-13T12:00:00Z',
+              settings: defaultSettings,
+              matches: [],
+            },
+            true,
+          )
+        }
+      >
+        Restore canonical
+      </button>
+    </>
+  );
+}
+
 function clockUpdate(timeSeconds: number): StatsEnvelope {
   return {
     event: 'ClockUpdatedSeconds',
@@ -213,7 +256,60 @@ describe('Fennec live state', () => {
     mocks.saveSettings.mockClear();
     mocks.clearProfile.mockClear();
     mocks.prepareProfileSessions.mockClear();
+    mocks.replaceAll.mockClear();
+    mocks.companionDeleteHistory.mockClear();
+    mocks.companionRestore.mockClear();
+    mocks.companionSnapshot.mockReset();
     window.localStorage.removeItem('fennec-stats-api-verified-v1');
+  });
+
+  it('rebuilds canonical data actions from the companion result', async () => {
+    const current = {
+      id: 'current-live',
+      lifecycle: 'live',
+      startedAt: new Date().toISOString(),
+      lastEventAt: new Date().toISOString(),
+      participants: [],
+      teams: [],
+      events: [],
+    } as unknown as MatchState;
+    mocks.companionSnapshot.mockResolvedValue({
+      matches: [current],
+      settings: defaultSettings,
+      profile: undefined,
+    });
+
+    render(
+      <FennecProvider>
+        <DataActionsProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete canonical' }));
+    await waitFor(() =>
+      expect(mocks.companionDeleteHistory).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('current-live')).toBeInTheDocument(),
+    );
+    expect(mocks.replaceAll).toHaveBeenLastCalledWith(
+      [current],
+      expect.objectContaining({ theme: defaultSettings.theme }),
+      undefined,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore canonical' }));
+    await waitFor(() =>
+      expect(mocks.companionRestore).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() =>
+      expect(mocks.companionSnapshot).toHaveBeenCalledTimes(2),
+    );
+    await waitFor(() => expect(mocks.replaceAll).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByText('current-live')).toBeInTheDocument(),
+    );
   });
 
   it('keeps successful Stats API verification after disconnection and remount', async () => {
