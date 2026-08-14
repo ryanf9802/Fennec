@@ -58,8 +58,22 @@ export const companionDownloadUrl =
   'https://github.com/ryanf9802/Fennec/releases/latest/download/Fennec-Companion-Windows-x64-setup.exe';
 export const companionPairingLaunchUrl = 'fennec://pair';
 const companionStatusRequestTimeoutMs = 1_500;
+const companionBaseUrl = 'http://127.0.0.1:49125';
 let sessionPairingToken: string | undefined;
 let accessRequest: Promise<CompanionHealth | undefined> | undefined;
+
+type LoopbackRequestInit = RequestInit & {
+  targetAddressSpace: 'loopback';
+};
+
+function companionFetch(path: string, init: RequestInit = {}) {
+  // Hosted Fennec must declare the HTTP destination before Chromium applies
+  // its secure-context Local Network Access checks.
+  return fetch(`${companionBaseUrl}${path}`, {
+    ...init,
+    targetAddressSpace: 'loopback',
+  } as LoopbackRequestInit);
+}
 
 async function companionStatusRequest<T>(
   path: '/health' | '/pair' | '/status',
@@ -77,7 +91,7 @@ async function companionStatusRequest<T>(
   });
   const request = (async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:49125${path}`, {
+      const response = await companionFetch(path, {
         cache: 'no-store',
         ...init,
         signal: controller.signal,
@@ -198,7 +212,7 @@ export async function companionCommand(
     | 'disable-dashboard-auto-open',
 ): Promise<boolean> {
   try {
-    const response = await fetch(`http://127.0.0.1:49125/commands/${command}`, {
+    const response = await companionFetch(`/commands/${command}`, {
       method: 'POST',
       headers: companionPairingToken()
         ? { Authorization: `Bearer ${companionPairingToken()}` }
@@ -217,7 +231,7 @@ async function companionDataRequest(
 ): Promise<Response> {
   const token = companionPairingToken();
   if (!token) throw new Error('Pair the companion before managing its data.');
-  const response = await fetch(`http://127.0.0.1:49125${path}`, {
+  const response = await companionFetch(path, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,

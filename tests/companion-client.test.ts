@@ -54,15 +54,24 @@ describe('automatic companion access', () => {
     });
     expect(values.get('fennec-companion-token')).toBe('automatic-token');
     expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      'http://127.0.0.1:49125/health',
+      expect.objectContaining({ targetAddressSpace: 'loopback' }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
       2,
       'http://127.0.0.1:49125/pair',
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({
+        method: 'POST',
+        targetAddressSpace: 'loopback',
+      }),
     );
     expect(fetch).toHaveBeenNthCalledWith(
       3,
       'http://127.0.0.1:49125/status',
       expect.objectContaining({
         headers: { Authorization: 'Bearer automatic-token' },
+        targetAddressSpace: 'loopback',
       }),
     );
   });
@@ -262,6 +271,7 @@ describe('automatic companion access', () => {
       expect.objectContaining({
         method: 'POST',
         headers: { Authorization: 'Bearer paired-token' },
+        targetAddressSpace: 'loopback',
       }),
     );
   });
@@ -295,6 +305,7 @@ describe('automatic companion access', () => {
         headers: expect.objectContaining({
           Authorization: 'Bearer paired-token',
         }),
+        targetAddressSpace: 'loopback',
       }),
     );
     expect(fetch).toHaveBeenNthCalledWith(
@@ -303,12 +314,16 @@ describe('automatic companion access', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify(snapshot),
+        targetAddressSpace: 'loopback',
       }),
     );
     expect(fetch).toHaveBeenNthCalledWith(
       3,
       'http://127.0.0.1:49125/data/delete-history',
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({
+        method: 'POST',
+        targetAddressSpace: 'loopback',
+      }),
     );
   });
 });
