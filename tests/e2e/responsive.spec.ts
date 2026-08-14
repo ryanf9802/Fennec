@@ -1,4 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { MatchState } from '../../src/domain/types';
+import type { BrowserMatchReducer } from '../../src/feed/BrowserMatchReducer';
+
+declare global {
+  interface Window {
+    fennecE2eReducer: BrowserMatchReducer;
+    fennecE2eState: { current?: MatchState };
+  }
+}
 
 const autoOpenDisabled = new WeakSet<Page>();
 
@@ -65,6 +74,73 @@ test.beforeEach(async ({ page }) => {
   await page.route('http://127.0.0.1:49125/**', (route) =>
     route.fulfill({ status: 503 }),
   );
+});
+
+test('a lagging browser tab cannot downgrade a completed shared match', async ({
+  context,
+  page,
+}) => {
+  const laggingPage = await context.newPage();
+  await Promise.all([page.goto('/landing/'), laggingPage.goto('/landing/')]);
+
+  const startMatch = (target: Page) =>
+    target.evaluate(async () => {
+      const { BrowserMatchReducer } =
+        await import('../../src/feed/BrowserMatchReducer');
+      const state: { current?: import('../../src/domain/types').MatchState } =
+        {};
+      const reducer = new BrowserMatchReducer();
+      await reducer.reduce(
+        () => state.current,
+        { event: 'MatchCreated', data: {} },
+        (match) => {
+          state.current = match;
+        },
+        '2026-08-14T00:00:00.000Z',
+      );
+      Object.assign(window, {
+        fennecE2eReducer: reducer,
+        fennecE2eState: state,
+      });
+      return state.current?.id;
+    });
+
+  const [primaryId, laggingId] = await Promise.all([
+    startMatch(page),
+    startMatch(laggingPage),
+  ]);
+  expect(laggingId).toBe(primaryId);
+
+  await page.evaluate(async () => {
+    const state = window.fennecE2eState;
+    await window.fennecE2eReducer.reduce(
+      () => state.current,
+      { event: 'MatchEnded', data: { WinnerTeamNum: 1 } },
+      (match) => {
+        state.current = match;
+      },
+      '2026-08-14T00:05:00.000Z',
+    );
+  });
+  const laggingResult = await laggingPage.evaluate(async () => {
+    const state = window.fennecE2eState;
+    const result = await window.fennecE2eReducer.reduce(
+      () => state.current,
+      { event: 'MatchDestroyed', data: {} },
+      (match) => {
+        state.current = match;
+      },
+      '2026-08-14T00:05:16.000Z',
+    );
+    return result.result.current;
+  });
+
+  expect(laggingResult).toMatchObject({
+    id: primaryId,
+    lifecycle: 'completed',
+    endedAt: '2026-08-14T00:05:00.000Z',
+    winnerTeamNumber: 1,
+  });
 });
 
 test('landing page stays concise and usable across viewport sizes', async ({

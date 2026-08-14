@@ -166,16 +166,23 @@ describe('browser match identity coordination', () => {
     );
     await firstReducer.reduce(
       first.read,
-      { event: 'MatchEnded', data: {} },
+      { event: 'MatchEnded', data: { WinnerTeamNum: 1 } },
       first.commit,
       '2026-08-14T00:05:00.000Z',
     );
-    await laggingReducer.reduce(
+    const lateUpdate = await laggingReducer.reduce(
       lagging.read,
       { event: 'UpdateState', data: {} },
       lagging.commit,
       '2026-08-14T00:05:00.010Z',
     );
+
+    expect(lateUpdate.result.current).toMatchObject({
+      id: original.result.current.id,
+      lifecycle: 'completed',
+      endedAt: '2026-08-14T00:05:00.000Z',
+      winnerTeamNumber: 1,
+    });
 
     const restarted = reducerState();
     const next = await new BrowserMatchReducer().reduce(
@@ -186,5 +193,48 @@ describe('browser match identity coordination', () => {
     );
 
     expect(next.result.current.id).not.toBe(original.result.current.id);
+  });
+
+  it('keeps shared completion authoritative through a lagging match destruction', async () => {
+    const first = reducerState();
+    const lagging = reducerState();
+    const firstReducer = new BrowserMatchReducer();
+    const laggingReducer = new BrowserMatchReducer();
+    const created = await firstReducer.reduce(
+      first.read,
+      matchCreated,
+      first.commit,
+      '2026-08-14T00:00:00.000Z',
+    );
+    await laggingReducer.reduce(
+      lagging.read,
+      matchCreated,
+      lagging.commit,
+      '2026-08-14T00:00:00.010Z',
+    );
+    await firstReducer.reduce(
+      first.read,
+      { event: 'MatchEnded', data: { WinnerTeamNum: 1 } },
+      first.commit,
+      '2026-08-14T00:05:00.000Z',
+    );
+
+    const destroyed = await laggingReducer.reduce(
+      lagging.read,
+      { event: 'MatchDestroyed', data: {} },
+      lagging.commit,
+      '2026-08-14T00:05:16.000Z',
+    );
+
+    expect(destroyed.result.current).toMatchObject({
+      id: created.result.current.id,
+      lifecycle: 'completed',
+      endedAt: '2026-08-14T00:05:00.000Z',
+      winnerTeamNumber: 1,
+    });
+    expect(destroyed.result.current.events.at(-1)).toMatchObject({
+      eventName: 'MatchDestroyed',
+      receivedAt: '2026-08-14T00:05:16.000Z',
+    });
   });
 });

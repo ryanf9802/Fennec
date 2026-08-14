@@ -9,6 +9,8 @@ interface SharedMatchIdentity {
   id: string;
   lifecycle: MatchState['lifecycle'];
   lastSeenAt: string;
+  endedAt?: string;
+  winnerTeamNumber?: number;
 }
 
 interface MatchReduction {
@@ -22,7 +24,10 @@ function validIdentity(value: unknown): value is SharedMatchIdentity {
   return (
     typeof record.id === 'string' &&
     ['live', 'completed', 'incomplete'].includes(String(record.lifecycle)) &&
-    typeof record.lastSeenAt === 'string'
+    typeof record.lastSeenAt === 'string' &&
+    (record.endedAt === undefined || typeof record.endedAt === 'string') &&
+    (record.winnerTeamNumber === undefined ||
+      typeof record.winnerTeamNumber === 'number')
   );
 }
 
@@ -35,7 +40,7 @@ export class BrowserMatchReducer {
     now = new Date().toISOString(),
   ): Promise<MatchReduction> {
     const operation = () => {
-      const previous = readPrevious();
+      const previous = this.applySharedCompletion(readPrevious());
       const fallbackId = this.fallbackId(previous, envelope, now);
       const result = reduceStatsEnvelope(previous, envelope, now, fallbackId);
       this.remember(result.current);
@@ -46,6 +51,26 @@ export class BrowserMatchReducer {
     return locks
       ? locks.request(identityLock, operation)
       : Promise.resolve(operation());
+  }
+
+  /** Makes a completed shared identity authoritative over a lagging tab's live copy. */
+  private applySharedCompletion(
+    previous: MatchState | undefined,
+  ): MatchState | undefined {
+    const shared = this.load();
+    if (
+      !previous ||
+      previous.lifecycle === 'completed' ||
+      shared?.id !== previous.id ||
+      shared.lifecycle !== 'completed'
+    )
+      return previous;
+    return {
+      ...previous,
+      lifecycle: 'completed',
+      endedAt: shared.endedAt ?? previous.endedAt ?? shared.lastSeenAt,
+      winnerTeamNumber: shared.winnerTeamNumber ?? previous.winnerTeamNumber,
+    };
   }
 
   /** Reuses only a recent live identity, while completed matches force a fresh allocation. */
@@ -95,7 +120,7 @@ export class BrowserMatchReducer {
       if (
         shared?.id === match.id &&
         shared.lifecycle === 'completed' &&
-        match.lifecycle === 'live'
+        match.lifecycle !== 'completed'
       )
         return;
       window.localStorage.setItem(
@@ -104,6 +129,11 @@ export class BrowserMatchReducer {
           id: match.id,
           lifecycle: match.lifecycle,
           lastSeenAt: match.lastEventAt,
+          endedAt: match.lifecycle === 'completed' ? match.endedAt : undefined,
+          winnerTeamNumber:
+            match.lifecycle === 'completed'
+              ? match.winnerTeamNumber
+              : undefined,
         } satisfies SharedMatchIdentity),
       );
     } catch {
