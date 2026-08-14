@@ -381,7 +381,7 @@ export function OnboardingPage() {
               </Requirement>
               <Requirement
                 complete={companionStatsApiVerified}
-                title="Enable the Rocket League Stats API"
+                title="Start Rocket League"
               >
                 {health?.feedConnected
                   ? "Fennec is connected to Rocket League's Stats API."

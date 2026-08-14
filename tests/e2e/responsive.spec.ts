@@ -1793,6 +1793,13 @@ test('one configured storefront completes its companion setup step and remains r
   await page.goto('/setup?demo=0');
   await page.getByRole('button', { name: /With companion/ }).click();
 
+  await expect(
+    page.getByText('Start Rocket League', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Enable the Rocket League Stats API', { exact: true }),
+  ).toHaveCount(0);
+
   const installationStep = page
     .getByRole('listitem')
     .filter({ hasText: 'Detect and configure Steam or Epic' });
