@@ -26,6 +26,10 @@ vi.mock('../src/app/FennecContext', () => ({
   }),
 }));
 
+vi.mock('../src/components/MatchAnalytics', () => ({
+  MatchAnalytics: () => null,
+}));
+
 const botMatch: MatchState = {
   id: 'bots',
   lifecycle: 'completed',

@@ -858,6 +858,23 @@ test('settings merge data management with an authoritative companion', async ({
   await page.addInitScript(() => {
     localStorage.setItem('fennec-companion-token', 'e2e-token');
   });
+  await page.routeWebSocket(
+    /^ws:\/\/127\.0\.0\.1:49125\/ws(?:\?|$)/,
+    (socket) => {
+      socket.send(
+        JSON.stringify({
+          type: 'sync_start',
+          totalMatches: 0,
+          status: {
+            instanceId: 'e2e-companion',
+            datasetGeneration: 1,
+            pendingFrames: 0,
+          },
+        }),
+      );
+      socket.send(JSON.stringify({ type: 'sync_complete' }));
+    },
+  );
   await page.route('http://127.0.0.1:49125/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/permission-probe') {

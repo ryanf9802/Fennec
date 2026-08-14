@@ -646,9 +646,9 @@ describe('Fennec live state', () => {
       await mocks.handlers!.onEnvelope(stateUpdate(13, 'live-match'));
       await mocks.handlers!.onEnvelope(clockUpdate(12));
     });
-    act(() => screen.getByRole('button', { name: 'Switch profile' }).click());
-    act(() => {
-      void mocks.handlers!.onEnvelope(clockUpdate(11));
+    await act(async () => {
+      screen.getByRole('button', { name: 'Switch profile' }).click();
+      await mocks.handlers!.onEnvelope(clockUpdate(11));
     });
 
     expect(mocks.savedMatches.at(-1)?.observedByPrimaryId).toBe(
