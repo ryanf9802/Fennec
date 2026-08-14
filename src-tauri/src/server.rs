@@ -564,15 +564,19 @@ async fn serve_socket(socket: WebSocket, state: Arc<AppState>, cursor: i64, dura
     }
 }
 
-pub async fn run(state: Arc<AppState>) -> std::io::Result<()> {
-    let cors = CorsLayer::new()
+fn companion_cors() -> CorsLayer {
+    CorsLayer::new()
         .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
             origin
                 .to_str()
                 .is_ok_and(crate::is_trusted_web_origin)
         }))
         .allow_methods([Method::GET, Method::POST])
-        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+        .allow_private_network(true)
+}
+
+pub async fn run(state: Arc<AppState>) -> std::io::Result<()> {
     let app = Router::new()
         .route("/permission-probe", get(permission_probe))
         .route("/health", get(health))
@@ -584,7 +588,7 @@ pub async fn run(state: Arc<AppState>) -> std::io::Result<()> {
         .route("/data/delete-history", post(delete_history))
         .route("/ws", get(websocket))
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
-        .layer(cors)
+        .layer(companion_cors())
         .with_state(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:49125").await?;
     axum::serve(listener, app)
@@ -640,11 +644,16 @@ pub async fn monitor_resources(state: Arc<AppState>) {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_process_cpu, pairing_origin_allowed, pairing_token_response, ResourceSample,
-        ResourceWindow,
+        companion_cors, normalize_process_cpu, pairing_origin_allowed, pairing_token_response,
+        permission_probe, ResourceSample, ResourceWindow,
     };
-    use axum::http::{header, HeaderMap, HeaderValue};
+    use axum::{
+        http::{header, HeaderMap, HeaderValue},
+        routing::get,
+        Router,
+    };
     use std::time::{Duration, Instant};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[test]
     fn normalizes_process_cpu_to_the_whole_machine() {
@@ -704,5 +713,51 @@ mod tests {
     fn pairing_token_response_cannot_be_cached() {
         let response = pairing_token_response("secret".to_string());
         assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+    }
+
+    #[tokio::test]
+    async fn private_network_preflights_require_a_trusted_origin() {
+        let app = Router::new()
+            .route("/permission-probe", get(permission_probe))
+            .layer(companion_cors());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test companion server");
+        let address = listener.local_addr().expect("read test server address");
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app)
+                .await
+                .expect("serve test companion requests");
+        });
+
+        async fn preflight(address: std::net::SocketAddr, origin: &str) -> String {
+            let mut stream = tokio::net::TcpStream::connect(address)
+                .await
+                .expect("connect to test companion server");
+            let request = format!(
+                "OPTIONS /permission-probe HTTP/1.1\r\nHost: {address}\r\nOrigin: {origin}\r\nAccess-Control-Request-Method: GET\r\nAccess-Control-Request-Private-Network: true\r\nConnection: close\r\n\r\n"
+            );
+            stream
+                .write_all(request.as_bytes())
+                .await
+                .expect("write preflight request");
+            let mut response = String::new();
+            stream
+                .read_to_string(&mut response)
+                .await
+                .expect("read preflight response");
+            response.to_ascii_lowercase()
+        }
+
+        let trusted = preflight(address, "https://app.fennec.gg").await;
+        assert!(trusted.contains(
+            "access-control-allow-origin: https://app.fennec.gg"
+        ));
+        assert!(trusted.contains("access-control-allow-private-network: true"));
+
+        let untrusted = preflight(address, "https://attacker.example").await;
+        assert!(!untrusted.contains("access-control-allow-origin:"));
+
+        server.abort();
     }
 }

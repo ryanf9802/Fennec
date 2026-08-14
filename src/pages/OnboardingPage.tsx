@@ -4,6 +4,7 @@ import {
   Download,
   ExternalLink,
   Monitor,
+  RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -156,6 +157,7 @@ export function OnboardingPage() {
   const selectPath = setup.selectPath;
   const { replayCinematic } = useAppEntrance();
   const [configuring, setConfiguring] = useState<'steam' | 'epic'>();
+  const [checkingCompanion, setCheckingCompanion] = useState(false);
   const [companionMessage, setCompanionMessage] = useState<string>();
   const [startMessage, setStartMessage] = useState<string>();
   const selectSetupPath = useCallback(
@@ -232,6 +234,15 @@ export function OnboardingPage() {
       'Waiting for the companion to start. This step will update automatically.',
     );
     void recheck();
+  };
+  const checkCompanionAgain = async () => {
+    setCheckingCompanion(true);
+    setStartMessage(undefined);
+    try {
+      await Promise.all([access.recheck(), recheck()]);
+    } finally {
+      setCheckingCompanion(false);
+    }
   };
   if (!path)
     return (
@@ -318,6 +329,14 @@ export function OnboardingPage() {
                     >
                       <Download className="size-4" /> Download latest companion
                     </a>
+                    <button
+                      className="button-secondary"
+                      disabled={checkingCompanion}
+                      onClick={() => void checkCompanionAgain()}
+                    >
+                      <RefreshCw className="size-4" />{' '}
+                      {checkingCompanion ? 'Checking…' : 'Check again'}
+                    </button>
                   </div>
                 )}
                 {!health && startMessage && (
