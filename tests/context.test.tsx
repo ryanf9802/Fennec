@@ -344,6 +344,52 @@ describe('Fennec live state', () => {
     });
   });
 
+  it('continues a restored companion match when the next frame has no guid', async () => {
+    render(
+      <FennecProvider>
+        <LiveStateProbe />
+      </FennecProvider>,
+    );
+    await waitFor(() => expect(mocks.handlers).toBeDefined());
+
+    const restored: MatchState = {
+      id: 'companion-live-match',
+      lifecycle: 'live',
+      startedAt: '2026-08-09T00:00:00Z',
+      lastEventAt: '2026-08-09T00:00:01Z',
+      playlistId: 13,
+      playlistName: 'Ranked Doubles',
+      playlistCategory: 'ranked',
+      arena: 'DFH Stadium',
+      timeSeconds: 300,
+      elapsedSeconds: 0,
+      isOvertime: false,
+      isReplay: false,
+      roundActive: true,
+      roundPhaseObserved: true,
+      isPaused: false,
+      hasWinner: false,
+      teams: [],
+      participants: [],
+      events: [],
+    };
+    let restore: Promise<void> | void;
+    act(() => {
+      restore = mocks.handlers!.onCheckpoint?.(restored);
+    });
+    await waitFor(() => expect(mocks.pendingSaves).toHaveLength(1));
+    mocks.pendingSaves.shift()?.();
+    await act(async () => restore);
+
+    await act(async () => {
+      await mocks.handlers!.onEnvelope(stateUpdate(13));
+    });
+
+    expect(screen.getByText('active match')).toBeInTheDocument();
+    expect(mocks.checkpoints.at(-1)?.id).toBe('companion-live-match');
+    expect(mocks.savedMatches.at(-1)?.id).toBe('companion-live-match');
+  });
+
   it('infers and synchronizes the first profile before attributing a match', async () => {
     render(
       <FennecProvider>

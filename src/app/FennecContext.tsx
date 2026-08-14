@@ -256,6 +256,20 @@ export function FennecProvider({
       onCheckpoint: async (match) => {
         if (!isHistoryEligibleMatch(match)) return;
         await saveMatch(match, settings.sessionGapMinutes);
+        const active = activeRef.current;
+        if (
+          match.lifecycle === 'live' &&
+          (!active ||
+            active.lifecycle !== 'live' ||
+            match.lastEventAt >= active.lastEventAt)
+        ) {
+          // Rebase reduction onto the companion's canonical live checkpoint.
+          // Otherwise a fresh browser starts the next guid-less frame as a new
+          // match and uploads a duplicate checkpoint under a random id.
+          activeRef.current = match;
+          setActiveMatch(match);
+          setConnection('live');
+        }
         await queryClient.invalidateQueries({ queryKey: historyKeys.all });
       },
       onTombstone: async (matchId) => {
