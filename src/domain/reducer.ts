@@ -43,9 +43,13 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
-function createMatch(guid: string | undefined, now: string): MatchState {
+function createMatch(
+  guid: string | undefined,
+  now: string,
+  fallbackId?: string,
+): MatchState {
   return {
-    id: guid ?? crypto.randomUUID().replaceAll('-', ''),
+    id: guid ?? fallbackId ?? crypto.randomUUID().replaceAll('-', ''),
     matchGuid: guid,
     lifecycle: 'live',
     startedAt: now,
@@ -256,6 +260,7 @@ export function reduceStatsEnvelope(
   previous: MatchState | undefined,
   envelope: StatsEnvelope,
   now = new Date().toISOString(),
+  fallbackId?: string,
 ): ReduceResult {
   const guid = stringValue(envelope.data.MatchGuid);
   if (
@@ -277,7 +282,7 @@ export function reduceStatsEnvelope(
   if (needsNew) {
     if (previous?.lifecycle === 'live')
       superseded = { ...previous, lifecycle: 'incomplete', endedAt: now };
-    match = createMatch(guid, now);
+    match = createMatch(guid, now, fallbackId);
   } else {
     const { events, ...state } = previous;
     match = { ...structuredClone(state), events };

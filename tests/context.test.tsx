@@ -527,9 +527,9 @@ describe('Fennec live state', () => {
     });
     for (const resolve of mocks.pendingSaves.splice(0)) resolve();
 
-    act(() => {
-      void mocks.handlers!.onEnvelope(clockUpdate(12));
-      void mocks.handlers!.onEnvelope(clockUpdate(13));
+    await act(async () => {
+      await mocks.handlers!.onEnvelope(clockUpdate(12));
+      await mocks.handlers!.onEnvelope(clockUpdate(13));
     });
 
     expect(screen.getByText('13')).toBeInTheDocument();
@@ -568,8 +568,8 @@ describe('Fennec live state', () => {
     );
     await waitFor(() => expect(mocks.handlers).toBeDefined());
 
-    act(() => {
-      void mocks.handlers!.onEnvelope({
+    await act(async () => {
+      await mocks.handlers!.onEnvelope({
         event: 'MatchCreated',
         data: { MatchGuid: 'live-match' },
       });
@@ -579,8 +579,8 @@ describe('Fennec live state', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('active match')).toBeInTheDocument();
 
-    act(() => {
-      void mocks.handlers!.onEnvelope({
+    await act(async () => {
+      await mocks.handlers!.onEnvelope({
         event: 'MatchEnded',
         data: { MatchGuid: 'live-match', WinnerTeamNum: 0 },
       });
@@ -617,12 +617,12 @@ describe('Fennec live state', () => {
     );
     await waitFor(() => expect(mocks.handlers).toBeDefined());
 
-    act(() => {
-      void mocks.handlers!.onEnvelope({
+    await act(async () => {
+      await mocks.handlers!.onEnvelope({
         event: 'UpdateState',
         data: { MatchGuid: 'same-guid', Game: { TimeSeconds: 0 } },
       });
-      void mocks.handlers!.onEnvelope({
+      await mocks.handlers!.onEnvelope({
         event: 'MatchDestroyed',
         data: { MatchGuid: 'same-guid' },
       });
@@ -634,8 +634,8 @@ describe('Fennec live state', () => {
       lifecycle: 'completed',
     });
 
-    act(() => {
-      void mocks.handlers!.onEnvelope({
+    await act(async () => {
+      await mocks.handlers!.onEnvelope({
         event: 'UpdateState',
         data: { MatchGuid: 'new-guid', Game: { TimeSeconds: 300 } },
       });

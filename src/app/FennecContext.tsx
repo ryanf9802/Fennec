@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { recoverActiveMatch, reduceStatsEnvelope } from '../domain/reducer';
+import { recoverActiveMatch } from '../domain/reducer';
 import {
   isTrackablePrimaryId,
   playerKeyForPrimaryId,
@@ -41,6 +41,7 @@ import { historyKeys, queryClient } from '../data/historyQueries';
 import type { FennecBackup } from '../data/backup';
 import { SimulatedStatsFeed } from '../feed/SimulatedStatsFeed';
 import { HybridStatsFeed } from '../feed/HybridStatsFeed';
+import { BrowserMatchReducer } from '../feed/BrowserMatchReducer';
 import type {
   CompanionSyncStatus,
   StatsFeedAdapter,
@@ -130,6 +131,7 @@ export function FennecProvider({
   const settingsRef = useRef<FennecSettings>(defaultSettings);
   const historyGenerationRef = useRef(0);
   const feedRef = useRef<StatsFeedAdapter | undefined>(undefined);
+  const browserMatchReducerRef = useRef(new BrowserMatchReducer());
   const [historyGeneration, setHistoryGeneration] = useState(0);
   const demoMode = demoModeEnabled(
     location.search,
@@ -293,8 +295,14 @@ export function FennecProvider({
        * history, and keeps the selected or inferred profile synchronized.
        */
       onEnvelope: async (envelope) => {
-        const previous = activeRef.current;
-        const result = reduceStatsEnvelope(previous, envelope);
+        const { previous, result } =
+          await browserMatchReducerRef.current.reduce(
+            () => activeRef.current,
+            envelope,
+            (match) => {
+              activeRef.current = match;
+            },
+          );
         const trainingMatches = [result.superseded, result.current].filter(
           (match): match is MatchState => !!match && isTrainingMatch(match),
         );
@@ -332,7 +340,6 @@ export function FennecProvider({
         const selected = profileRef.current;
         if (!result.current.observedByPrimaryId && selected)
           result.current.observedByPrimaryId = selected.primaryId;
-        activeRef.current = result.current;
         setActiveMatch(
           result.current.lifecycle === 'live' ? result.current : undefined,
         );
