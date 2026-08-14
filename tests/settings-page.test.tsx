@@ -328,7 +328,7 @@ describe('settings CSV export', () => {
     );
 
     const message =
-      'Close Rocket League before restoring a backup or deleting history.';
+      'Update the companion or close Rocket League before restoring a backup or deleting history.';
     expect(screen.getByText(message)).toHaveAttribute('role', 'status');
     expect(
       screen.getByRole('button', { name: 'Restore backup' }),
@@ -342,6 +342,48 @@ describe('settings CSV export', () => {
     expect(
       screen.getByRole('button', { name: 'Delete all history' }),
     ).toBeDisabled();
+  });
+
+  it('allows live history actions when the companion preserves capture', () => {
+    mocks.fennec.syncStatus = { mode: 'synchronized' };
+    mocks.companion = {
+      checking: false,
+      recheck: vi.fn(),
+      health: {
+        paired: true,
+        dataSyncVersion: 1,
+        liveDataActions: true,
+        canonicalMatches: 30,
+        databaseBytes: 2_097_152,
+        pendingFrames: 0,
+        gameRunning: true,
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Restore backup' }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete saved history' }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByText(/before restoring a backup/i),
+    ).not.toBeInTheDocument();
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete saved history' }),
+    );
+    expect(confirm).toHaveBeenCalledWith(
+      'Permanently delete all saved history from the companion and synchronized browsers? The current live match will be kept. This cannot be undone.',
+    );
+    confirm.mockRestore();
   });
 
   it('combines the data-action guidance when capture and sync are busy', () => {
@@ -366,7 +408,7 @@ describe('settings CSV export', () => {
     );
 
     const message =
-      'Close Rocket League and wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.';
+      'Wait for companion synchronization to finish before restoring a backup, rebuilding the browser cache, or deleting history.';
     expect(screen.getByText(message)).toHaveAttribute('role', 'status');
     for (const name of [
       'Restore backup',

@@ -280,6 +280,7 @@ pub fn run() {
                     update_status: UpdateStatus::Current,
                     available_update_version: None,
                     last_update_check_at: None,
+                    live_data_actions: true,
                 }),
                 resource_usage: RwLock::new(None),
                 frames,

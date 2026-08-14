@@ -476,24 +476,44 @@ export function FennecProvider({
 
   const deleteHistory = useCallback(
     async (canonical = false) => {
-      if (canonical) await companionDeleteHistory();
-      else
+      if (canonical) {
+        await companionDeleteHistory();
+        const snapshot = await companionSnapshot();
+        await applyReplacement({
+          format: 'fennec-backup',
+          version: 5,
+          exportedAt: new Date().toISOString(),
+          settings: normalizeSettings(snapshot.settings),
+          profile: snapshot.profile,
+          matches: snapshot.matches,
+        });
+      } else {
         for await (const match of historyRepository.iterateMatches())
           feedRef.current?.tombstone?.(match.id);
-      await clearLocalHistory();
+        await clearLocalHistory();
+      }
     },
-    [clearLocalHistory],
+    [applyReplacement, clearLocalHistory],
   );
 
   const restoreBackup = useCallback(
     async (backup: FennecBackup, canonical = false) => {
-      if (canonical)
+      if (canonical) {
         await companionRestore({
           matches: backup.matches,
           settings: normalizeSettings(backup.settings),
           profile: backup.profile,
         });
-      await applyReplacement(backup);
+        const snapshot = await companionSnapshot();
+        await applyReplacement({
+          format: 'fennec-backup',
+          version: 5,
+          exportedAt: new Date().toISOString(),
+          settings: normalizeSettings(snapshot.settings),
+          profile: snapshot.profile,
+          matches: snapshot.matches,
+        });
+      } else await applyReplacement(backup);
     },
     [applyReplacement],
   );

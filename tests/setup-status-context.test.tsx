@@ -6,6 +6,7 @@ import {
 import type { CompanionHealth } from '../src/companion/client';
 
 const mocks = vi.hoisted(() => ({
+  recheck: vi.fn().mockResolvedValue(undefined),
   health: {
     version: '0.1.0',
     protocolVersion: 0,
@@ -28,7 +29,7 @@ vi.mock('../src/companion/useCompanionStatus', () => ({
   useCompanionStatus: (enabled: boolean) => ({
     checking: false,
     health: enabled ? mocks.health : undefined,
-    recheck: vi.fn(),
+    recheck: mocks.recheck,
   }),
 }));
 
@@ -45,6 +46,7 @@ function StatusProbe() {
 
 describe('reactive setup status', () => {
   beforeEach(() => {
+    mocks.recheck.mockClear();
     const values = new Map<string, string>([
       ['fennec-setup-path-explicit-v2', 'browser'],
       ['fennec-companion-setup-complete-v1', 'true'],
@@ -70,8 +72,10 @@ describe('reactive setup status', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Companion' }));
     expect(screen.getByText('companion:incomplete')).toBeInTheDocument();
+    expect(mocks.recheck).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Browser' }));
     expect(screen.getByText('browser:complete')).toBeInTheDocument();
+    expect(mocks.recheck).toHaveBeenCalledTimes(1);
   });
 });
